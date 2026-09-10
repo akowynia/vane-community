@@ -48,8 +48,8 @@ const Chat = () => {
       messageEnd.current?.scrollIntoView({ behavior: 'auto' });
     };
 
-    if (messages.length === 1) {
-      document.title = `${messages[0].query.substring(0, 30)} - Vane`;
+    if (messages.length === 1 && messages[0]?.query) {
+      document.title = `${messages[0].query.substring(0, 30)} - Vane-Community`;
     }
 
     if (sections.length > lastScrolledRef.current) {
@@ -95,7 +95,7 @@ const Chat = () => {
             className="pointer-events-none absolute -bottom-6 left-0 right-0 h-[calc(100%+24px+24px)] hidden dark:block"
             style={{
               background:
-                'linear-gradient(to top, #0d1117 0%, #0d1117 35%, rgba(13,17,23,0.95) 45%, rgba(13,17,23,0.85) 55%, rgba(13,17,23,0.7) 65%, rgba(13,17,23,0.5) 75%, rgba(13,17,23,0.3) 85%, rgba(13,17,23,0.1) 92%, transparent 100%)',
+                'linear-gradient(to top, #0c0a09 0%, #0c0a09 35%, rgba(12,10,9,0.95) 45%, rgba(12,10,9,0.85) 55%, rgba(12,10,9,0.7) 65%, rgba(12,10,9,0.5) 75%, rgba(12,10,9,0.3) 85%, rgba(12,10,9,0.1) 92%, transparent 100%)',
             }}
           />
           <MessageInput />

@@ -76,13 +76,21 @@ export const PATCH = async (
       },
     );
   } catch (err: any) {
-    console.error('An error occurred while updating provider', err.message);
+    console.error('An error occurred while updating provider:', err?.message || err);
+    const message = err?.message || 'An error has occurred.';
+    const isClientError =
+      message.includes('SSRF Protection') ||
+      message.includes('Invalid') ||
+      message.includes('Missing') ||
+      message.includes('required') ||
+      message.includes('not found');
+
     return Response.json(
       {
-        message: 'An error has occurred.',
+        message,
       },
       {
-        status: 500,
+        status: isClientError ? 400 : 500,
       },
     );
   }

@@ -30,44 +30,63 @@ class GeminiProvider extends BaseModelProvider<GeminiConfig> {
   }
 
   async getDefaultModels(): Promise<ModelList> {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${this.config.apiKey}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${this.config.apiKey}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(5000),
         },
-      },
-    );
+      );
 
-    const data = await res.json();
-
-    let defaultEmbeddingModels: Model[] = [];
-    let defaultChatModels: Model[] = [];
-
-    data.models.forEach((m: any) => {
-      if (
-        m.supportedGenerationMethods.some(
-          (genMethod: string) =>
-            genMethod === 'embedText' || genMethod === 'embedContent',
-        )
-      ) {
-        defaultEmbeddingModels.push({
-          key: m.name,
-          name: m.displayName,
-        });
-      } else if (m.supportedGenerationMethods.includes('generateContent')) {
-        defaultChatModels.push({
-          key: m.name,
-          name: m.displayName,
-        });
+      if (!res.ok) {
+        throw new Error(
+          `Gemini API returned HTTP ${res.status}: ${res.statusText || 'Error'}`,
+        );
       }
-    });
 
-    return {
-      embedding: defaultEmbeddingModels,
-      chat: defaultChatModels,
-    };
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('Gemini API returned an invalid JSON response.');
+      }
+
+      let defaultEmbeddingModels: Model[] = [];
+      let defaultChatModels: Model[] = [];
+
+      (data.models || []).forEach((m: any) => {
+        if (
+          m.supportedGenerationMethods?.some(
+            (genMethod: string) =>
+              genMethod === 'embedText' || genMethod === 'embedContent',
+          )
+        ) {
+          defaultEmbeddingModels.push({
+            key: m.name,
+            name: m.displayName,
+          });
+        } else if (m.supportedGenerationMethods?.includes('generateContent')) {
+          defaultChatModels.push({
+            key: m.name,
+            name: m.displayName,
+          });
+        }
+      });
+
+      return {
+        embedding: defaultEmbeddingModels,
+        chat: defaultChatModels,
+      };
+    } catch (err: any) {
+      if (err instanceof SyntaxError) {
+        throw new Error('Gemini API returned an invalid JSON response.');
+      }
+      throw new Error(err.message || 'Error connecting to Gemini API.');
+    }
   }
 
   async getModelList(): Promise<ModelList> {
@@ -121,11 +140,11 @@ class GeminiProvider extends BaseModelProvider<GeminiConfig> {
   static parseAndValidate(raw: any): GeminiConfig {
     if (!raw || typeof raw !== 'object')
       throw new Error('Invalid config provided. Expected object');
-    if (!raw.apiKey)
+    if (!raw.apiKey || typeof raw.apiKey !== 'string' || !raw.apiKey.trim())
       throw new Error('Invalid config provided. API key must be provided');
 
     return {
-      apiKey: String(raw.apiKey),
+      apiKey: String(raw.apiKey).trim(),
     };
   }
 

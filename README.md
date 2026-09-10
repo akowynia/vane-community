@@ -1,34 +1,31 @@
-# Vane 🔍
+# Vane-Community 🔍
 
-[![GitHub Repo stars](https://img.shields.io/github/stars/ItzCrazyKns/Vane?style=social)](https://github.com/ItzCrazyKns/Vane/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/ItzCrazyKns/Vane?style=social)](https://github.com/ItzCrazyKns/Vane/network/members)
-[![GitHub watchers](https://img.shields.io/github/watchers/ItzCrazyKns/Vane?style=social)](https://github.com/ItzCrazyKns/Vane/watchers)
-[![Docker Pulls](https://img.shields.io/docker/pulls/itzcrazykns1337/vane?color=blue)](https://hub.docker.com/r/itzcrazykns1337/vane)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/ItzCrazyKns/Vane/blob/master/LICENSE)
-[![GitHub last commit](https://img.shields.io/github/last-commit/ItzCrazyKns/Vane?color=green)](https://github.com/ItzCrazyKns/Vane/commits/master)
-[![Discord](https://dcbadge.limes.pink/api/server/26aArMy8tT?style=flat)](https://discord.gg/26aArMy8tT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
 
-Vane is a **privacy-focused AI answering engine** that runs entirely on your own hardware. It combines knowledge from the vast internet with support for **local LLMs** (Ollama) and cloud providers (OpenAI, Claude, Groq), delivering accurate answers with **cited sources** while keeping your searches completely private.
+Vane-Community is a **privacy-focused AI answering engine** that runs entirely on your own hardware. It combines knowledge from the vast internet with support for **local LLMs** (Ollama) and cloud providers (OpenAI, Anthropic Claude, Google Gemini, Groq, and more), delivering accurate answers with **cited sources** while keeping your searches completely private.
 
-![preview](.assets/vane-screenshot.png)
+> This project is an independent continuation based on [Vane](https://github.com/ItzCrazyKns/Vane) v1.12.2 by [ItzCrazyKns](https://github.com/ItzCrazyKns). Starting from v1.0.0, it is developed and maintained independently by [akowynia](https://github.com/akowynia) — blog: [lowcyai.pl](https://lowcyai.pl) — together with a growing community of contributors. See [CHANGELOG.md](CHANGELOG.md) for what's changed.
 
-Want to know more about its architecture and how it works? You can read it [here](https://github.com/ItzCrazyKns/Vane/tree/master/docs/architecture/README.md).
+![Vane-Community main chat screen](.assets/screenshot-main.png)
 
-## ✨ Features
+Want to know more about its architecture and how it works? You can read it [here](docs/architecture/README.md).
+
+## ✨ Core Features
 
 🤖 **Support for all major AI providers** - Use local LLMs through Ollama or connect to OpenAI, Anthropic Claude, Google Gemini, Groq, and more. Mix and match models based on your needs.
 
 ⚡ **Smart search modes** - Choose Speed Mode when you need quick answers, Balanced Mode for everyday searches, or Quality Mode for deep research.
 
-🧭 **Pick your sources** - Search the web, discussions, or academic papers. More sources and integrations are in progress.
+🧭 **Pick your sources** - Search the web, discussions, or academic papers.
 
 🧩 **Widgets** - Helpful UI cards that show up when relevant, like weather, calculations, stock prices, and other quick lookups.
 
-🔍 **Web search powered by SearxNG** - Access multiple search engines while keeping your identity private. Support for Tavily and Exa coming soon for even better results.
+🔍 **Web search powered by SearXNG** - Access multiple search engines while keeping your identity private.
 
 📷 **Image and video search** - Find visual content alongside text results. Search isn't limited to just articles anymore.
 
-📄 **File uploads** - Upload documents and ask questions about them. PDFs, text files, images - Vane understands them all.
+📄 **File uploads** - Upload documents and ask questions about them. PDFs, text files, images - Vane-Community understands them all.
 
 🌐 **Search specific domains** - Limit your search to specific websites when you know where to look. Perfect for technical documentation or research papers.
 
@@ -38,214 +35,161 @@ Want to know more about its architecture and how it works? You can read it [here
 
 🕒 **Search history** - Every search is saved locally so you can revisit your discoveries anytime. Your research is never lost.
 
-✨ **More coming soon** - We're actively developing new features based on community feedback. Join our Discord to help shape Vane's future!
+---
 
-## Sponsors
+## 🆕 What's New Since v1.12.2
 
-Vane's development is powered by the generous support of our sponsors. Their contributions help keep this project free, open-source, and accessible to everyone.
+Vane-Community v1.0.0 adds a substantial set of new capabilities on top of the base it was forked from. Full details for each are in [docs/architecture](docs/architecture/README.md); a complete list of changes is in [CHANGELOG.md](CHANGELOG.md).
 
-We'd like to thank the following partners for their generous support:
+👥 **Multi-user accounts & access control** - Add multiple accounts with role-based permissions (admin/member), per-user and per-guest token limits (5h/daily/weekly/monthly), and control which providers and models each user can access. See [Roles, Vault & Multi-user Security](docs/architecture/ROLES_VAULT_AND_MULTIUSER.md).
 
-<table>
-  <tr>
-    <td width="100" align="center">
-      <a href="https://dashboard.exa.ai" target="_blank">
-        <img src=".assets/sponsers/exa.png" alt="Exa" width="80" height="80" style="border-radius: .75rem;" />
-      </a>
-    </td>
-    <td>
-      <a href="https://dashboard.exa.ai">Exa</a> • The Perfect Web Search API for LLMs - web search, crawling, deep research, and answer APIs
-    </td>
-  </tr>
-</table>
+🧭 **Waypoints** - Persistent, personalized spaces with their own custom system instructions and context, so you can keep a focused assistant for a specific project or topic. See [Waypoints](docs/architecture/WAYPOINTS.md).
 
-## Installation
+⏰ **Waypoint Crons** - Schedule recurring research and refresh jobs inside a Waypoint, so it stays up to date on its own. See [Waypoint Crons](docs/architecture/WAYPOINT_CRONS.md).
 
-There are mainly 2 ways of installing Vane - With Docker, Without Docker. Using Docker is highly recommended.
+📝 **Scratchpad** - An AI-assisted canvas/notes workspace (similar to ChatGPT Canvas or Claude Artifacts) with document versioning, templates, and an integrated research chat. See [Scratchpad](docs/architecture/SCRATCHPAD.md).
+
+🎬 **AI Presentations** _(Beta)_ - Generate slide decks straight from the Scratchpad: the assistant interviews you, researches the web, plans the deck, and exports a ready-to-use PPTX file with charts and images. See [AI Presentation Generator](docs/architecture/PRESENTATIONS.md).
+
+🔑 **API Access & Developer Playground** - Issue scoped API keys with rate limiting and usage tracking, and try requests directly from an in-app playground. See [API Access & Developer Playground](docs/architecture/API_ACCESS_AND_PLAYGROUND.md).
+
+📊 **Model Statistics** - A telemetry dashboard tracking token usage and latency per model, so you can see what your setup actually costs. See [Model Statistics & Telemetry](docs/architecture/MODEL_STATISTICS.md).
+
+🧵 **Model task queue** - Smarter scheduling for local providers (Ollama, LM Studio) that avoids unnecessary VRAM reloads when switching between models. See [Model Task Queue & Model-Aware Scheduling](docs/architecture/PROVIDER_QUEUE_AND_MODEL_SCHEDULING.md).
+
+🎛️ **Quality Mode token budgets** - Configurable limits for deep-research mode, so long research sessions stay predictable. See [Quality Mode Optimizations](docs/architecture/QUALITY_MODE_OPTIMIZATIONS.md).
+
+🔎 **Dynamic SearXNG engine management** - Enable/disable search engines and manage their API keys (Brave, Bing, Google, Mojeek, PubMed) from the UI, backed by an encrypted credential vault. See [Search Engines Configuration & API Keys](docs/architecture/SEARCH_ENGINES_CONFIG.md).
+
+🔒 **Hardened security** - SSRF protection (including DNS-rebinding and cloud metadata defenses), constant-time API key checks, CSRF origin validation, and automatic secret masking in API responses. See [Security Architecture](docs/architecture/SECURITY.md).
+
+🌍 **Full internationalization** - The entire app, including the setup wizard, is available in 12 languages. See [Localization System](docs/architecture/LOCALIZATION.md).
+
+---
+
+## 📸 Screenshots
+
+| | |
+|---|---|
+| ![Scratchpad workspace](.assets/screenshot-scratchpad.png) **Scratchpad** - notes, versioning, and AI research side by side. | ![AI Presentation generator](.assets/screenshot-presentations.png) **AI Presentations** _(Beta)_ - from a topic to a finished slide deck. |
+| ![Waypoints](.assets/screenshot-waypoints.png) **Waypoints** - personalized spaces with their own instructions and context. | ![Access control panel](.assets/screenshot-access-control.png) **Access Control** - manage users, roles, and usage limits. |
+| ![API Playground](.assets/screenshot-api-playground.png) **API Playground** - try the REST API without leaving the app. | ![Model Statistics](.assets/screenshot-model-statistics.png) **Model Statistics** - token usage and latency at a glance. |
+
+---
+
+## 📦 Installation
+
+There are 2 main ways of running Vane-Community: with Docker (recommended) or without Docker.
 
 ### Getting Started with Docker (Recommended)
 
-Vane can be easily run using Docker. Simply run the following command:
+Build and start the container with the bundled SearXNG search engine:
 
 ```bash
-docker run -d -p 3000:3000 -v vane-data:/home/vane/data --name vane itzcrazykns1337/vane:latest
+# Build image
+docker build -t vane-community .
+
+# Run container
+docker run -d \
+  -p 3000:3000 \
+  -p 8080:8080 \
+  -v vane-community-data:/home/vane-community/data \
+  --name vane-community \
+  vane-community
+
 ```
 
-This will pull and start the Vane container with the bundled SearxNG search engine. Once running, open your browser and navigate to http://localhost:3000. You can then configure your settings (API keys, models, etc.) directly in the setup screen.
+Once running, open your browser and navigate to **http://localhost:3000** to complete the initial setup.
 
-**Note**: The image includes both Vane and SearxNG, so no additional setup is required. The `-v` flags create persistent volumes for your data and uploaded files.
+#### Using Vane-Community with Your Own External SearXNG Instance
 
-#### Using Vane with Your Own SearxNG Instance
-
-If you already have SearxNG running, you can use the slim version of Vane:
+If you already have SearXNG running externally, you can use the lightweight slim version:
 
 ```bash
-docker run -d -p 3000:3000 -e SEARXNG_API_URL=http://your-searxng-url:8080 -v vane-data:/home/vane/data --name vane itzcrazykns1337/vane:slim-latest
+# Build slim image
+docker build -f Dockerfile.slim -t vane-community:slim .
+
+# Run slim container
+docker run -d \
+  -p 3000:3000 \
+  -e SEARXNG_API_URL=http://your-searxng-url:8080 \
+  -v vane-community-data:/home/vane-community/data \
+  --name vane-community \
+  vane-community:slim
 ```
 
-**Important**: Make sure your SearxNG instance has:
-
-- JSON format enabled in the settings
+**Important**: Make sure your external SearXNG instance has:
+- JSON format enabled in settings (`formats: [html, json]`)
 - Wolfram Alpha search engine enabled
 
-Replace `http://your-searxng-url:8080` with your actual SearxNG URL. Then configure your AI provider settings in the setup screen at http://localhost:3000.
-
-#### Advanced Setup (Building from Source)
-
-If you prefer to build from source or need more control:
-
-1. Ensure Docker is installed and running on your system.
-2. Clone the Vane repository:
-
-   ```bash
-   git clone https://github.com/ItzCrazyKns/Vane.git
-   ```
-
-3. After cloning, navigate to the directory containing the project files.
-
-4. Build and run using Docker:
-
-   ```bash
-   docker build -t vane .
-   docker run -d -p 3000:3000 -v vane-data:/home/vane/data --name vane vane
-   ```
-
-5. Access Vane at http://localhost:3000 and configure your settings in the setup screen.
-
-**Note**: After the containers are built, you can start Vane directly from Docker without having to open a terminal.
+---
 
 ### Non-Docker Installation
 
 1. Install SearXNG and allow `JSON` format in the SearXNG settings. Make sure Wolfram Alpha search engine is also enabled.
-2. Clone the repository:
+2. Install dependencies:
 
    ```bash
-   git clone https://github.com/ItzCrazyKns/Vane.git
-   cd Vane
+   yarn install
    ```
 
-3. Install dependencies:
+3. Build the application:
 
    ```bash
-   npm i
+   yarn build
    ```
 
-4. Build the application:
+4. Start the application:
 
    ```bash
-   npm run build
+   yarn start
    ```
 
-5. Start the application:
+5. Open your browser and navigate to **http://localhost:3000** to complete the setup and configure your settings (API keys, models, SearXNG URL, etc.).
 
-   ```bash
-   npm run start
-   ```
+---
 
-6. Open your browser and navigate to http://localhost:3000 to complete the setup and configure your settings (API keys, models, SearxNG URL, etc.) in the setup screen.
-
-**Note**: Using Docker is recommended as it simplifies the setup process, especially for managing environment variables and dependencies.
-
-See the [installation documentation](https://github.com/ItzCrazyKns/Vane/tree/master/docs/installation) for more information like updating, etc.
-
-### Troubleshooting
+### 🔧 Troubleshooting
 
 #### Local OpenAI-API-Compliant Servers
 
-If Vane tells you that you haven't configured any chat model providers, ensure that:
+If Vane-Community tells you that you haven't configured any chat model providers, ensure that:
 
-1. Your server is running on `0.0.0.0` (not `127.0.0.1`) and on the same port you put in the API URL.
+1. Your server is running on `0.0.0.0` (not `127.0.0.1`) and on the same port configured in the API URL.
 2. You have specified the correct model name loaded by your local LLM server.
-3. You have specified the correct API key, or if one is not defined, you have put _something_ in the API key field and not left it empty.
+3. You have specified the correct API key (or non-empty placeholder if not required).
 
 #### Ollama Connection Errors
 
-If you're encountering an Ollama connection error, it is likely due to the backend being unable to connect to Ollama's API. To fix this issue you can:
+If you encounter connection errors with Ollama:
 
 1. **Check your Ollama API URL:** Ensure that the API URL is correctly set in the settings menu.
-2. **Update API URL Based on OS:**
-
-   - **Windows:** Use `http://host.docker.internal:11434`
-   - **Mac:** Use `http://host.docker.internal:11434`
-   - **Linux:** Use `http://<private_ip_of_host>:11434`
-
-   Adjust the port number if you're using a different one.
-
+2. **Update API URL based on OS:**
+   - **Windows / Mac (Docker):** Use `http://host.docker.internal:11434`
+   - **Linux (Docker):** Use `http://<private_ip_of_host>:11434`
 3. **Linux Users - Expose Ollama to Network:**
+   - In `/etc/systemd/system/ollama.service`, add `Environment="OLLAMA_HOST=0.0.0.0:11434"`.
+   - Run `systemctl daemon-reload && systemctl restart ollama`.
 
-   - Inside `/etc/systemd/system/ollama.service`, you need to add `Environment="OLLAMA_HOST=0.0.0.0:11434"`. (Change the port number if you are using a different one.) Then reload the systemd manager configuration with `systemctl daemon-reload`, and restart Ollama by `systemctl restart ollama`. For more information see [Ollama docs](https://github.com/ollama/ollama/blob/main/docs/faq.md#setting-environment-variables-on-linux)
+---
 
-   - Ensure that the port (default is 11434) is not blocked by your firewall.
+## 🔍 Using as a Default Search Engine
 
-#### Lemonade Connection Errors
+To use Vane-Community directly from your browser's address/search bar:
 
-If you're encountering a Lemonade connection error, it is likely due to the backend being unable to connect to Lemonade's API. To fix this issue you can:
+1. Open your browser's settings -> Search Engines.
+2. Add a new search engine with query URL: `http://localhost:3000/?q=%s`.
+3. Set as default or assign a shortcut keyword.
 
-1. **Check your Lemonade API URL:** Ensure that the API URL is correctly set in the settings menu.
-2. **Update API URL Based on OS:**
+---
 
-   - **Windows:** Use `http://host.docker.internal:8000`
-   - **Mac:** Use `http://host.docker.internal:8000`
-   - **Linux:** Use `http://<private_ip_of_host>:8000`
+## 💻 API Documentation
 
-   Adjust the port number if you're using a different one.
+Vane-Community provides a full REST API for programmatic search and answering:
+- See the complete [Search API Documentation](docs/API/SEARCH.md).
 
-3. **Ensure Lemonade Server is Running:**
+---
 
-   - Make sure your Lemonade server is running and accessible on the configured port (default is 8000).
-   - Verify that Lemonade is configured to accept connections from all interfaces (`0.0.0.0`), not just localhost (`127.0.0.1`).
-   - Ensure that the port (default is 8000) is not blocked by your firewall.
+## 🤝 Contribution
 
-## Using as a Search Engine
-
-If you wish to use Vane as an alternative to traditional search engines like Google or Bing, or if you want to add a shortcut for quick access from your browser's search bar, follow these steps:
-
-1. Open your browser's settings.
-2. Navigate to the 'Search Engines' section.
-3. Add a new site search with the following URL: `http://localhost:3000/?q=%s`. Replace `localhost` with your IP address or domain name, and `3000` with the port number if Vane is not hosted locally.
-4. Click the add button. Now, you can use Vane directly from your browser's search bar.
-
-## Using Vane's API
-
-Vane also provides an API for developers looking to integrate its powerful search engine into their own applications. You can run searches, use multiple models and get answers to your queries.
-
-For more details, check out the full documentation [here](https://github.com/ItzCrazyKns/Vane/tree/master/docs/API/SEARCH.md).
-
-## Expose Vane to network
-
-Vane runs on Next.js and handles all API requests. It works right away on the same network and stays accessible even with port forwarding.
-
-## One-Click Deployment
-
-[![Deploy to Sealos](https://raw.githubusercontent.com/labring-actions/templates/main/Deploy-on-Sealos.svg)](https://usw.sealos.io/?openapp=system-template%3FtemplateName%3Dperplexica)
-[![Deploy to RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/?app_id=267)
-[![Run on ClawCloud](https://raw.githubusercontent.com/ClawCloud/Run-Template/refs/heads/main/Run-on-ClawCloud.svg)](https://template.run.claw.cloud/?referralCode=U11MRQ8U9RM4&openapp=system-fastdeploy%3FtemplateName%3Dperplexica)
-[![Deploy on Hostinger](https://assets.hostinger.com/vps/deploy.svg)](https://www.hostinger.com/vps/docker-hosting?compose_url=https://raw.githubusercontent.com/ItzCrazyKns/Vane/refs/heads/master/docker-compose.yaml)
-
-## Upcoming Features
-
-- [ ] Adding more widgets, integrations, search sources
-- [ ] Adding ability to create custom agents (name T.B.D.)
-- [ ] Adding authentication
-
-## Support Us
-
-If you find Vane useful, consider giving us a star on GitHub. This helps more people discover Vane and supports the development of new features. Your support is greatly appreciated.
-
-### Donations
-
-We also accept donations to help sustain our project. If you would like to contribute, you can use the following options to donate. Thank you for your support!
-
-| Ethereum                                              |
-| ----------------------------------------------------- |
-| Address: `0xB025a84b2F269570Eb8D4b05DEdaA41D8525B6DD` |
-
-## Contribution
-
-Vane is built on the idea that AI and large language models should be easy for everyone to use. If you find bugs or have ideas, please share them in via GitHub Issues. For more information on contributing to Vane you can read the [CONTRIBUTING.md](CONTRIBUTING.md) file to learn more about Vane and how you can contribute to it.
-
-## Help and Support
-
-If you have any questions or feedback, please feel free to reach out to us. You can create an issue on GitHub or join our Discord server. There, you can connect with other users, share your experiences and reviews, and receive more personalized help. [Click here](https://discord.gg/EFwsmQDgAu) to join the Discord server. To discuss matters outside of regular support, feel free to contact me on Discord at `itzcrazykns`.
-
-Thank you for exploring Vane, the AI-powered search engine designed to enhance your search experience. We are constantly working to improve Vane and expand its capabilities. We value your feedback and contributions which help us make Vane even better. Don't forget to check back for updates and new features!
+Vane-Community is developed independently and in the open. Contributions, bug reports, and suggestions are welcome! Please check out [CONTRIBUTING.md](CONTRIBUTING.md) for details on setting up development workflows.

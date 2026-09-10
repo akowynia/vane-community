@@ -68,6 +68,13 @@ class ActionRegistry {
       researchBlockId: string;
       fileIds: string[];
       mode: SearchAgentConfig['mode'];
+      classification?: ClassifierOutput;
+      query?: string;
+      tokenTracker?: {
+        addTokens: (count: number) => void;
+        getUsedTokens: () => number;
+        isLimitExceeded: () => boolean;
+      };
     },
   ) {
     const action = this.actions.get(name);
@@ -76,7 +83,7 @@ class ActionRegistry {
       throw new Error(`Action with name ${name} not found`);
     }
 
-    return action.execute(params, additionalConfig);
+    return action.execute(params || {}, additionalConfig);
   }
 
   static async executeAll(
@@ -85,22 +92,35 @@ class ActionRegistry {
       researchBlockId: string;
       fileIds: string[];
       mode: SearchAgentConfig['mode'];
+      classification?: ClassifierOutput;
+      query?: string;
+      tokenTracker?: {
+        addTokens: (count: number) => void;
+        getUsedTokens: () => number;
+        isLimitExceeded: () => boolean;
+      };
     },
   ): Promise<ActionOutput[]> {
-    const results: ActionOutput[] = [];
-
-    await Promise.all(
+    return Promise.all(
       actions.map(async (actionConfig) => {
-        const output = await this.execute(
-          actionConfig.name,
-          actionConfig.arguments,
-          additionalConfig,
-        );
-        results.push(output);
+        try {
+          return await this.execute(
+            actionConfig.name,
+            actionConfig.arguments || {},
+            additionalConfig,
+          );
+        } catch (err) {
+          console.error(
+            `[ActionRegistry] Error executing action "${actionConfig.name}":`,
+            err,
+          );
+          return {
+            type: 'search_results' as const,
+            results: [],
+          };
+        }
       }),
     );
-
-    return results;
   }
 }
 

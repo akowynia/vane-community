@@ -4,10 +4,15 @@ import UploadStore from '@/lib/uploads/store';
 
 const schema = z.object({
   queries: z
-    .array(z.string())
+    .union([z.array(z.string()), z.string()])
+    .optional()
     .describe(
       'A list of queries to search in user uploaded files. Can be a maximum of 3 queries.',
     ),
+  query: z
+    .string()
+    .optional()
+    .describe('A query to search in user uploaded files.'),
 });
 
 const uploadsSearchAction: ResearchAction<typeof schema> = {
@@ -27,7 +32,25 @@ const uploadsSearchAction: ResearchAction<typeof schema> = {
   Never use this tool to search the web or for information that is not contained within the user's uploaded files.
   `,
   execute: async (input, additionalConfig) => {
-    input.queries = input.queries.slice(0, 3);
+    const rawQueries = (input as any)?.queries ?? (input as any)?.query;
+    const queries = (
+      Array.isArray(rawQueries)
+        ? rawQueries
+        : typeof rawQueries === 'string'
+          ? [rawQueries]
+          : []
+    )
+      .filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
+      .slice(0, 3);
+
+    input.queries = queries;
+
+    if (queries.length === 0) {
+      return {
+        type: 'search_results',
+        results: [],
+      };
+    }
 
     const researchBlock = additionalConfig.session.getBlock(
       additionalConfig.researchBlockId,

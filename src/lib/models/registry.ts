@@ -4,6 +4,35 @@ import { getConfiguredModelProviders } from '../config/serverRegistry';
 import { providers } from './providers';
 import { MinimalProvider, ModelList } from './types';
 import configManager from '../config';
+import { validateProviderBaseURL } from '../security/ssrf';
+
+function sanitizeErrorMessage(err: any): string {
+  if (!err) return 'Failed to connect to provider';
+  const msg = typeof err === 'string' ? err : err.message || '';
+  if (!msg) return 'Failed to connect to provider';
+
+  const lower = msg.toLowerCase();
+  // If the error contains raw HTML, JSON parse errors containing body snippets, or unexpected tokens:
+  if (
+    lower.includes('<!doctype') ||
+    lower.includes('<html') ||
+    lower.includes('<head') ||
+    lower.includes('<body') ||
+    lower.includes('unexpected token') ||
+    lower.includes('is not valid json') ||
+    lower.includes('json.parse') ||
+    lower.includes('syntaxerror')
+  ) {
+    return 'Failed to connect to model provider: received invalid non-JSON response';
+  }
+
+  // If the error message is too long (possibly leaking body or stack trace), sanitize:
+  if (msg.length > 200) {
+    return 'Failed to connect to model provider or received invalid response';
+  }
+
+  return msg;
+}
 
 class ModelRegistry {
   activeProviders: (ConfigModelProvider & {
@@ -28,7 +57,7 @@ class ModelRegistry {
         });
       } catch (err) {
         console.error(
-          `Failed to initialize provider. Type: ${p.type}, ID: ${p.id}, Config: ${JSON.stringify(p.config)}, Error: ${err}`,
+          `Failed to initialize provider. Type: ${p.type}, ID: ${p.id}, Error: ${err}`,
         );
       }
     });
@@ -52,7 +81,7 @@ class ModelRegistry {
             chat: [
               {
                 key: 'error',
-                name: err.message,
+                name: sanitizeErrorMessage(err),
               },
             ],
             embedding: [],
@@ -62,6 +91,7 @@ class ModelRegistry {
         providers.push({
           id: p.id,
           name: p.name,
+          type: p.type,
           chatModels: m.chat,
           embeddingModels: m.embedding,
         });
@@ -99,6 +129,16 @@ class ModelRegistry {
     const provider = providers[type];
     if (!provider) throw new Error('Invalid provider type');
 
+    // SSRF Validation for baseURL if provided
+    if (config?.baseURL && typeof config.baseURL === 'string') {
+      const validation = await validateProviderBaseURL(config.baseURL, type);
+      if (!validation.valid) {
+        throw new Error(
+          `SSRF Protection: Invalid base URL - ${validation.reason}`,
+        );
+      }
+    }
+
     const newProvider = configManager.addModelProvider(type, name, config);
 
     const instance = createProviderInstance(
@@ -121,7 +161,7 @@ class ModelRegistry {
         chat: [
           {
             key: 'error',
-            name: err.message,
+            name: sanitizeErrorMessage(err),
           },
         ],
         embedding: [],
@@ -133,8 +173,10 @@ class ModelRegistry {
       provider: instance,
     });
 
+    const sanitized = configManager.sanitizeModelProvider(newProvider);
+
     return {
-      ...newProvider,
+      ...sanitized,
       chatModels: m.chat || [],
       embeddingModels: m.embedding || [],
     };
@@ -154,6 +196,19 @@ class ModelRegistry {
     name: string,
     config: any,
   ): Promise<ConfigModelProvider> {
+    const providerEntry = this.activeProviders.find((p) => p.id === providerId);
+    const providerType = providerEntry?.type;
+
+    // SSRF Validation for baseURL if provided
+    if (config?.baseURL && typeof config.baseURL === 'string') {
+      const validation = await validateProviderBaseURL(config.baseURL, providerType);
+      if (!validation.valid) {
+        throw new Error(
+          `SSRF Protection: Invalid base URL - ${validation.reason}`,
+        );
+      }
+    }
+
     const updated = await configManager.updateModelProvider(
       providerId,
       name,
@@ -163,7 +218,7 @@ class ModelRegistry {
       providers[updated.type],
       providerId,
       name,
-      config,
+      updated.config,
     );
 
     let m: ModelList = { chat: [], embedding: [] };
@@ -179,20 +234,32 @@ class ModelRegistry {
         chat: [
           {
             key: 'error',
-            name: err.message,
+            name: sanitizeErrorMessage(err),
           },
         ],
         embedding: [],
       };
     }
 
-    this.activeProviders.push({
-      ...updated,
-      provider: instance,
-    });
+    const existingIndex = this.activeProviders.findIndex(
+      (p) => p.id === providerId,
+    );
+    if (existingIndex !== -1) {
+      this.activeProviders[existingIndex] = {
+        ...updated,
+        provider: instance,
+      };
+    } else {
+      this.activeProviders.push({
+        ...updated,
+        provider: instance,
+      });
+    }
+
+    const sanitized = configManager.sanitizeModelProvider(updated);
 
     return {
-      ...updated,
+      ...sanitized,
       chatModels: m.chat || [],
       embeddingModels: m.embedding || [],
     };

@@ -1,6 +1,25 @@
 import { Discover } from '@/app/discover/page';
 import Link from 'next/link';
 
+const formatThumbnail = (thumbnail?: string): string => {
+  if (!thumbnail) return '';
+  try {
+    const parsed = new URL(thumbnail);
+    if (
+      parsed.hostname.includes('bing.net') ||
+      parsed.hostname.includes('bing.com')
+    ) {
+      const id = parsed.searchParams.get('id');
+      if (id) {
+        return `${parsed.origin}${parsed.pathname}?id=${id}`;
+      }
+    }
+    return thumbnail;
+  } catch {
+    return thumbnail;
+  }
+};
+
 const SmallNewsCard = ({ item }: { item: Discover }) => (
   <Link
     href={`/?q=Summary: ${item.url}`}
@@ -10,12 +29,12 @@ const SmallNewsCard = ({ item }: { item: Discover }) => (
     <div className="relative aspect-video overflow-hidden">
       <img
         className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-        src={
-          new URL(item.thumbnail).origin +
-          new URL(item.thumbnail).pathname +
-          `?id=${new URL(item.thumbnail).searchParams.get('id')}`
-        }
+        src={formatThumbnail(item.thumbnail)}
         alt={item.title}
+        onError={(e) => {
+          (e.target as HTMLImageElement).src =
+            'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80';
+        }}
       />
     </div>
     <div className="p-4">

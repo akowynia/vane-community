@@ -55,16 +55,24 @@ const calculationWidget: Widget = {
       return;
     }
 
-    const result = mathEval(output.expression);
+    try {
+      const result = mathEval(output.expression);
 
-    return {
-      type: 'calculation_result',
-      llmContext: `The result of the calculation for the expression "${output.expression}" is: ${result}`,
-      data: {
-        expression: output.expression,
-        result,
-      },
-    };
+      return {
+        type: 'calculation_result',
+        llmContext: `The result of the calculation for the expression "${output.expression}" is: ${result}`,
+        data: {
+          expression: output.expression,
+          result,
+        },
+      };
+    } catch (evalErr) {
+      console.warn(
+        `[calculationWidget] Failed to evaluate mathematical expression "${output.expression}":`,
+        evalErr,
+      );
+      return;
+    }
   },
 };
 

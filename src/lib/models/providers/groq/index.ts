@@ -29,29 +29,48 @@ class GroqProvider extends BaseModelProvider<GroqConfig> {
   }
 
   async getDefaultModels(): Promise<ModelList> {
-    const res = await fetch(`https://api.groq.com/openai/v1/models`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.config.apiKey}`,
-      },
-    });
-
-    const data = await res.json();
-
-    const defaultChatModels: Model[] = [];
-
-    data.data.forEach((m: any) => {
-      defaultChatModels.push({
-        key: m.id,
-        name: m.id,
+    try {
+      const res = await fetch(`https://api.groq.com/openai/v1/models`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.config.apiKey}`,
+        },
+        signal: AbortSignal.timeout(5000),
       });
-    });
 
-    return {
-      embedding: [],
-      chat: defaultChatModels,
-    };
+      if (!res.ok) {
+        throw new Error(
+          `Groq API returned HTTP ${res.status}: ${res.statusText || 'Error'}`,
+        );
+      }
+
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('Groq API returned an invalid JSON response.');
+      }
+
+      const defaultChatModels: Model[] = [];
+
+      (data.data || []).forEach((m: any) => {
+        defaultChatModels.push({
+          key: m.id,
+          name: m.id,
+        });
+      });
+
+      return {
+        embedding: [],
+        chat: defaultChatModels,
+      };
+    } catch (err: any) {
+      if (err instanceof SyntaxError) {
+        throw new Error('Groq API returned an invalid JSON response.');
+      }
+      throw new Error(err.message || 'Error connecting to Groq API.');
+    }
   }
 
   async getModelList(): Promise<ModelList> {
@@ -90,11 +109,11 @@ class GroqProvider extends BaseModelProvider<GroqConfig> {
   static parseAndValidate(raw: any): GroqConfig {
     if (!raw || typeof raw !== 'object')
       throw new Error('Invalid config provided. Expected object');
-    if (!raw.apiKey)
+    if (!raw.apiKey || typeof raw.apiKey !== 'string' || !raw.apiKey.trim())
       throw new Error('Invalid config provided. API key must be provided');
 
     return {
-      apiKey: String(raw.apiKey),
+      apiKey: String(raw.apiKey).trim(),
     };
   }
 

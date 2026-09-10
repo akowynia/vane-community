@@ -4,14 +4,96 @@ general:
   instance_name: 'searxng'
 
 search:
-  autocomplete: 'google'
+  autocomplete: 'duckduckgo'
   formats:
     - html
     - json
 
 server:
   secret_key: 'a2fb23f1b02e6ee83875b09826990de0f6bd908b6638e8c10277d415f6ab852b' # Is overwritten by ${SEARXNG_SECRET}
+  limiter: false
+  image_proxy: false
 
+outgoing:
+  request_timeout: 6.0
+  max_request_timeout: 10.0
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
+
+# ==============================================================================
+# Konfiguracja silników wyszukiwania (Search Engines)
+# ==============================================================================
+# UWAGA: Silniki takie jak duckduckgo, brave (bez api_key), yahoo oraz mojeek
+# są domyślnie WYŁĄCZONE (disabled: true). Zewnętrzne serwery tych dostawców
+# stosują agresywną ochronę antybotową (Cloudflare Turnstile/CAPTCHA, TLS/JA3
+# fingerprinting, rate limiting HTTP 429). Ponieważ zapytania z SearXNG są wysyłane
+# z serwera w środowisku bez pełnej przeglądarki i JS, zapytania do tych silników
+# są notorycznie odrzucane przy pierwszym strzale.
+#
+# Aby korzystać z Brave Search bez limitów i błędów, podaj oficjalny klucz API
+# w Ustawieniach Vane -> Wyszukiwanie (Brave Search API Key).
+# ==============================================================================
 engines:
-  - name: wolframalpha
+  # Silniki stabilne (Włączone domyślnie)
+  - name: google
+    engine: google
     disabled: false
+  - name: bing
+    engine: bing
+    disabled: false
+  - name: qwant
+    engine: qwant
+    disabled: false
+  - name: startpage
+    engine: startpage
+    disabled: false
+  - name: wikidata
+    engine: wikidata
+    disabled: false
+  - name: wikipedia
+    engine: wikipedia
+    disabled: false
+  - name: hackernews
+    engine: hackernews
+    disabled: false
+  - name: stackexchange
+    engine: stackexchange
+    disabled: false
+  - name: github
+    engine: github
+    disabled: false
+  - name: arxiv
+    engine: arxiv
+    disabled: false
+  - name: pubmed
+    engine: pubmed
+    disabled: false
+  - name: crossref
+    engine: crossref
+    disabled: false
+
+  # Silniki podatne na blokady antybotowe (Domyślnie wyłączone)
+  # DuckDuckGo: Blokady Cloudflare CAPTCHA na IP datacenter/VPN i klientów bez JS
+  - name: duckduckgo
+    engine: duckduckgo
+    disabled: true
+
+  # Brave: Wymaga oficjalnego api_key, inaczej zwraca HTTP 429 Too Many Requests
+  - name: brave
+    engine: brave
+    disabled: true
+
+  # Yahoo: Wymusza Consent Wall RODO lub zwraca 403 / błędy parsowania XPath
+  - name: yahoo
+    engine: yahoo
+    disabled: true
+
+  # Mojeek: Agresywne limity zapytań i blokady IP
+  - name: mojeek
+    engine: mojeek
+    disabled: true
+
+  - name: google news
+    engine: google_news
+    disabled: true

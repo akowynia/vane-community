@@ -29,22 +29,33 @@ const searchImages = async (
     query: z.string().describe('The image search query.'),
   });
 
-  const res = await llm.generateObject<typeof schema>({
-    messages: [
-      {
-        role: 'system',
-        content: imageSearchPrompt,
-      },
-      ...imageSearchFewShots,
-      {
-        role: 'user',
-        content: `<conversation>\n${formatChatHistoryAsString(input.chatHistory)}\n</conversation>\n<follow_up>\n${input.query}\n</follow_up>`,
-      },
-    ],
-    schema: schema,
-  });
+  let searchQuery = input.query;
+  try {
+    const res = await llm.generateObject<typeof schema>({
+      messages: [
+        {
+          role: 'system',
+          content: imageSearchPrompt,
+        },
+        ...imageSearchFewShots,
+        {
+          role: 'user',
+          content: `<conversation>\n${formatChatHistoryAsString(input.chatHistory)}\n</conversation>\n<follow_up>\n${input.query}\n</follow_up>`,
+        },
+      ],
+      schema: schema,
+    });
+    if (res?.query && res.query.trim().length > 0) {
+      searchQuery = res.query.trim();
+    }
+  } catch (err) {
+    console.warn(
+      `[searchImages] LLM query generation failed, falling back to raw query "${input.query}":`,
+      err,
+    );
+  }
 
-  const searchRes = await searchSearxng(res.query, {
+  const searchRes = await searchSearxng(searchQuery, {
     engines: ['bing images', 'google images'],
   });
 

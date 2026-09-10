@@ -2,10 +2,10 @@ import type { Config } from 'tailwindcss';
 import type { DefaultColors } from 'tailwindcss/types/generated/colors';
 
 const themeDark = (colors: DefaultColors) => ({
-  50: '#0d1117',
-  100: '#161b22',
-  200: '#21262d',
-  300: '#30363d',
+  50: '#0c0a09',
+  100: '#161412',
+  200: '#28221b',
+  300: '#3d342a',
 });
 
 const themeLight = (colors: DefaultColors) => ({
@@ -35,6 +35,18 @@ const config: Config = {
         const colorsLight = themeLight(colors);
 
         return {
+          bronze: {
+            50: '#fbf8f4',
+            100: '#f5efe6',
+            200: '#e9dcce',
+            300: '#d7c0a9',
+            400: '#c59f7d',
+            500: '#b8864d',
+            600: '#9d6e3a',
+            700: '#7a542a',
+            800: '#53371a',
+            900: '#2e1d0d',
+          },
           dark: {
             primary: colorsDark[50],
             secondary: colorsDark[100],

@@ -1,13 +1,161 @@
 import BaseEmbedding from '@/lib/models/base/embedding';
 import BaseLLM from '@/lib/models/base/llm';
-import { searchSearxng, SearxngSearchOptions } from '@/lib/searxng';
+import {
+  searchSearxng,
+  SearxngSearchOptions,
+  SearxngUnresponsiveEngine,
+} from '@/lib/searxng';
 import SessionManager from '@/lib/session';
 import { Chunk, ResearchBlock, SearchResultsResearchBlock } from '@/lib/types';
 import { SearchAgentConfig } from '../../../types';
 import computeSimilarity from '@/lib/utils/computeSimilarity';
 import z from 'zod';
 import Scraper from '@/lib/scraper';
-import { splitText } from '@/lib/utils/splitText';
+import { splitText, getTokenCount } from '@/lib/utils/splitText';
+
+export const normalizeUrl = (url?: string): string => {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    const trackingParams = [
+      'utm_source',
+      'utm_medium',
+      'utm_campaign',
+      'utm_term',
+      'utm_content',
+      'ref',
+      'source',
+      'fbclid',
+      'gclid',
+    ];
+    trackingParams.forEach((p) => parsed.searchParams.delete(p));
+    const pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+    let clean = `${parsed.protocol}//${parsed.hostname.toLowerCase()}${pathname}`;
+    if (parsed.search) {
+      clean += parsed.search;
+    }
+    return clean;
+  } catch {
+    return url.trim().toLowerCase().replace(/\/+$/, '');
+  }
+};
+
+export const normalizeTitle = (title?: string): string => {
+  if (!title) return '';
+  return title
+    .toLowerCase()
+    .replace(
+      /\s*[-–|:]\s*(pubmed|ncbi|sciencedirect|researchgate|google scholar|arxiv|springer|wiley|nature|frontiers|plos|ieee|biorxiv|medrxiv|science|cell).*$/i,
+      '',
+    )
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+export const areTitlesSimilar = (title1?: string, title2?: string): boolean => {
+  const t1 = normalizeTitle(title1);
+  const t2 = normalizeTitle(title2);
+  if (!t1 || !t2) return false;
+  if (t1 === t2) return true;
+
+  if (t1.length >= 15 && t2.length >= 15) {
+    if (t1.includes(t2) || t2.includes(t1)) return true;
+  }
+
+  const words1 = new Set(t1.split(' ').filter((w) => w.length >= 3));
+  const words2 = new Set(t2.split(' ').filter((w) => w.length >= 3));
+  if (words1.size === 0 || words2.size === 0) return false;
+
+  const intersection = new Set([...words1].filter((w) => words2.has(w)));
+  const union = new Set([...words1, ...words2]);
+  const jaccard = intersection.size / union.size;
+
+  return jaccard >= 0.7;
+};
+
+const emitSearchWarnings = (
+  collectedUnresponsive: SearxngUnresponsiveEngine[],
+  totalResultsCount: number,
+  researchBlock: ResearchBlock,
+  session: InstanceType<typeof SessionManager>,
+) => {
+  const uniqueCaptchaEngines = Array.from(
+    new Set(
+      collectedUnresponsive
+        .filter((e) => e.type === 'captcha')
+        .map((e) => e.engine),
+    ),
+  );
+
+  const uniqueRateLimitEngines = Array.from(
+    new Set(
+      collectedUnresponsive
+        .filter((e) => e.type === 'rate_limit')
+        .map((e) => e.engine),
+    ),
+  );
+
+  const uniqueErrorEngines = Array.from(
+    new Set(
+      collectedUnresponsive
+        .filter((e) => e.type === 'blocked' || e.type === 'error')
+        .map((e) => e.engine),
+    ),
+  );
+
+  let hasWarnings = false;
+
+  if (uniqueCaptchaEngines.length > 0) {
+    hasWarnings = true;
+    researchBlock.data.subSteps.push({
+      id: crypto.randomUUID(),
+      type: 'search_warning',
+      warningType: 'captcha',
+      engines: uniqueCaptchaEngines,
+    });
+  }
+
+  if (uniqueRateLimitEngines.length > 0) {
+    hasWarnings = true;
+    researchBlock.data.subSteps.push({
+      id: crypto.randomUUID(),
+      type: 'search_warning',
+      warningType: 'rate_limit',
+      engines: uniqueRateLimitEngines,
+    });
+  }
+
+  if (uniqueErrorEngines.length > 0) {
+    hasWarnings = true;
+    researchBlock.data.subSteps.push({
+      id: crypto.randomUUID(),
+      type: 'search_warning',
+      warningType: 'error',
+      engines: uniqueErrorEngines,
+    });
+  }
+
+  if (totalResultsCount === 0 && collectedUnresponsive.length === 0) {
+    hasWarnings = true;
+    researchBlock.data.subSteps.push({
+      id: crypto.randomUUID(),
+      type: 'search_warning',
+      warningType: 'no_results',
+      engines: [],
+    });
+  }
+
+  if (hasWarnings) {
+    session.updateBlock(researchBlock.id, [
+      {
+        op: 'replace',
+        path: '/data/subSteps',
+        value: researchBlock.data.subSteps,
+      },
+    ]);
+  }
+};
 
 export const executeSearch = async (input: {
   queries: string[];
@@ -17,6 +165,11 @@ export const executeSearch = async (input: {
   session: InstanceType<typeof SessionManager>;
   llm: BaseLLM<any>;
   embedding: BaseEmbedding<any>;
+  tokenTracker?: {
+    addTokens: (count: number) => void;
+    getUsedTokens: () => number;
+    isLimitExceeded: () => boolean;
+  };
 }) => {
   const researchBlock = input.researchBlock;
 
@@ -39,93 +192,155 @@ export const executeSearch = async (input: {
     let searchResultsEmitted = false;
 
     const results: Chunk[] = [];
+    const collectedUnresponsive: SearxngUnresponsiveEngine[] = [];
 
     const search = async (q: string) => {
-      const res = await searchSearxng(q, {
-        ...(input.searchConfig ? input.searchConfig : {}),
-      });
-
-      let resultChunks: Chunk[] = [];
-
       try {
-        const queryEmbedding = (await input.embedding.embedText([q]))[0];
+        let res = await searchSearxng(q, {
+          ...(input.searchConfig ? input.searchConfig : {}),
+        });
 
-        resultChunks = (
-          await Promise.all(
-            res.results.map(async (r) => {
-              const content = r.content || r.title;
-              const chunkEmbedding = (
-                await input.embedding.embedText([content])
-              )[0];
+        // Fallback: if a query restricted to a category (e.g. 'general') returned 0 results,
+        // retry without the categories parameter in case the external SearXNG has no active engines in that category
+        if (
+          res.results.length === 0 &&
+          input.searchConfig?.categories &&
+          input.searchConfig.categories.length > 0
+        ) {
+          console.log(
+            `[baseSearch] Category "${input.searchConfig.categories.join(',')}" returned 0 results for "${q}". Retrying without category restriction...`,
+          );
+          try {
+            const fallbackOpts = { ...input.searchConfig };
+            delete fallbackOpts.categories;
+            const fallbackRes = await searchSearxng(q, fallbackOpts);
+            if (fallbackRes.results.length > 0) {
+              console.log(
+                `[baseSearch] Category fallback search retrieved ${fallbackRes.results.length} results for "${q}".`,
+              );
+              res = fallbackRes;
+            }
+          } catch (fallbackErr: any) {
+            console.warn(
+              `[baseSearch] Fallback search without categories failed for "${q}":`,
+              fallbackErr?.message || fallbackErr,
+            );
+          }
+        }
 
-              return {
-                content,
-                metadata: {
-                  title: r.title,
-                  url: r.url,
-                  similarity: computeSimilarity(queryEmbedding, chunkEmbedding),
-                  embedding: chunkEmbedding,
-                },
-              };
-            }),
-          )
-        ).filter((c) => c.metadata.similarity > 0.5);
-      } catch (err) {
-        resultChunks = res.results.map((r) => {
-          const content = r.content || r.title;
+        if (res.unresponsiveEngines && res.unresponsiveEngines.length > 0) {
+          collectedUnresponsive.push(...res.unresponsiveEngines);
+        }
 
-          return {
-            content,
-            metadata: {
-              title: r.title,
-              url: r.url,
-              similarity: 1,
-              embedding: [],
+        let resultChunks: Chunk[] = [];
+
+        try {
+          const contents = res.results.map((r) => r.content || r.title);
+
+          const [queryEmbeddingRes, chunkEmbeddings] = await Promise.all([
+            input.embedding.embedText([q]),
+            contents.length > 0
+              ? input.embedding.embedText(contents)
+              : Promise.resolve([]),
+          ]);
+
+          const queryEmbedding = queryEmbeddingRes[0];
+
+          const scoredChunks: Chunk[] = res.results.map((r, idx) => {
+            const content = contents[idx];
+            const chunkEmbedding = chunkEmbeddings[idx] || [];
+
+            return {
+              content,
+              metadata: {
+                title: r.title,
+                url: r.url,
+                similarity:
+                  queryEmbedding && chunkEmbedding.length > 0
+                    ? computeSimilarity(queryEmbedding, chunkEmbedding)
+                    : 1,
+                embedding: chunkEmbedding,
+              },
+            };
+          });
+
+          const filtered = scoredChunks.filter((c) => c.metadata.similarity > 0.3);
+          resultChunks = filtered.length > 0 ? filtered : scoredChunks;
+        } catch (err: any) {
+          console.warn(
+            `[baseSearch] Embedding calculation failed for query "${q}", falling back to unranked results:`,
+            err?.message || err,
+          );
+          resultChunks = res.results.map((r) => {
+            const content = r.content || r.title;
+
+            return {
+              content,
+              metadata: {
+                title: r.title,
+                url: r.url,
+                similarity: 1,
+                embedding: [],
+              },
+            };
+          });
+        } finally {
+          results.push(...resultChunks);
+        }
+
+        if (!searchResultsEmitted) {
+          searchResultsEmitted = true;
+
+          researchBlock.data.subSteps.push({
+            id: searchResultsBlockId,
+            type: 'search_results',
+            reading: resultChunks,
+          });
+
+          input.session.updateBlock(researchBlock.id, [
+            {
+              op: 'replace',
+              path: '/data/subSteps',
+              value: researchBlock.data.subSteps,
             },
-          };
-        });
-      } finally {
-        results.push(...resultChunks);
-      }
+          ]);
+        } else if (searchResultsEmitted) {
+          const subStepIndex = researchBlock.data.subSteps.findIndex(
+            (step) => step.id === searchResultsBlockId,
+          );
 
-      if (!searchResultsEmitted) {
-        searchResultsEmitted = true;
+          if (subStepIndex !== -1) {
+            const subStep = researchBlock.data.subSteps[
+              subStepIndex
+            ] as SearchResultsResearchBlock;
 
-        researchBlock.data.subSteps.push({
-          id: searchResultsBlockId,
-          type: 'search_results',
-          reading: resultChunks,
-        });
+            subStep.reading.push(...resultChunks);
 
-        input.session.updateBlock(researchBlock.id, [
-          {
-            op: 'replace',
-            path: '/data/subSteps',
-            value: researchBlock.data.subSteps,
-          },
-        ]);
-      } else if (searchResultsEmitted) {
-        const subStepIndex = researchBlock.data.subSteps.findIndex(
-          (step) => step.id === searchResultsBlockId,
+            input.session.updateBlock(researchBlock.id, [
+              {
+                op: 'replace',
+                path: '/data/subSteps',
+                value: researchBlock.data.subSteps,
+              },
+            ]);
+          }
+        }
+      } catch (searchErr: any) {
+        console.error(
+          `[baseSearch] Search execution failed for query "${q}":`,
+          searchErr?.message || searchErr,
         );
-
-        const subStep = researchBlock.data.subSteps[
-          subStepIndex
-        ] as SearchResultsResearchBlock;
-
-        subStep.reading.push(...resultChunks);
-
-        input.session.updateBlock(researchBlock.id, [
-          {
-            op: 'replace',
-            path: '/data/subSteps',
-            value: researchBlock.data.subSteps,
-          },
-        ]);
       }
     };
 
     await Promise.all(input.queries.map(search));
+
+    emitSearchWarnings(
+      collectedUnresponsive,
+      results.length,
+      researchBlock,
+      input.session,
+    );
 
     results.sort((a, b) => b.metadata.similarity - a.metadata.similarity);
 
@@ -133,22 +348,45 @@ export const executeSearch = async (input: {
 
     for (let i = 0; i < results.length; i++) {
       let isDuplicate = false;
+      const currentUrl = normalizeUrl(results[i].metadata.url);
+      const currentTitle = results[i].metadata.title;
 
       for (const indice of uniqueSearchResultIndices.keys()) {
-        if (
-          results[i].metadata.embedding.length === 0 ||
-          results[indice].metadata.embedding.length === 0
-        )
-          continue;
+        const existingUrl = normalizeUrl(results[indice].metadata.url);
+        const existingTitle = results[indice].metadata.title;
 
-        const similarity = computeSimilarity(
-          results[i].metadata.embedding,
-          results[indice].metadata.embedding,
-        );
-
-        if (similarity > 0.75) {
+        // 1. Check for an identical or normalized URL
+        if (currentUrl && existingUrl && currentUrl === existingUrl) {
           isDuplicate = true;
           break;
+        }
+
+        // 2. Check for the same academic article / study by title (e.g. PubMed vs ScienceDirect)
+        if (
+          currentTitle &&
+          existingTitle &&
+          areTitlesSimilar(currentTitle, existingTitle)
+        ) {
+          isDuplicate = true;
+          break;
+        }
+
+        // 3. Check vector similarity if embeddings are available
+        if (
+          results[i].metadata.embedding &&
+          results[indice].metadata.embedding &&
+          results[i].metadata.embedding.length > 0 &&
+          results[indice].metadata.embedding.length > 0
+        ) {
+          const similarity = computeSimilarity(
+            results[i].metadata.embedding,
+            results[indice].metadata.embedding,
+          );
+
+          if (similarity > 0.75) {
+            isDuplicate = true;
+            break;
+          }
         }
       }
 
@@ -174,68 +412,174 @@ export const executeSearch = async (input: {
     let searchResultsEmitted = false;
 
     const searchResults: Chunk[] = [];
+    const collectedUnresponsive: SearxngUnresponsiveEngine[] = [];
+
+    const isAntiBotOrBlocked = (title?: string, content?: string): boolean => {
+      const text = `${title || ''} ${content || ''}`.toLowerCase();
+      return (
+        text.includes('blocked by security policy') ||
+        text.includes('attention required! | cloudflare') ||
+        text.includes('403 forbidden') ||
+        text.includes('access denied') ||
+        text.includes('captcha')
+      );
+    };
 
     const search = async (q: string) => {
-      const res = await searchSearxng(q, {
-        ...(input.searchConfig ? input.searchConfig : {}),
-      });
-
-      let resultChunks: Chunk[] = [];
-
-      resultChunks = res.results.map((r) => {
-        const content = r.content || r.title;
-
-        return {
-          content,
-          metadata: {
-            title: r.title,
-            url: r.url,
-            similarity: 1,
-            embedding: [],
-          },
-        };
-      });
-
-      searchResults.push(...resultChunks);
-
-      if (!searchResultsEmitted) {
-        searchResultsEmitted = true;
-
-        researchBlock.data.subSteps.push({
-          id: searchResultsBlockId,
-          type: 'search_results',
-          reading: resultChunks,
+      try {
+        let res = await searchSearxng(q, {
+          ...(input.searchConfig ? input.searchConfig : {}),
         });
 
-        input.session.updateBlock(researchBlock.id, [
-          {
-            op: 'replace',
-            path: '/data/subSteps',
-            value: researchBlock.data.subSteps,
-          },
-        ]);
-      } else if (searchResultsEmitted) {
-        const subStepIndex = researchBlock.data.subSteps.findIndex(
-          (step) => step.id === searchResultsBlockId,
+        if (
+          res.results.length === 0 &&
+          input.searchConfig?.categories &&
+          input.searchConfig.categories.length > 0
+        ) {
+          console.log(
+            `[baseSearch] Quality mode category "${input.searchConfig.categories.join(',')}" returned 0 results for "${q}". Retrying without category restriction...`,
+          );
+          try {
+            const fallbackOpts = { ...input.searchConfig };
+            delete fallbackOpts.categories;
+            const fallbackRes = await searchSearxng(q, fallbackOpts);
+            if (fallbackRes.results.length > 0) {
+              console.log(
+                `[baseSearch] Quality mode fallback retrieved ${fallbackRes.results.length} results for "${q}".`,
+              );
+              res = fallbackRes;
+            }
+          } catch (fallbackErr: any) {
+            console.warn(
+              `[baseSearch] Quality mode fallback search failed for "${q}":`,
+              fallbackErr?.message || fallbackErr,
+            );
+          }
+        }
+
+        if (res.unresponsiveEngines && res.unresponsiveEngines.length > 0) {
+          collectedUnresponsive.push(...res.unresponsiveEngines);
+        }
+
+        let resultChunks: Chunk[] = [];
+
+        // Wczesne filtrowanie relewancji cosine similarity > 0.3 w trybie Quality przed LLM Pickerem
+        try {
+          const cleanResults = res.results.filter(
+            (r) => !isAntiBotOrBlocked(r.title, r.content),
+          );
+          const contents = cleanResults.map((r) => r.content || r.title);
+
+          const [queryEmbeddingRes, chunkEmbeddings] = await Promise.all([
+            input.embedding.embedText([q]),
+            contents.length > 0
+              ? input.embedding.embedText(contents)
+              : Promise.resolve([]),
+          ]);
+
+          const queryEmbedding = queryEmbeddingRes[0];
+
+          const scoredChunks: Chunk[] = cleanResults.map((r, idx) => {
+            const content = contents[idx];
+            const chunkEmbedding = chunkEmbeddings[idx] || [];
+
+            return {
+              content,
+              metadata: {
+                title: r.title,
+                url: r.url,
+                similarity:
+                  queryEmbedding && chunkEmbedding.length > 0
+                    ? computeSimilarity(queryEmbedding, chunkEmbedding)
+                    : 1,
+                embedding: chunkEmbedding,
+              },
+            };
+          });
+
+          const filtered = scoredChunks.filter((c) => c.metadata.similarity > 0.3);
+          resultChunks = filtered.length > 0 ? filtered : scoredChunks;
+        } catch (embedErr: any) {
+          console.warn(
+            `[baseSearch] Quality mode embedding calculation failed for "${q}", falling back to raw results:`,
+            embedErr?.message || embedErr,
+          );
+          resultChunks = res.results
+            .filter((r) => !isAntiBotOrBlocked(r.title, r.content))
+            .map((r) => {
+              const content = r.content || r.title;
+              return {
+                content,
+                metadata: {
+                  title: r.title,
+                  url: r.url,
+                  similarity: 1,
+                  embedding: [],
+                },
+              };
+            });
+        }
+
+        searchResults.push(...resultChunks);
+
+        if (!searchResultsEmitted) {
+          searchResultsEmitted = true;
+
+          researchBlock.data.subSteps.push({
+            id: searchResultsBlockId,
+            type: 'search_results',
+            reading: resultChunks,
+          });
+
+          input.session.updateBlock(researchBlock.id, [
+            {
+              op: 'replace',
+              path: '/data/subSteps',
+              value: researchBlock.data.subSteps,
+            },
+          ]);
+        } else if (searchResultsEmitted) {
+          const subStepIndex = researchBlock.data.subSteps.findIndex(
+            (step) => step.id === searchResultsBlockId,
+          );
+
+          if (subStepIndex !== -1) {
+            const subStep = researchBlock.data.subSteps[
+              subStepIndex
+            ] as SearchResultsResearchBlock;
+
+            subStep.reading.push(...resultChunks);
+
+            input.session.updateBlock(researchBlock.id, [
+              {
+                op: 'replace',
+                path: '/data/subSteps',
+                value: researchBlock.data.subSteps,
+              },
+            ]);
+          }
+        }
+      } catch (searchErr: any) {
+        console.error(
+          `[baseSearch] Quality mode search execution failed for query "${q}":`,
+          searchErr?.message || searchErr,
         );
-
-        const subStep = researchBlock.data.subSteps[
-          subStepIndex
-        ] as SearchResultsResearchBlock;
-
-        subStep.reading.push(...resultChunks);
-
-        input.session.updateBlock(researchBlock.id, [
-          {
-            op: 'replace',
-            path: '/data/subSteps',
-            value: researchBlock.data.subSteps,
-          },
-        ]);
       }
     };
 
     await Promise.all(input.queries.map(search));
+
+    emitSearchWarnings(
+      collectedUnresponsive,
+      searchResults.length,
+      researchBlock,
+      input.session,
+    );
+
+    // Sort results by vector relevance before passing them to the LLM Picker
+    searchResults.sort(
+      (a, b) => (b.metadata?.similarity || 0) - (a.metadata?.similarity || 0),
+    );
 
     const pickerPrompt = `
       Assistant is an AI search result picker. Assistant's task is to pick 2-3 of the most relevant search results based off the query which can be then scraped for information to answer the query.
@@ -269,23 +613,69 @@ export const executeSearch = async (input: {
         ),
     });
 
-    const pickerResponse = await input.llm.generateObject<typeof pickerSchema>({
-      schema: pickerSchema,
-      messages: [
-        {
-          role: 'system',
-          content: pickerPrompt,
-        },
-        {
-          role: 'user',
-          content: `<queries>${input.queries.join(', ')}</queries>\n<search_results>${searchResults.map((result, index) => `<result indice=${index}>${JSON.stringify(result)}</result>`).join('\n')}</search_results>`,
-        },
-      ],
-    });
+    const deduplicatedSearchResults: Chunk[] = [];
+    for (const r of searchResults) {
+      const rUrl = normalizeUrl(r.metadata?.url);
+      const rTitle = r.metadata?.title;
+      const isDup = deduplicatedSearchResults.some((u) => {
+        const uUrl = normalizeUrl(u.metadata?.url);
+        const uTitle = u.metadata?.title;
+        if (rUrl && uUrl && rUrl === uUrl) return true;
+        if (rTitle && uTitle && areTitlesSimilar(rTitle, uTitle)) return true;
+        return false;
+      });
+      if (!isDup) {
+        deduplicatedSearchResults.push(r);
+      }
+    }
 
-    const pickedIndices = pickerResponse.picked_indices.slice(0, 3);
+    // Check whether the token budget is already exhausted before calling the picker
+    if (input.tokenTracker?.isLimitExceeded()) {
+      return deduplicatedSearchResults.slice(0, 5);
+    }
+
+    let pickedIndices: number[] = [];
+    try {
+      const pickerUserContent = `<queries>${input.queries.join(', ')}</queries>\n<search_results>${deduplicatedSearchResults.map((result, index) => `<result indice=${index}>${JSON.stringify(result)}</result>`).join('\n')}</search_results>`;
+      
+      if (input.tokenTracker) {
+        input.tokenTracker.addTokens(
+          getTokenCount(pickerPrompt) + getTokenCount(pickerUserContent),
+        );
+      }
+
+      const pickerResponse = await input.llm.generateObject<typeof pickerSchema>({
+        schema: pickerSchema,
+        messages: [
+          {
+            role: 'system',
+            content: pickerPrompt,
+          },
+          {
+            role: 'user',
+            content: pickerUserContent,
+          },
+        ],
+      });
+
+      if (input.tokenTracker && pickerResponse) {
+        input.tokenTracker.addTokens(getTokenCount(JSON.stringify(pickerResponse)));
+      }
+
+      pickedIndices = Array.isArray(pickerResponse?.picked_indices)
+        ? pickerResponse.picked_indices.slice(0, 3)
+        : [];
+    } catch (pickerErr) {
+      console.warn('[baseSearch] Picker LLM call failed, falling back to top search results:', pickerErr);
+      pickedIndices = [0, 1, 2].slice(0, Math.min(3, deduplicatedSearchResults.length));
+    }
+
+    if (pickedIndices.length === 0 && deduplicatedSearchResults.length > 0) {
+      pickedIndices = [0, 1, 2].slice(0, Math.min(3, deduplicatedSearchResults.length));
+    }
+
     const pickedResults = pickedIndices
-      .map((i) => searchResults[i])
+      .map((i) => deduplicatedSearchResults[i])
       .filter((r) => r !== undefined);
 
     const alreadyExtractedURLs: string[] = [];
@@ -299,7 +689,12 @@ export const executeSearch = async (input: {
     });
 
     const filteredResults = pickedResults.filter(
-      (r) => !alreadyExtractedURLs.find((url) => url === r.metadata.url),
+      (r) =>
+        !alreadyExtractedURLs.some(
+          (url) =>
+            url === r.metadata.url ||
+            (normalizeUrl(url) && normalizeUrl(url) === normalizeUrl(r.metadata.url)),
+        ),
     );
 
     if (filteredResults.length > 0) {
@@ -362,59 +757,96 @@ export const executeSearch = async (input: {
         ),
     });
 
-    await Promise.all(
-      filteredResults.map(async (result, i) => {
-        try {
-          const scrapedData = await Scraper.scrape(result.metadata.url).catch(
-            (err) => {
-              console.log('Error scraping data from', result.metadata.url, err);
-            },
+    for (const result of filteredResults) {
+      if (input.tokenTracker?.isLimitExceeded()) {
+        console.warn(
+          '[baseSearch] Token budget limit reached during scraping, breaking early.',
+        );
+        break;
+      }
+
+      try {
+        const scrapedData = await Scraper.scrape(result.metadata.url, {
+          optimizationMode: 'quality',
+        }).catch((err) => {
+          console.log('Error scraping data from', result.metadata.url, err);
+          return null;
+        });
+
+        if (!scrapedData || scrapedData.error || !scrapedData.content) {
+          console.warn(
+            `[baseSearch] Skipping ${result.metadata.url} due to extraction failure: ${scrapedData?.error || 'no_data'}`,
           );
+          continue;
+        }
 
-          if (!scrapedData) return;
+        let accumulatedContent = '';
+        // Limit to max 2 most important chunks per page to conserve the token budget
+        const chunks = splitText(scrapedData.content, 4000, 500).slice(0, 2);
 
-          let accumulatedContent = '';
-          const chunks = splitText(scrapedData.content, 4000, 500);
+        for (const chunk of chunks) {
+          if (input.tokenTracker?.isLimitExceeded()) {
+            console.warn(
+              '[baseSearch] Token budget limit reached during chunk extraction, stopping further chunks.',
+            );
+            break;
+          }
 
-          await Promise.all(
-            chunks.map(async (chunk) => {
-              try {
-                const extractorOutput = await input.llm.generateObject<
-                  typeof extractorSchema
-                >({
-                  schema: extractorSchema,
-                  messages: [
-                    {
-                      role: 'system',
-                      content: extractorPrompt,
-                    },
-                    {
-                      role: 'user',
-                      content: `<queries>${input.queries.join(', ')}</queries>\n<scraped_data>${chunk}</scraped_data>`,
-                    },
-                  ],
-                });
+          try {
+            const userContent = `<queries>${input.queries.join(', ')}</queries>\n<scraped_data>${chunk}</scraped_data>`;
+            if (input.tokenTracker) {
+              input.tokenTracker.addTokens(
+                getTokenCount(extractorPrompt) + getTokenCount(userContent),
+              );
+            }
 
-                accumulatedContent += extractorOutput.extracted_facts + '\n';
-              } catch (err) {
-                console.log('Error extracting information from chunk', err);
-              }
-            }),
-          );
+            const extractorOutput = await input.llm.generateObject<
+              typeof extractorSchema
+            >({
+              schema: extractorSchema,
+              messages: [
+                {
+                  role: 'system',
+                  content: extractorPrompt,
+                },
+                {
+                  role: 'user',
+                  content: userContent,
+                },
+              ],
+            });
 
+            if (input.tokenTracker && extractorOutput?.extracted_facts) {
+              input.tokenTracker.addTokens(
+                getTokenCount(extractorOutput.extracted_facts),
+              );
+            }
+
+            accumulatedContent += (extractorOutput?.extracted_facts || '') + '\n';
+          } catch (err) {
+            console.log('Error extracting information from chunk', err);
+          }
+        }
+
+        if (accumulatedContent.trim().length > 0) {
           extractedFacts.push({
             ...result,
-            content: accumulatedContent,
+            content: accumulatedContent.trim(),
           });
-        } catch (err) {
-          console.log(
-            'Error scraping or extracting information from',
-            result.metadata.url,
-            err,
-          );
         }
-      }),
-    );
+      } catch (err) {
+        console.log(
+          'Error scraping or extracting information from',
+          result.metadata.url,
+          err,
+        );
+      }
+    }
+
+    // If nothing was extracted, or due to the limit, include the top snippets instead
+    if (extractedFacts.length === 0 && deduplicatedSearchResults.length > 0) {
+      return deduplicatedSearchResults.slice(0, 5);
+    }
 
     return extractedFacts;
   } else {

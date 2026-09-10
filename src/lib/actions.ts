@@ -22,15 +22,29 @@ export const getSuggestions = async (chatHistory: [string, string][]) => {
 };
 
 export const getApproxLocation = async () => {
-  const res = await fetch('https://free.freeipapi.com/api/json', {
-    method: 'GET',
-  });
+  try {
+    const res = await fetch('https://free.freeipapi.com/api/json', {
+      method: 'GET',
+      signal: AbortSignal.timeout(4000),
+    });
 
-  const data = await res.json();
+    if (!res.ok) {
+      throw new Error(`freeipapi returned status ${res.status}`);
+    }
 
-  return {
-    latitude: data.latitude,
-    longitude: data.longitude,
-    city: data.cityName,
-  };
+    const data = await res.json();
+
+    return {
+      latitude: data.latitude ?? 0,
+      longitude: data.longitude ?? 0,
+      city: data.cityName || 'Unknown',
+    };
+  } catch (err) {
+    console.warn('Failed to retrieve approx location, using fallback:', err);
+    return {
+      latitude: 0,
+      longitude: 0,
+      city: 'Unknown',
+    };
+  }
 };

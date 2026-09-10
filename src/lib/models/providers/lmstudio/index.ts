@@ -6,9 +6,11 @@ import LMStudioLLM from './lmstudioLLM';
 import BaseLLM from '../../base/llm';
 import BaseEmbedding from '../../base/embedding';
 import LMStudioEmbedding from './lmstudioEmbedding';
+import { isCloudMetadataIP } from '@/lib/security/ssrf';
 
 interface LMStudioConfig {
   baseURL: string;
+  queueEnabled?: boolean;
 }
 
 const providerConfigFields: UIConfigField[] = [
@@ -20,6 +22,16 @@ const providerConfigFields: UIConfigField[] = [
     required: true,
     placeholder: 'http://localhost:1234',
     env: 'LM_STUDIO_BASE_URL',
+    scope: 'server',
+  },
+  {
+    type: 'switch',
+    name: 'Enable Request Queue',
+    key: 'queueEnabled',
+    description:
+      'Queue requests sequentially and optimize model switching in VRAM',
+    required: false,
+    default: true,
     scope: 'server',
   },
 ];
@@ -43,11 +55,27 @@ class LMStudioProvider extends BaseModelProvider<LMStudioConfig> {
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: AbortSignal.timeout(5000),
       });
 
-      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          `LM Studio API returned HTTP ${res.status}: ${res.statusText || 'Error'}`,
+        );
+      }
 
-      const models: Model[] = data.data.map((m: any) => {
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('LM Studio returned an invalid JSON response.');
+      }
+
+      if (!data || typeof data !== 'object' || !Array.isArray(data.data)) {
+        throw new Error('LM Studio returned unexpected response format.');
+      }
+
+      const models: Model[] = (data.data || []).map((m: any) => {
         return {
           name: m.id,
           key: m.id,
@@ -58,14 +86,38 @@ class LMStudioProvider extends BaseModelProvider<LMStudioConfig> {
         embedding: models,
         chat: models,
       };
-    } catch (err) {
-      if (err instanceof TypeError) {
+    } catch (err: any) {
+      const cause = err?.cause;
+      const causeCode = cause?.code || err?.code;
+      const isSslError =
+        causeCode === 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY' ||
+        causeCode === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+        causeCode === 'CERT_HAS_EXPIRED' ||
+        causeCode === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+        causeCode === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+        err?.message?.includes('certificate') ||
+        cause?.message?.includes('certificate');
+
+      if (isSslError) {
+        throw new Error(
+          `LM Studio SSL error: ${causeCode || 'certificate verification failed'}. If using a reverse proxy with self-signed SSL or mkcert, ensure NODE_TLS_REJECT_UNAUTHORIZED=0 is set or custom CA certificate is installed.`,
+        );
+      }
+
+      if (
+        err instanceof TypeError ||
+        err.name === 'TimeoutError' ||
+        err.name === 'AbortError'
+      ) {
         throw new Error(
           'Error connecting to LM Studio. Please ensure the base URL is correct and the LM Studio server is running.',
         );
       }
+      if (err instanceof SyntaxError) {
+        throw new Error('LM Studio returned an invalid JSON response.');
+      }
 
-      throw err;
+      throw new Error(err.message || 'Error connecting to LM Studio.');
     }
   }
 
@@ -120,11 +172,45 @@ class LMStudioProvider extends BaseModelProvider<LMStudioConfig> {
   static parseAndValidate(raw: any): LMStudioConfig {
     if (!raw || typeof raw !== 'object')
       throw new Error('Invalid config provided. Expected object');
-    if (!raw.baseURL)
-      throw new Error('Invalid config provided. Base URL must be provided');
+    if (!raw.baseURL || typeof raw.baseURL !== 'string')
+      throw new Error('Invalid config provided. Base URL must be provided as a string');
+
+    const trimmed = raw.baseURL.trim();
+    try {
+      const u = new URL(trimmed);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        throw new Error('Base URL must start with http:// or https://');
+      }
+      if (u.username || u.password) {
+        throw new Error('Base URL cannot contain embedded credentials.');
+      }
+      const hostname = u.hostname.toLowerCase().trim();
+      const ipLiteral =
+        hostname.startsWith('[') && hostname.endsWith(']')
+          ? hostname.slice(1, -1)
+          : hostname;
+      if (
+        isCloudMetadataIP(ipLiteral) ||
+        hostname === 'metadata.google.internal' ||
+        hostname === 'metadata.internal' ||
+        hostname === 'instance-data' ||
+        hostname.endsWith('.ec2.internal') ||
+        hostname.endsWith('.google.internal')
+      ) {
+        throw new Error('Base URL cannot point to cloud metadata endpoints.');
+      }
+    } catch (err: any) {
+      throw new Error(err.message || 'Invalid Base URL format.');
+    }
+
+    const queueEnabled =
+      raw.queueEnabled !== undefined
+        ? raw.queueEnabled === true || raw.queueEnabled === 'true'
+        : true;
 
     return {
-      baseURL: String(raw.baseURL),
+      baseURL: trimmed,
+      queueEnabled,
     };
   }
 

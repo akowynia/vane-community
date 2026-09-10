@@ -3,14 +3,17 @@ import ModelRegistry from '@/lib/models/registry';
 import { NextRequest, NextResponse } from 'next/server';
 import { ConfigModelProvider } from '@/lib/config/types';
 
+import { requireAdmin } from '@/lib/security/rbac';
+
 type SaveConfigBody = {
   key: string;
-  value: string;
+  value: any;
 };
 
-export const GET = async (req: NextRequest) => {
+export const GET = async () => {
   try {
-    const values = configManager.getCurrentConfig();
+    // Return sanitized configuration where all secrets/API keys are masked
+    const values = configManager.getSanitizedConfig();
     const fields = configManager.getUIConfigSections();
 
     const modelRegistry = new ModelRegistry();
@@ -44,9 +47,16 @@ export const GET = async (req: NextRequest) => {
 
 export const POST = async (req: NextRequest) => {
   try {
+    if (configManager.isSetupComplete()) {
+      const adminCheck = await requireAdmin(req);
+      if (adminCheck instanceof NextResponse) {
+        return adminCheck;
+      }
+    }
+
     const body: SaveConfigBody = await req.json();
 
-    if (!body.key || !body.value) {
+    if (!body.key || body.value === undefined) {
       return Response.json(
         {
           message: 'Key and value are required.',
@@ -57,7 +67,18 @@ export const POST = async (req: NextRequest) => {
       );
     }
 
-    configManager.updateConfig(body.key, body.value);
+    try {
+      await configManager.updateConfig(body.key, body.value);
+    } catch (validationErr: any) {
+      return Response.json(
+        {
+          message: validationErr.message || 'Invalid configuration value.',
+        },
+        {
+          status: 400,
+        },
+      );
+    }
 
     return Response.json(
       {
@@ -68,7 +89,7 @@ export const POST = async (req: NextRequest) => {
       },
     );
   } catch (err) {
-    console.error('Error in getting config: ', err);
+    console.error('Error in updating config: ', err);
     return Response.json(
       { message: 'An error has occurred.' },
       { status: 500 },

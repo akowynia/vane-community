@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ConfigModelProvider } from '@/lib/config/types';
 import { toast } from 'sonner';
+import { useTranslation } from '@/lib/i18n';
 
 const AddModel = ({
   providerId,
@@ -14,6 +15,7 @@ const AddModel = ({
   setProviders: React.Dispatch<React.SetStateAction<ConfigModelProvider[]>>;
   type: 'chat' | 'embedding';
 }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [modelName, setModelName] = useState('');
   const [modelKey, setModelKey] = useState('');
@@ -59,13 +61,13 @@ const AddModel = ({
         }),
       );
 
-      toast.success('Model added successfully.');
+      toast.success(t('settings.modelAddSuccess'));
       setModelName('');
       setModelKey('');
       setOpen(false);
     } catch (error) {
       console.error('Error adding model:', error);
-      toast.error('Failed to add model.');
+      toast.error(t('settings.modelAddError'));
     } finally {
       setLoading(false);
     }
@@ -78,7 +80,7 @@ const AddModel = ({
         className="text-xs text-black/70 dark:text-white/70 hover:text-black hover:dark:text-white flex flex-row items-center space-x-1 active:scale-95 transition duration-200"
       >
         <Plus size={12} />
-        <span>Add</span>
+        <span>{t('common.add')}</span>
       </button>
       <AnimatePresence>
         {open && (
@@ -98,7 +100,12 @@ const AddModel = ({
               <DialogPanel className="w-full mx-4 lg:w-[600px] max-h-[85vh] flex flex-col border bg-light-primary dark:bg-dark-primary border-light-secondary dark:border-dark-secondary rounded-lg">
                 <div className="px-6 pt-6 pb-4">
                   <h3 className="text-black/90 dark:text-white/90 font-medium text-sm">
-                    Add new {type === 'chat' ? 'chat' : 'embedding'} model
+                    {t('settings.addNewModel', {
+                      type:
+                        type === 'chat'
+                          ? t('settings.chatType')
+                          : t('settings.embeddingType'),
+                    })}
                   </h3>
                 </div>
                 <div className="border-t border-light-200 dark:border-dark-200" />
@@ -110,7 +117,7 @@ const AddModel = ({
                     <div className="flex flex-col space-y-4 flex-1">
                       <div className="flex flex-col items-start space-y-2">
                         <label className="text-xs text-black/70 dark:text-white/70">
-                          Model name*
+                          {t('settings.modelName')}*
                         </label>
                         <input
                           value={modelName}
@@ -123,7 +130,7 @@ const AddModel = ({
                       </div>
                       <div className="flex flex-col items-start space-y-2">
                         <label className="text-xs text-black/70 dark:text-white/70">
-                          Model key*
+                          {t('settings.modelKey')}*
                         </label>
                         <input
                           value={modelKey}
@@ -145,7 +152,7 @@ const AddModel = ({
                         {loading ? (
                           <Loader2 className="animate-spin" size={16} />
                         ) : (
-                          'Add Model'
+                          t('settings.addModel')
                         )}
                       </button>
                     </div>

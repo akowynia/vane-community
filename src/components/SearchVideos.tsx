@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import Lightbox, { GenericSlide, VideoSlide } from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import { Message } from './ChatWindow';
+import { useTranslation } from '@/lib/i18n';
 
 type Video = {
   url: string;
@@ -33,6 +34,7 @@ const Searchvideos = ({
   chatHistory: [string, string][];
   messageId: string;
 }) => {
+  const { t } = useTranslation();
   const [videos, setVideos] = useState<Video[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
@@ -87,7 +89,7 @@ const Searchvideos = ({
         >
           <div className="flex flex-row items-center space-x-2">
             <VideoIcon size={17} />
-            <p>Search videos</p>
+            <p>{t('chat.searchVideos')}</p>
           </div>
           <PlusIcon className="text-[#24A0ED]" size={17} />
         </button>
@@ -126,7 +128,7 @@ const Searchvideos = ({
                     />
                     <div className="absolute bg-white/70 dark:bg-black/70 text-black/70 dark:text-white/70 px-2 py-1 flex flex-row items-center space-x-1 bottom-1 right-1 rounded-md">
                       <PlayCircle size={15} />
-                      <p className="text-xs">Video</p>
+                      <p className="text-xs">{t('common.video')}</p>
                     </div>
                   </div>
                 ))
@@ -150,7 +152,7 @@ const Searchvideos = ({
                     />
                     <div className="absolute bg-white/70 dark:bg-black/70 text-black/70 dark:text-white/70 px-2 py-1 flex flex-row items-center space-x-1 bottom-1 right-1 rounded-md">
                       <PlayCircle size={15} />
-                      <p className="text-xs">Video</p>
+                      <p className="text-xs">{t('common.video')}</p>
                     </div>
                   </div>
                 ))}
@@ -170,7 +172,7 @@ const Searchvideos = ({
                   ))}
                 </div>
                 <p className="text-black/70 dark:text-white/70 text-xs">
-                  View {videos.length - 3} more
+                  {t('common.viewMore', { count: videos.length - 3 })}
                 </p>
               </button>
             )}
@@ -196,10 +198,15 @@ const Searchvideos = ({
             render={{
               slide: ({ slide }) => {
                 const index = slides.findIndex((s) => s === slide);
-                return slide.type === 'video-slide' ? (
+                if (slide.type !== 'video-slide') return null;
+                const sanitizedSrc = slide.iframe_src.replace(
+                  /https?:\/\/(www\.)?youtube-nocookie\.com/g,
+                  'https://www.youtube.com',
+                );
+                return (
                   <div className="h-full w-full flex flex-row items-center justify-center">
                     <iframe
-                      src={`${slide.iframe_src}${slide.iframe_src.includes('?') ? '&' : '?'}enablejsapi=1`}
+                      src={`${sanitizedSrc}${sanitizedSrc.includes('?') ? '&' : '?'}enablejsapi=1`}
                       ref={(el) => {
                         if (el) {
                           videoRefs.current[index] = el;
@@ -210,7 +217,7 @@ const Searchvideos = ({
                       allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
                     />
                   </div>
-                ) : null;
+                );
               },
             }}
           />

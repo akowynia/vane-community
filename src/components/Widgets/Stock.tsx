@@ -126,17 +126,17 @@ const Stock = (props: StockWidgetProps) => {
       },
       grid: {
         vertLines: {
-          color: isDarkMode ? '#21262d' : '#e8edf1',
+          color: isDarkMode ? '#28221b' : '#e8edf1',
           style: LineStyle.Solid,
         },
         horzLines: {
-          color: isDarkMode ? '#21262d' : '#e8edf1',
+          color: isDarkMode ? '#28221b' : '#e8edf1',
           style: LineStyle.Solid,
         },
       },
       crosshair: {
         vertLine: {
-          color: isDarkMode ? '#30363d' : '#d0d7de',
+          color: isDarkMode ? '#3d342a' : '#d0d7de',
           labelVisible: false,
         },
         horzLine: {

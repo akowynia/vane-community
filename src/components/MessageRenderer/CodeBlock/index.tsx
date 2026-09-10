@@ -31,14 +31,36 @@ const CodeBlock = ({
     return resolvedTheme === 'dark' ? darkTheme : lightTheme;
   }, [mounted, resolvedTheme]);
 
+  const extractText = (node: any): string => {
+    if (typeof node === 'string') return node;
+    if (typeof node === 'number') return String(node);
+    if (!node) return '';
+    if (Array.isArray(node)) return node.map(extractText).join('');
+    if (typeof node === 'object') {
+      if (node.props && node.props.children) {
+        return extractText(node.props.children);
+      }
+      if (node.text) return String(node.text);
+    }
+    return '';
+  };
+
+  const codeString = useMemo(() => {
+    return extractText(children);
+  }, [children]);
+
   return (
     <div className="relative">
       <button
         className="absolute top-2 right-2 p-1"
         onClick={() => {
-          navigator.clipboard.writeText(children as string);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
+          try {
+            navigator.clipboard.writeText(codeString);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          } catch (err) {
+            console.error('Failed to copy code block:', err);
+          }
         }}
       >
         {copied ? (
@@ -58,7 +80,7 @@ const CodeBlock = ({
         style={syntaxTheme}
         showInlineLineNumbers
       >
-        {children as string}
+        {codeString}
       </SyntaxHighlighterComponent>
     </div>
   );

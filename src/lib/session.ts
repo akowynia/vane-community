@@ -19,6 +19,9 @@ class SessionManager {
   constructor(id?: string) {
     this.id = id ?? crypto.randomUUID();
 
+    // Default error listener preventing ERR_UNHANDLED_ERROR crashes in Node EventEmitter
+    this.emitter.on('error', () => {});
+
     setTimeout(() => {
       SessionManager.sessions.delete(this.id);
     }, this.TTL_MS);

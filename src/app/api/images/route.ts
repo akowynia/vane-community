@@ -11,6 +11,9 @@ interface ImageSearchBody {
 export const POST = async (req: Request) => {
   try {
     const body: ImageSearchBody = await req.json();
+    if (!body.chatModel?.key || !body.chatModel?.providerId) {
+      return Response.json({ images: [] }, { status: 200 });
+    }
 
     const registry = new ModelRegistry();
 
@@ -32,9 +35,9 @@ export const POST = async (req: Request) => {
 
     return Response.json({ images }, { status: 200 });
   } catch (err) {
-    console.error(`An error occurred while searching images: ${err}`);
+    console.error('[Images API] Error occurred while searching images:', err);
     return Response.json(
-      { message: 'An error occurred while searching images' },
+      { message: 'An error occurred while searching images', images: [] },
       { status: 500 },
     );
   }

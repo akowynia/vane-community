@@ -1,37 +1,76 @@
-FROM node:24.5.0-slim AS builder
+# ==========================================
+# Etap 1: Budowanie aplikacji Next.js (Standalone)
+# ==========================================
+FROM node:22-bookworm-slim AS builder
 
-RUN apt-get update && apt-get install -y python3 python3-pip sqlite3 && rm -rf /var/lib/apt/lists/*
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-WORKDIR /home/vane
+WORKDIR /home/vane-community
 
 COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile --network-timeout 600000
+RUN yarn install --frozen-lockfile --network-timeout 600000 && \
+    yarn playwright install --only-shell chromium && \
+    chmod -R 755 /ms-playwright && \
+    yarn cache clean
 
-COPY tsconfig.json next.config.mjs next-env.d.ts postcss.config.js drizzle.config.ts tailwind.config.ts ./
+COPY tsconfig.json next.config.mjs next-env.d.ts postcss.config.js drizzle.config.ts tailwind.config.ts .eslintrc.json ./
 COPY src ./src
 COPY public ./public
 COPY drizzle ./drizzle
 
-RUN mkdir -p /home/vane/data
+RUN mkdir -p /home/vane-community/data
 RUN yarn build
 
-FROM node:24.5.0-slim
+# ==========================================
+# Etap 2: Obraz produkcyjny (Runtime)
+# ==========================================
+FROM node:22-bookworm-slim AS runtime
 
-RUN apt-get update && apt-get install -y python3 python3-pip sqlite3 && rm -rf /var/lib/apt/lists/*
+ENV NODE_ENV=production
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-WORKDIR /home/vane
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sqlite3 \
+    ca-certificates \
+    curl \
+    fonts-liberation \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libdbus-1-3 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxrandr2 \
+    libgbm1 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libasound2 \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /home/vane/public ./public
-COPY --from=builder /home/vane/.next/static ./public/_next/static
+RUN groupadd -g 1001 vane-community && \
+    useradd -u 1001 -g vane-community -m -s /bin/bash vane-community
 
-COPY --from=builder /home/vane/.next/standalone ./
-COPY --from=builder /home/vane/data ./data
-COPY drizzle ./drizzle
+COPY --from=builder --chown=vane-community:vane-community /ms-playwright /ms-playwright
 
-RUN mkdir /home/vane/uploads
+WORKDIR /home/vane-community
 
-RUN yarn add playwright
-RUN yarn playwright install --with-deps --only-shell chromium
+RUN mkdir -p uploads data && \
+    chown -R vane-community:vane-community /home/vane-community
+
+COPY --from=builder --chown=vane-community:vane-community /home/vane-community/public ./public
+COPY --from=builder --chown=vane-community:vane-community /home/vane-community/.next/static ./.next/static
+COPY --from=builder --chown=vane-community:vane-community /home/vane-community/.next/standalone ./
+COPY --from=builder --chown=vane-community:vane-community /home/vane-community/data ./data
+COPY --chown=vane-community:vane-community drizzle ./drizzle
+
+USER vane-community
 
 EXPOSE 3000
 

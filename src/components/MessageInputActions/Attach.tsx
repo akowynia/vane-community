@@ -19,9 +19,15 @@ import { useChat } from '@/lib/hooks/useChat';
 import { AnimatePresence } from 'motion/react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { useTranslation } from '@/lib/i18n';
 
-const Attach = () => {
+interface AttachProps {
+  position?: 'top' | 'bottom';
+}
+
+const Attach = ({ position = 'bottom' }: AttachProps) => {
   const { files, setFiles, setFileIds, fileIds } = useChat();
+  const { t } = useTranslation();
 
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<any>();
@@ -48,7 +54,7 @@ const Attach = () => {
       const embeddingModel = localStorage.getItem('embeddingModelKey');
 
       if (!embeddingModelProvider || !embeddingModel) {
-        throw new Error('Please select an embedding model before uploading.');
+        throw new Error(t('chat.selectEmbeddingModelFirst'));
       }
 
       data.append('embedding_model_provider_id', embeddingModelProvider);
@@ -62,7 +68,7 @@ const Attach = () => {
       const resData = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        throw new Error(resData.message || 'Failed to upload file(s).');
+        throw new Error(resData.message || t('chat.uploadError'));
       }
 
       if (!Array.isArray(resData.files)) {
@@ -99,7 +105,10 @@ const Attach = () => {
           <AnimatePresence>
             {open && (
               <PopoverPanel
-                className="absolute z-10 w-64 md:w-[350px] right-0"
+                className={cn(
+                  'absolute z-[60] w-64 md:w-[350px] right-0',
+                  position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2',
+                )}
                 static
               >
                 <motion.div
@@ -107,11 +116,14 @@ const Attach = () => {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ duration: 0.1, ease: 'easeOut' }}
-                  className="origin-top-right bg-light-primary dark:bg-dark-primary border rounded-md border-light-200 dark:border-dark-200 w-full max-h-[200px] md:max-h-none overflow-y-auto flex flex-col"
+                  className={cn(
+                    'bg-light-primary dark:bg-dark-primary border rounded-md border-light-200 dark:border-dark-200 w-full max-h-[200px] md:max-h-none overflow-y-auto flex flex-col shadow-xl',
+                    position === 'top' ? 'origin-bottom-right' : 'origin-top-right',
+                  )}
                 >
                   <div className="flex flex-row items-center justify-between px-3 py-2">
                     <h4 className="text-black/70 dark:text-white/70 text-sm">
-                      Attached files
+                      {t('chat.attachedFiles')}
                     </h4>
                     <div className="flex flex-row items-center space-x-4">
                       <button
@@ -128,7 +140,7 @@ const Attach = () => {
                           hidden
                         />
                         <Plus size={16} />
-                        <p className="text-xs">Add</p>
+                        <p className="text-xs">{t('chat.addFile')}</p>
                       </button>
                       <button
                         onClick={() => {
@@ -138,7 +150,7 @@ const Attach = () => {
                         className="flex flex-row items-center space-x-1 text-black/70 dark:text-white/70 hover:text-black hover:dark:text-white transition duration-200 focus:outline-none"
                       >
                         <Trash size={13} />
-                        <p className="text-xs">Clear</p>
+                        <p className="text-xs">{t('chat.clearFiles')}</p>
                       </button>
                     </div>
                   </div>

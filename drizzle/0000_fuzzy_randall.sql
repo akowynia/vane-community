@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS `chats` (
 	`title` text NOT NULL,
 	`createdAt` text NOT NULL,
 	`focusMode` text NOT NULL,
+	`userId` text,
 	`files` text DEFAULT '[]'
 );
 --> statement-breakpoint

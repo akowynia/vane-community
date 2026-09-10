@@ -4,7 +4,11 @@ import { ResearchBlock } from '@/lib/types';
 import { executeSearch } from './baseSearch';
 
 const schema = z.object({
-  queries: z.array(z.string()).describe('List of academic search queries'),
+  queries: z
+    .union([z.array(z.string()), z.string()])
+    .optional()
+    .describe('List of academic search queries'),
+  query: z.string().optional().describe('An academic search query'),
 });
 
 const academicSearchDescription = `
@@ -30,9 +34,25 @@ const academicSearchAction: ResearchAction<typeof schema> = {
     config.classification.classification.skipSearch === false &&
     config.classification.classification.academicSearch === true,
   execute: async (input, additionalConfig) => {
-    input.queries = (
-      Array.isArray(input.queries) ? input.queries : [input.queries]
-    ).slice(0, 3);
+    const rawQueries = (input as any)?.queries ?? (input as any)?.query;
+    const queries = (
+      Array.isArray(rawQueries)
+        ? rawQueries
+        : typeof rawQueries === 'string'
+          ? [rawQueries]
+          : []
+    )
+      .filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
+      .slice(0, 3);
+
+    input.queries = queries;
+
+    if (queries.length === 0) {
+      return {
+        type: 'search_results',
+        results: [],
+      };
+    }
 
     const researchBlock = additionalConfig.session.getBlock(
       additionalConfig.researchBlockId,
@@ -47,6 +67,7 @@ const academicSearchAction: ResearchAction<typeof schema> = {
       queries: input.queries,
       researchBlock: researchBlock,
       session: additionalConfig.session,
+      tokenTracker: additionalConfig.tokenTracker,
       searchConfig: {
         engines: ['arxiv', 'google scholar', 'pubmed'],
       },

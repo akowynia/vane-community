@@ -13,6 +13,9 @@ export type SearchAgentConfig = {
   embedding: BaseEmbedding<any>;
   mode: 'speed' | 'balanced' | 'quality';
   systemInstructions: string;
+  providerId?: string;
+  modelKey?: string;
+  qualityModeTokenLimit?: number;
 };
 
 export type SearchAgentInput = {
@@ -21,6 +24,10 @@ export type SearchAgentInput = {
   config: SearchAgentConfig;
   chatId: string;
   messageId: string;
+  signal?: AbortSignal;
+  apiKeyId?: string;
+  userId?: string;
+  source?: string;
 };
 
 export type WidgetInput = {
@@ -47,6 +54,8 @@ export type ClassifierInput = {
   enabledSources: SearchSources[];
   query: string;
   chatHistory: ChatTurnMessage[];
+  providerId?: string;
+  modelKey?: string;
 };
 
 export type ClassifierOutput = {
@@ -78,6 +87,7 @@ export type ResearcherInput = {
 export type ResearcherOutput = {
   findings: ActionOutput[];
   searchFindings: Chunk[];
+  isTokenLimitReached?: boolean;
 };
 
 export type SearchActionOutput = {
@@ -118,6 +128,13 @@ export interface ResearchAction<
       researchBlockId: string;
       fileIds: string[];
       mode: SearchAgentConfig['mode'];
+      classification?: ClassifierOutput;
+      query?: string;
+      tokenTracker?: {
+        addTokens: (count: number) => void;
+        getUsedTokens: () => number;
+        isLimitExceeded: () => boolean;
+      };
     },
   ) => Promise<ActionOutput>;
 }

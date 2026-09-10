@@ -11,7 +11,7 @@ import { Ollama, Tool as OllamaTool, Message as OllamaMessage } from 'ollama';
 import { parse } from 'partial-json';
 import crypto from 'crypto';
 import { Message } from '@/lib/types';
-import { repairJson } from '@toolsycc/json-repair';
+import { parseAndValidateObject, sanitizeJsonString } from '@/lib/utils/jsonParser';
 
 type OllamaConfig = {
   baseURL: string;
@@ -52,7 +52,7 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
       } else if (msg.role === 'assistant') {
         return {
           role: 'assistant',
-          content: msg.content,
+          content: msg.content ?? '',
           tool_calls:
             msg.tool_calls?.map((tc, i) => ({
               function: {
@@ -64,7 +64,10 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
         };
       }
 
-      return msg;
+      return {
+        role: msg.role,
+        content: msg.content ?? '',
+      } as OllamaMessage;
     });
   }
 
@@ -82,29 +85,38 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
       });
     });
 
-    const res = await this.ollamaClient.chat({
-      model: this.config.model,
-      messages: this.convertToOllamaMessages(input.messages),
-      tools: ollamaTools.length > 0 ? ollamaTools : undefined,
-      ...(reasoningModels.find((m) => this.config.model.includes(m))
-        ? { think: false }
-        : {}),
-      options: {
-        top_p: input.options?.topP ?? this.config.options?.topP,
-        temperature:
-          input.options?.temperature ?? this.config.options?.temperature ?? 0.7,
-        num_predict: input.options?.maxTokens ?? this.config.options?.maxTokens,
-        num_ctx: 32000,
-        frequency_penalty:
-          input.options?.frequencyPenalty ??
-          this.config.options?.frequencyPenalty,
-        presence_penalty:
-          input.options?.presencePenalty ??
-          this.config.options?.presencePenalty,
-        stop:
-          input.options?.stopSequences ?? this.config.options?.stopSequences,
-      },
-    });
+    const res = await this.ollamaClient
+      .chat({
+        model: this.config.model,
+        messages: this.convertToOllamaMessages(input.messages),
+        tools: ollamaTools.length > 0 ? ollamaTools : undefined,
+        ...(reasoningModels.find((m) => this.config.model.includes(m))
+          ? { think: false }
+          : {}),
+        options: {
+          top_p: input.options?.topP ?? this.config.options?.topP,
+          temperature:
+            input.options?.temperature ?? this.config.options?.temperature ?? 0.7,
+          num_predict: input.options?.maxTokens ?? this.config.options?.maxTokens,
+          num_ctx: 32000,
+          frequency_penalty:
+            input.options?.frequencyPenalty ??
+            this.config.options?.frequencyPenalty,
+          presence_penalty:
+            input.options?.presencePenalty ??
+            this.config.options?.presencePenalty,
+          stop:
+            input.options?.stopSequences ?? this.config.options?.stopSequences,
+        },
+      })
+      .catch((err: any) => {
+        if (err?.message?.includes('does not support tools')) {
+          throw new Error(
+            `The selected Ollama model "${this.config.model}" does not support tools/function calling. Please select a model with tool support (such as llama3.1, qwen2.5, or mistral).`,
+          );
+        }
+        throw err;
+      });
 
     return {
       content: res.message.content,
@@ -136,30 +148,39 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
       });
     });
 
-    const stream = await this.ollamaClient.chat({
-      model: this.config.model,
-      messages: this.convertToOllamaMessages(input.messages),
-      stream: true,
-      ...(reasoningModels.find((m) => this.config.model.includes(m))
-        ? { think: false }
-        : {}),
-      tools: ollamaTools.length > 0 ? ollamaTools : undefined,
-      options: {
-        top_p: input.options?.topP ?? this.config.options?.topP,
-        temperature:
-          input.options?.temperature ?? this.config.options?.temperature ?? 0.7,
-        num_ctx: 32000,
-        num_predict: input.options?.maxTokens ?? this.config.options?.maxTokens,
-        frequency_penalty:
-          input.options?.frequencyPenalty ??
-          this.config.options?.frequencyPenalty,
-        presence_penalty:
-          input.options?.presencePenalty ??
-          this.config.options?.presencePenalty,
-        stop:
-          input.options?.stopSequences ?? this.config.options?.stopSequences,
-      },
-    });
+    const stream = await this.ollamaClient
+      .chat({
+        model: this.config.model,
+        messages: this.convertToOllamaMessages(input.messages),
+        stream: true,
+        ...(reasoningModels.find((m) => this.config.model.includes(m))
+          ? { think: false }
+          : {}),
+        tools: ollamaTools.length > 0 ? ollamaTools : undefined,
+        options: {
+          top_p: input.options?.topP ?? this.config.options?.topP,
+          temperature:
+            input.options?.temperature ?? this.config.options?.temperature ?? 0.7,
+          num_ctx: 32000,
+          num_predict: input.options?.maxTokens ?? this.config.options?.maxTokens,
+          frequency_penalty:
+            input.options?.frequencyPenalty ??
+            this.config.options?.frequencyPenalty,
+          presence_penalty:
+            input.options?.presencePenalty ??
+            this.config.options?.presencePenalty,
+          stop:
+            input.options?.stopSequences ?? this.config.options?.stopSequences,
+        },
+      })
+      .catch((err: any) => {
+        if (err?.message?.includes('does not support tools')) {
+          throw new Error(
+            `The selected Ollama model "${this.config.model}" does not support tools/function calling. Please select a model with tool support (such as llama3.1, qwen2.5, or mistral).`,
+          );
+        }
+        throw err;
+      });
 
     for await (const chunk of stream) {
       yield {
@@ -207,14 +228,18 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
       },
     });
 
+    const msg = response.message as any;
+    const rawContent =
+      (typeof msg.content === 'string' && msg.content.trim().length > 0
+        ? msg.content
+        : '') ||
+      (typeof msg.thinking === 'string' && msg.thinking.trim().length > 0
+        ? msg.thinking
+        : '') ||
+      '';
+
     try {
-      return input.schema.parse(
-        JSON.parse(
-          repairJson(response.message.content, {
-            extractJson: true,
-          }) as string,
-        ),
-      ) as T;
+      return parseAndValidateObject<T>(rawContent, input.schema, 'Ollama');
     } catch (err) {
       throw new Error(`Error parsing response from Ollama: ${err}`);
     }

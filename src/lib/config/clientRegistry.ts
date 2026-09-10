@@ -6,6 +6,8 @@ const getClientConfig = (key: string, defaultVal?: any) => {
 
 export const getTheme = () => getClientConfig('theme', 'dark');
 
+export const getLanguage = () => getClientConfig('language', 'en');
+
 export const getAutoMediaSearch = () =>
   getClientConfig('autoMediaSearch', 'true') === 'true';
 

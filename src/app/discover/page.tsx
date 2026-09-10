@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import SmallNewsCard from '@/components/Discover/SmallNewsCard';
 import MajorNewsCard from '@/components/Discover/MajorNewsCard';
+import { useTranslation } from '@/lib/i18n';
 
 export interface Discover {
   title: string;
@@ -14,30 +15,32 @@ export interface Discover {
   thumbnail: string;
 }
 
-const topics: { key: string; display: string }[] = [
-  {
-    display: 'Tech & Science',
-    key: 'tech',
-  },
-  {
-    display: 'Finance',
-    key: 'finance',
-  },
-  {
-    display: 'Art & Culture',
-    key: 'art',
-  },
-  {
-    display: 'Sports',
-    key: 'sports',
-  },
-  {
-    display: 'Entertainment',
-    key: 'entertainment',
-  },
-];
-
 const Page = () => {
+  const { t } = useTranslation();
+
+  const topics: { key: string; display: string }[] = [
+    {
+      display: t('discover.techScience'),
+      key: 'tech',
+    },
+    {
+      display: t('discover.finance'),
+      key: 'finance',
+    },
+    {
+      display: t('discover.artCulture'),
+      key: 'art',
+    },
+    {
+      display: t('discover.sports'),
+      key: 'sports',
+    },
+    {
+      display: t('discover.entertainment'),
+      key: 'entertainment',
+    },
+  ];
+
   const [discover, setDiscover] = useState<Discover[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTopic, setActiveTopic] = useState<string>(topics[0].key);
@@ -58,12 +61,14 @@ const Page = () => {
         throw new Error(data.message);
       }
 
-      data.blogs = data.blogs.filter((blog: Discover) => blog.thumbnail);
+      const articles = (data.blogs || []).filter(
+        (blog: Discover) => blog.title && blog.url,
+      );
 
-      setDiscover(data.blogs);
+      setDiscover(articles);
     } catch (err: any) {
       console.error('Error fetching data:', err.message);
-      toast.error('Error fetching data');
+      toast.error(t('discover.errorFetching'));
     } finally {
       setLoading(false);
     }
@@ -80,26 +85,23 @@ const Page = () => {
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div className="flex items-center justify-center">
               <Globe2Icon size={45} className="mb-2.5" />
-              <h1
-                className="text-5xl font-normal p-2"
-                style={{ fontFamily: 'PP Editorial, serif' }}
-              >
-                Discover
+              <h1 className="text-3xl lg:text-4xl font-semibold tracking-tight p-2 text-black dark:text-stone-100">
+                {t('discover.title')}
               </h1>
             </div>
             <div className="flex flex-row items-center space-x-2 overflow-x-auto">
-              {topics.map((t, i) => (
+              {topics.map((item, i) => (
                 <div
                   key={i}
                   className={cn(
                     'border-[0.1px] rounded-full text-sm px-3 py-1 text-nowrap transition duration-200 cursor-pointer',
-                    activeTopic === t.key
+                    activeTopic === item.key
                       ? 'text-cyan-700 dark:text-cyan-300 bg-cyan-300/20 border-cyan-700/60 dar:bg-cyan-300/30 dark:border-cyan-300/40'
                       : 'border-black/30 dark:border-white/30 text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white hover:border-black/40 dark:hover:border-white/40 hover:bg-black/5 dark:hover:bg-white/5',
                   )}
-                  onClick={() => setActiveTopic(t.key)}
+                  onClick={() => setActiveTopic(item.key)}
                 >
-                  <span>{t.display}</span>
+                  <span>{item.display}</span>
                 </div>
               ))}
             </div>
@@ -261,6 +263,20 @@ const Page = () => {
                   return sections;
                 })()}
             </div>
+
+            {(!discover || discover.length === 0) && (
+              <div className="flex flex-col items-center justify-center py-24 text-center">
+                <p className="text-black/60 dark:text-white/60 text-lg mb-4">
+                  {t('discover.noArticlesFound')}
+                </p>
+                <button
+                  onClick={() => fetchArticles(activeTopic)}
+                  className="px-5 py-2 text-sm font-medium rounded-full bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/20 transition duration-200"
+                >
+                  {t('discover.refresh')}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -1,10 +1,12 @@
 'use client';
 
-import { Wind } from 'lucide-react';
+import { Wind, MoreVertical } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getApproxLocation } from '@/lib/actions';
+import { useTranslation } from '@/lib/i18n';
 
 const WeatherWidget = () => {
+  const { t } = useTranslation();
   const [data, setData] = useState({
     temperature: 0,
     condition: '',
@@ -101,56 +103,58 @@ const WeatherWidget = () => {
   }, []);
 
   return (
-    <div className="bg-light-secondary dark:bg-dark-secondary rounded-2xl border border-light-200 dark:border-dark-200 shadow-sm shadow-light-200/10 dark:shadow-black/25 flex flex-row items-center w-full h-24 min-h-[96px] max-h-[96px] px-3 py-2 gap-3">
+    <div className="bg-light-secondary/90 dark:bg-[#161412]/85 backdrop-blur-md rounded-2xl border border-light-200 dark:border-[#28221b] shadow-lg shadow-black/20 hover:border-light-300 dark:hover:border-[#3d342a] p-4 flex flex-col justify-between w-full h-[128px] transition duration-200">
       {loading ? (
-        <>
-          <div className="flex flex-col items-center justify-center w-16 min-w-16 max-w-16 h-full animate-pulse">
-            <div className="h-10 w-10 rounded-full bg-light-200 dark:bg-dark-200 mb-2" />
-            <div className="h-4 w-10 rounded bg-light-200 dark:bg-dark-200" />
+        <div className="animate-pulse flex flex-col justify-between h-full">
+          <div className="flex flex-row items-center justify-between">
+            <div className="h-3 w-16 rounded bg-light-200 dark:bg-[#25201a]" />
+            <div className="h-3 w-3 rounded-full bg-light-200 dark:bg-[#25201a]" />
           </div>
-          <div className="flex flex-col justify-between flex-1 h-full py-1 animate-pulse">
-            <div className="flex flex-row items-center justify-between">
-              <div className="h-3 w-20 rounded bg-light-200 dark:bg-dark-200" />
-              <div className="h-3 w-12 rounded bg-light-200 dark:bg-dark-200" />
-            </div>
-            <div className="h-3 w-16 rounded bg-light-200 dark:bg-dark-200 mt-1" />
-            <div className="flex flex-row justify-between w-full mt-auto pt-1 border-t border-light-200 dark:border-dark-200">
-              <div className="h-3 w-16 rounded bg-light-200 dark:bg-dark-200" />
-              <div className="h-3 w-8 rounded bg-light-200 dark:bg-dark-200" />
-            </div>
+          <div className="flex flex-row items-center space-x-3 my-1">
+            <div className="h-10 w-10 rounded-full bg-light-200 dark:bg-[#25201a]" />
+            <div className="h-7 w-20 rounded bg-light-200 dark:bg-[#25201a]" />
           </div>
-        </>
+          <div className="flex flex-row justify-between pt-1 border-t border-light-200/50 dark:border-[#28221b]/60">
+            <div className="h-3 w-20 rounded bg-light-200 dark:bg-[#25201a]" />
+            <div className="h-3 w-14 rounded bg-light-200 dark:bg-[#25201a]" />
+          </div>
+        </div>
       ) : (
         <>
-          <div className="flex flex-col items-center justify-center w-16 min-w-16 max-w-16 h-full">
-            <img
-              src={`/weather-ico/${data.icon}.svg`}
-              alt={data.condition}
-              className="h-10 w-auto"
-            />
-            <span className="text-base font-semibold text-black dark:text-white">
-              {data.temperature}°{data.temperatureUnit}
-            </span>
+          <div className="flex flex-row items-center justify-between text-xs text-black/60 dark:text-stone-400 font-medium">
+            <span>Weather</span>
+            <button
+              onClick={updateWeather}
+              title="Refresh"
+              className="text-black/40 dark:text-stone-500 hover:text-black dark:hover:text-stone-300 transition"
+            >
+              <MoreVertical size={14} />
+            </button>
           </div>
-          <div className="flex flex-col justify-between flex-1 h-full py-2">
-            <div className="flex flex-row items-center justify-between">
-              <span className="text-sm font-semibold text-black dark:text-white">
-                {data.location}
+          <div className="flex flex-row items-center justify-between my-0.5">
+            <div className="flex flex-row items-center space-x-2.5">
+              <img
+                src={`/weather-ico/${data.icon}.svg`}
+                alt={data.condition}
+                className="h-9 w-auto object-contain"
+              />
+              <span className="text-3xl font-light text-black dark:text-stone-100">
+                {data.temperature}°{data.temperatureUnit}
               </span>
-              <span className="flex items-center text-xs text-black/60 dark:text-white/60 font-medium">
-                <Wind className="w-3 h-3 mr-1" />
+            </div>
+            <div className="flex flex-col items-end text-right">
+              <span className="flex items-center text-xs font-medium text-black/70 dark:text-stone-300">
+                <Wind className="w-3 h-3 mr-1 text-black/40 dark:text-stone-500" />
                 {data.windSpeed} {data.windSpeedUnit}
               </span>
-            </div>
-            <span className="text-xs text-black/50 dark:text-white/50 italic">
-              {data.condition}
-            </span>
-            <div className="flex flex-row justify-between w-full mt-auto pt-2 border-t border-light-200/50 dark:border-dark-200/50 text-xs text-black/50 dark:text-white/50 font-medium">
-              <span>Humidity {data.humidity}%</span>
-              <span className="font-semibold text-black/70 dark:text-white/70">
-                Now
+              <span className="text-[10px] text-black/50 dark:text-stone-500 italic">
+                {data.condition}
               </span>
             </div>
+          </div>
+          <div className="flex flex-row justify-between w-full pt-2 border-t border-light-200/50 dark:border-[#28221b]/60 text-[11px] text-black/50 dark:text-stone-400 font-medium">
+            <span className="truncate max-w-[150px]">{data.location}</span>
+            <span>{t('widgets.humidity', { value: data.humidity })}</span>
           </div>
         </>
       )}

@@ -6,7 +6,7 @@ export const POST = async (req: Request) => {
       measureUnit: 'Imperial' | 'Metric';
     } = await req.json();
 
-    if (!body.lat || !body.lng) {
+    if (typeof body.lat !== 'number' || typeof body.lng !== 'number') {
       return Response.json(
         {
           message: 'Invalid request.',

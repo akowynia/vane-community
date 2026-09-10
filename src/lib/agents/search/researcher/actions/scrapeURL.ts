@@ -3,6 +3,7 @@ import { ResearchAction } from '../../types';
 import { Chunk, ReadingResearchBlock } from '@/lib/types';
 import Scraper from '@/lib/scraper';
 import { splitText } from '@/lib/utils/splitText';
+import { validateUrlForSSRF } from '@/lib/security/ssrf';
 
 const extractorPrompt = `
                   Assistant is an AI information extractor. Assistant will be shared with scraped information from a website along with the queries used to retrieve that information. Assistant's task is to extract relevant facts from the scraped data to answer the queries.
@@ -47,7 +48,11 @@ const extractorSchema = z.object({
 });
 
 const schema = z.object({
-  urls: z.array(z.string()).describe('A list of URLs to scrape content from.'),
+  urls: z
+    .union([z.array(z.string()), z.string()])
+    .optional()
+    .describe('A list of URLs to scrape content from.'),
+  url: z.string().optional().describe('A single URL to scrape content from.'),
 });
 
 const actionDescription = `
@@ -65,7 +70,25 @@ const scrapeURLAction: ResearchAction<typeof schema> = {
   getDescription: () => actionDescription,
   enabled: (_) => true,
   execute: async (params, additionalConfig) => {
-    params.urls = params.urls.slice(0, 3);
+    const rawUrls = (params as any)?.urls ?? (params as any)?.url;
+    const urls = (
+      Array.isArray(rawUrls)
+        ? rawUrls
+        : typeof rawUrls === 'string'
+          ? [rawUrls]
+          : []
+    )
+      .filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
+      .slice(0, 3);
+
+    params.urls = urls;
+
+    if (urls.length === 0) {
+      return {
+        type: 'search_results',
+        results: [],
+      };
+    }
 
     let readingBlockId = crypto.randomUUID();
     let readingEmitted = false;
@@ -79,7 +102,40 @@ const scrapeURLAction: ResearchAction<typeof schema> = {
     await Promise.all(
       params.urls.map(async (url) => {
         try {
-          const scraped = await Scraper.scrape(url);
+          const ssrfCheck = await validateUrlForSSRF(url);
+          if (!ssrfCheck.valid) {
+            console.warn(`[scrape_url] SSRF blocked for URL "${url}": ${ssrfCheck.reason}`);
+            results.push({
+              content: `Access to "${url}" is blocked by security policy: ${ssrfCheck.reason}`,
+              metadata: {
+                url,
+                title: 'Blocked by Security Policy',
+              },
+            });
+            return;
+          }
+
+          const scraped = await Scraper.scrape(url, {
+            chatId: (additionalConfig as any)?.session?.id,
+          });
+
+          if (!scraped || scraped.error || !scraped.content) {
+            const errorDesc =
+              scraped?.error === 'ssrf_blocked'
+                ? 'Access blocked by security policy.'
+                : scraped?.error === 'content_too_short' || scraped?.error === 'empty_content'
+                  ? 'Failed to extract sufficient readable text from the page (content too short or empty).'
+                  : 'Failed to scrape and extract content from this page.';
+
+            results.push({
+              content: `Could not retrieve content from "${url}": ${errorDesc}`,
+              metadata: {
+                url,
+                title: scraped?.title || 'Extraction Failed',
+              },
+            });
+            return;
+          }
 
           if (
             !readingEmitted &&
@@ -144,14 +200,15 @@ const scrapeURLAction: ResearchAction<typeof schema> = {
             );
           }
 
-          const chunks = splitText(scraped.content, 4000, 500);
+          const chunks = splitText(scraped.content, 3000, 300);
 
           let accumulatedContent = '';
 
           if (chunks.length > 1) {
             try {
+              const chunksToProcess = chunks.slice(0, 4);
               await Promise.all(
-                chunks.map(async (chunk) => {
+                chunksToProcess.map(async (chunk) => {
                   const extracted = await additionalConfig.llm.generateObject<
                     typeof extractorSchema
                   >({
@@ -176,10 +233,14 @@ const scrapeURLAction: ResearchAction<typeof schema> = {
                 'Error during extraction, falling back to raw content',
                 err,
               );
-              accumulatedContent = chunks[0];
+              accumulatedContent = chunks[0].slice(0, 3500);
             }
           } else {
-            accumulatedContent = scraped.content;
+            accumulatedContent = scraped.content.slice(0, 3500);
+          }
+
+          if (accumulatedContent.length > 4000) {
+            accumulatedContent = accumulatedContent.slice(0, 4000);
           }
 
           results.push({

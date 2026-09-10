@@ -7,7 +7,7 @@ export type SystemMessage = {
 
 export type AssistantMessage = {
   role: 'assistant';
-  content: string;
+  content: string | null;
   tool_calls?: ToolCall[];
 };
 
@@ -99,13 +99,28 @@ export type UploadSearchResultsResearchBlock = {
   results: Chunk[];
 };
 
+export type SearchWarningResearchBlock = {
+  id: string;
+  type: 'search_warning';
+  warningType:
+    | 'captcha'
+    | 'rate_limit'
+    | 'blocked'
+    | 'error'
+    | 'no_results'
+    | 'token_limit_reached';
+  engines: string[];
+  message?: string;
+};
+
 export type ResearchBlockSubStep =
   | ReasoningResearchBlock
   | SearchingResearchBlock
   | SearchResultsResearchBlock
   | ReadingResearchBlock
   | UploadSearchingResearchBlock
-  | UploadSearchResultsResearchBlock;
+  | UploadSearchResultsResearchBlock
+  | SearchWarningResearchBlock;
 
 export type ResearchBlock = {
   id: string;
@@ -115,9 +130,23 @@ export type ResearchBlock = {
   };
 };
 
+export type MetricsBlock = {
+  id: string;
+  type: 'metrics';
+  data: {
+    modelKey: string;
+    providerId: string;
+    durationMs: number;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+};
+
 export type Block =
   | TextBlock
   | SourceBlock
   | SuggestionBlock
   | WidgetBlock
-  | ResearchBlock;
+  | ResearchBlock
+  | MetricsBlock;

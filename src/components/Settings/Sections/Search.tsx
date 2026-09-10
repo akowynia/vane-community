@@ -1,5 +1,6 @@
 import { UIConfigField } from '@/lib/config/types';
 import SettingsField from '../SettingsField';
+import SearchEngines from './SearchEngines';
 
 const Search = ({
   fields,
@@ -10,20 +11,24 @@ const Search = ({
 }) => {
   return (
     <div className="flex-1 space-y-6 overflow-y-auto px-6 py-6">
-      {fields.map((field) => (
-        <SettingsField
-          key={field.key}
-          field={field}
-          value={
-            (field.scope === 'client'
-              ? localStorage.getItem(field.key)
-              : values[field.key]) ?? field.default
-          }
-          dataAdd="search"
-        />
-      ))}
+      {(fields || [])
+        .filter((field) => field && field.key)
+        .map((field) => (
+          <SettingsField
+            key={field.key}
+            field={field}
+            value={
+              (field.scope === 'client'
+                ? localStorage.getItem(field.key)
+                : values?.[field.key]) ?? field.default
+            }
+            dataAdd="search"
+          />
+        ))}
+      <SearchEngines />
     </div>
   );
 };
 
 export default Search;
+

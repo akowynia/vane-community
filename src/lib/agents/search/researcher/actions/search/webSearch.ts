@@ -4,10 +4,15 @@ import { ResearchBlock } from '@/lib/types';
 import { executeSearch } from './baseSearch';
 
 const actionSchema = z.object({
-  type: z.literal('web_search'),
   queries: z
-    .array(z.string())
+    .union([z.array(z.string()), z.string()])
+    .optional()
     .describe('An array of search queries to perform web searches for.'),
+  query: z
+    .string()
+    .optional()
+    .describe('A search query to perform web search for.'),
+  type: z.string().optional(),
 });
 
 const speedModePrompt = `
@@ -85,9 +90,29 @@ const webSearchAction: ResearchAction<typeof actionSchema> = {
     config.sources.includes('web') &&
     config.classification.classification.skipSearch === false,
   execute: async (input, additionalConfig) => {
-    input.queries = (
-      Array.isArray(input.queries) ? input.queries : [input.queries]
-    ).slice(0, 3);
+    const rawQueries = (input as any)?.queries ?? (input as any)?.query;
+    const queries = (
+      Array.isArray(rawQueries)
+        ? rawQueries
+        : typeof rawQueries === 'string'
+          ? [rawQueries]
+          : []
+    )
+      .filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
+      .slice(0, 3);
+
+    const fallbackQuery =
+      (additionalConfig as any)?.classification?.standaloneFollowUp?.trim() ||
+      (additionalConfig as any)?.query?.trim();
+
+    const finalQueries =
+      queries.length > 0
+        ? queries
+        : fallbackQuery
+          ? [fallbackQuery]
+          : [];
+
+    input.queries = finalQueries;
 
     const researchBlock = additionalConfig.session.getBlock(
       additionalConfig.researchBlockId,
@@ -102,6 +127,10 @@ const webSearchAction: ResearchAction<typeof actionSchema> = {
       queries: input.queries,
       researchBlock: researchBlock,
       session: additionalConfig.session,
+      tokenTracker: additionalConfig.tokenTracker,
+      searchConfig: {
+        categories: ['general'],
+      },
     });
 
     return {

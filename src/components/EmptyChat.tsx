@@ -12,8 +12,12 @@ import {
   getShowNewsWidget,
   getShowWeatherWidget,
 } from '@/lib/config/clientRegistry';
+import { useTranslation } from '@/lib/i18n';
+
+import CompassBackground from './CompassBackground';
 
 const EmptyChat = () => {
+  const { t } = useTranslation();
   const [showWeather, setShowWeather] = useState(() =>
     typeof window !== 'undefined' ? getShowWeatherWidget() : true,
   );
@@ -42,26 +46,34 @@ const EmptyChat = () => {
   }, []);
 
   return (
-    <div className="relative">
-      <div className="absolute w-full flex flex-row items-center justify-end mr-5 mt-5">
+    <div className="relative min-h-screen flex flex-col justify-center items-center overflow-hidden">
+      {/* Nautical Compass Rose & Celestial Glow in background */}
+      <CompassBackground />
+
+      {/* Mobile settings button */}
+      <div className="absolute w-full flex flex-row items-center justify-end pr-5 pt-5 top-0 right-0 z-20 lg:hidden">
         <SettingsButtonMobile />
       </div>
-      <div className="flex flex-col items-center justify-center min-h-screen max-w-screen-sm mx-auto p-2 space-y-4">
-        <div className="flex flex-col items-center justify-center w-full space-y-8">
-          <h2 className="text-black/70 dark:text-white/70 text-3xl font-medium -mt-8">
-            Research begins here.
+
+      <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-2xl mx-auto px-4 py-8 space-y-6">
+        <div className="flex flex-col items-center justify-center w-full space-y-6 relative z-30">
+          <h2 className="text-black/85 dark:text-stone-100 text-3xl sm:text-4xl md:text-5xl font-light tracking-tight text-center drop-shadow-sm">
+            {t('chat.researchBeginsHere')}
           </h2>
-          <EmptyChatMessageInput />
+          <div className="w-full relative z-30">
+            <EmptyChatMessageInput />
+          </div>
         </div>
+
         {(showWeather || showNews) && (
-          <div className="flex flex-col w-full gap-4 mt-2 sm:flex-row sm:justify-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full pt-1 relative z-10">
             {showWeather && (
-              <div className="flex-1 w-full">
+              <div className="w-full">
                 <WeatherWidget />
               </div>
             )}
             {showNews && (
-              <div className="flex-1 w-full">
+              <div className="w-full">
                 <NewsArticleWidget />
               </div>
             )}

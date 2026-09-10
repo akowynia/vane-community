@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Section } from '@/lib/hooks/useChat';
 import { SourceBlock } from '@/lib/types';
 
+import { useTranslation } from '@/lib/i18n';
+
 const Copy = ({
   section,
   initialMessage,
@@ -12,9 +14,11 @@ const Copy = ({
   initialMessage: string;
 }) => {
   const [copied, setCopied] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <button
+      title={copied ? t('chat.copied') : t('chat.copy')}
       onClick={() => {
         const sources = section.message.responseBlocks.filter(
           (b) => b.type === 'source' && b.data.length > 0,

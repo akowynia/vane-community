@@ -1,12 +1,12 @@
-# How to Contribute to Vane
+# How to Contribute to Vane-Community
 
-Thanks for your interest in contributing to Vane! Your help makes this project better. This guide explains how to contribute effectively.
+Thanks for your interest in contributing to Vane-Community! Your help makes this project better. This guide explains how to contribute effectively.
 
-Vane is a modern AI chat application with advanced search capabilities.
+Vane-Community is a modern AI chat application with advanced search capabilities.
 
 ## Project Structure
 
-Vane's codebase is organized as follows:
+Vane-Community's codebase is organized as follows:
 
 - **UI Components and Pages**:
   - **Components (`src/components`)**: Reusable UI components.
@@ -53,7 +53,7 @@ If you are not sure where to start, use this section as a map.
 
 ## API Documentation
 
-Vane includes API documentation for programmatic access.
+Vane-Community includes API documentation for programmatic access.
 
 - **Search API**: For detailed documentation, see `docs/API/SEARCH.md`.
 
@@ -61,7 +61,7 @@ Vane includes API documentation for programmatic access.
 
 Before diving into coding, setting up your local environment is key. Here's what you need to do:
 
-1. Run `npm install` to install all dependencies.
+1. Run `yarn install` or `npm install` to install all dependencies.
 2. Use `npm run dev` to start the application in development mode.
 3. Open http://localhost:3000 and complete the setup in the UI (API keys, models, search backend URL, etc.).
 
@@ -79,4 +79,4 @@ Before committing changes:
 2. Always run `npm run format:write` to format your code according to the project's coding standards. This helps maintain consistency and code quality.
 3. We currently do not have a code of conduct, but it is in the works. In the meantime, please be mindful of how you engage with the project and its community.
 
-Following these steps will help maintain the integrity of Vane's codebase and facilitate a smoother integration of your valuable contributions. Thank you for your support and commitment to improving Vane.
+Following these steps will help maintain the integrity of Vane-Community's codebase and facilitate a smoother integration of your valuable contributions. Thank you for your support and commitment to improving Vane-Community.

@@ -6,6 +6,7 @@ import BaseEmbedding from '../../base/embedding';
 import BaseModelProvider from '../../base/provider';
 import BaseLLM from '../../base/llm';
 import OpenAILLM from './openaiLLM';
+import { isCloudMetadataIP } from '@/lib/security/ssrf';
 
 interface OpenAIConfig {
   apiKey: string;
@@ -200,14 +201,42 @@ class OpenAIProvider extends BaseModelProvider<OpenAIConfig> {
   static parseAndValidate(raw: any): OpenAIConfig {
     if (!raw || typeof raw !== 'object')
       throw new Error('Invalid config provided. Expected object');
-    if (!raw.apiKey || !raw.baseURL)
-      throw new Error(
-        'Invalid config provided. API key and base URL must be provided',
-      );
+    if (!raw.apiKey || typeof raw.apiKey !== 'string' || !raw.apiKey.trim())
+      throw new Error('Invalid config provided. API key must be provided');
+    if (!raw.baseURL || typeof raw.baseURL !== 'string' || !raw.baseURL.trim())
+      throw new Error('Invalid config provided. Base URL must be provided');
+
+    const trimmedURL = raw.baseURL.trim();
+    try {
+      const u = new URL(trimmedURL);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        throw new Error('Base URL must start with http:// or https://');
+      }
+      if (u.username || u.password) {
+        throw new Error('Base URL cannot contain embedded credentials.');
+      }
+      const hostname = u.hostname.toLowerCase().trim();
+      const ipLiteral =
+        hostname.startsWith('[') && hostname.endsWith(']')
+          ? hostname.slice(1, -1)
+          : hostname;
+      if (
+        isCloudMetadataIP(ipLiteral) ||
+        hostname === 'metadata.google.internal' ||
+        hostname === 'metadata.internal' ||
+        hostname === 'instance-data' ||
+        hostname.endsWith('.ec2.internal') ||
+        hostname.endsWith('.google.internal')
+      ) {
+        throw new Error('Base URL cannot point to cloud metadata endpoints.');
+      }
+    } catch (err: any) {
+      throw new Error(err.message || 'Invalid Base URL format.');
+    }
 
     return {
-      apiKey: String(raw.apiKey),
-      baseURL: String(raw.baseURL),
+      apiKey: String(raw.apiKey).trim(),
+      baseURL: trimmedURL,
     };
   }
 

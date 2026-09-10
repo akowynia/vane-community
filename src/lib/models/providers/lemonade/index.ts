@@ -6,6 +6,7 @@ import BaseLLM from '../../base/llm';
 import LemonadeLLM from './lemonadeLLM';
 import BaseEmbedding from '../../base/embedding';
 import LemonadeEmbedding from './lemonadeEmbedding';
+import { isCloudMetadataIP } from '@/lib/security/ssrf';
 
 interface LemonadeConfig {
   baseURL: string;
@@ -50,11 +51,27 @@ class LemonadeProvider extends BaseModelProvider<LemonadeConfig> {
             ? { Authorization: `Bearer ${this.config.apiKey}` }
             : {}),
         },
+        signal: AbortSignal.timeout(5000),
       });
 
-      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          `Lemonade API returned HTTP ${res.status}: ${res.statusText || 'Error'}`,
+        );
+      }
 
-      const models: Model[] = data.data
+      let data: any;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('Lemonade API returned an invalid JSON response.');
+      }
+
+      if (!data || typeof data !== 'object' || !Array.isArray(data.data)) {
+        throw new Error('Lemonade API returned unexpected response format.');
+      }
+
+      const models: Model[] = (data.data || [])
         .filter((m: any) => m.recipe === 'llamacpp')
         .map((m: any) => {
           return {
@@ -67,14 +84,21 @@ class LemonadeProvider extends BaseModelProvider<LemonadeConfig> {
         embedding: models,
         chat: models,
       };
-    } catch (err) {
-      if (err instanceof TypeError) {
+    } catch (err: any) {
+      if (
+        err instanceof TypeError ||
+        err.name === 'TimeoutError' ||
+        err.name === 'AbortError'
+      ) {
         throw new Error(
           'Error connecting to Lemonade API. Please ensure the base URL is correct and the service is available.',
         );
       }
+      if (err instanceof SyntaxError) {
+        throw new Error('Lemonade API returned an invalid JSON response.');
+      }
 
-      throw err;
+      throw new Error(err.message || 'Error connecting to Lemonade API.');
     }
   }
 
@@ -129,11 +153,39 @@ class LemonadeProvider extends BaseModelProvider<LemonadeConfig> {
   static parseAndValidate(raw: any): LemonadeConfig {
     if (!raw || typeof raw !== 'object')
       throw new Error('Invalid config provided. Expected object');
-    if (!raw.baseURL)
-      throw new Error('Invalid config provided. Base URL must be provided');
+    if (!raw.baseURL || typeof raw.baseURL !== 'string')
+      throw new Error('Invalid config provided. Base URL must be provided as a string');
+
+    const trimmed = raw.baseURL.trim();
+    try {
+      const u = new URL(trimmed);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        throw new Error('Base URL must start with http:// or https://');
+      }
+      if (u.username || u.password) {
+        throw new Error('Base URL cannot contain embedded credentials.');
+      }
+      const hostname = u.hostname.toLowerCase().trim();
+      const ipLiteral =
+        hostname.startsWith('[') && hostname.endsWith(']')
+          ? hostname.slice(1, -1)
+          : hostname;
+      if (
+        isCloudMetadataIP(ipLiteral) ||
+        hostname === 'metadata.google.internal' ||
+        hostname === 'metadata.internal' ||
+        hostname === 'instance-data' ||
+        hostname.endsWith('.ec2.internal') ||
+        hostname.endsWith('.google.internal')
+      ) {
+        throw new Error('Base URL cannot point to cloud metadata endpoints.');
+      }
+    } catch (err: any) {
+      throw new Error(err.message || 'Invalid Base URL format.');
+    }
 
     return {
-      baseURL: String(raw.baseURL),
+      baseURL: trimmed,
       apiKey: raw.apiKey ? String(raw.apiKey) : undefined,
     };
   }

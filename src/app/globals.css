@@ -45,34 +45,34 @@
 
   @media (prefers-color-scheme: dark) {
     * {
-      scrollbar-color: #21262d transparent; /* dark-200 */
+      scrollbar-color: #28221b transparent; /* dark-200 */
     }
 
     *::-webkit-scrollbar-thumb {
-      background: #21262d; /* dark-200 */
+      background: #28221b; /* dark-200 */
     }
 
     *::-webkit-scrollbar-thumb:hover {
-      background: #30363d; /* dark-300 */
+      background: #3d342a; /* dark-300 */
     }
   }
 
   :root.dark *,
   html.dark *,
   body.dark * {
-    scrollbar-color: #21262d transparent; /* dark-200 */
+    scrollbar-color: #28221b transparent; /* dark-200 */
   }
 
   :root.dark *::-webkit-scrollbar-thumb,
   html.dark *::-webkit-scrollbar-thumb,
   body.dark *::-webkit-scrollbar-thumb {
-    background: #21262d; /* dark-200 */
+    background: #28221b; /* dark-200 */
   }
 
   :root.dark *::-webkit-scrollbar-thumb:hover,
   html.dark *::-webkit-scrollbar-thumb:hover,
   body.dark *::-webkit-scrollbar-thumb:hover {
-    background: #30363d; /* dark-300 */
+    background: #3d342a; /* dark-300 */
   }
 
   html {
@@ -97,3 +97,14 @@
     font-size: 16px !important;
   }
 }
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  nav, aside, header, footer, button, [role="dialog"], .headlessui-dialog {
+    display: none !important;
+  }
+}
+

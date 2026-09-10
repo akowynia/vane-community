@@ -15,7 +15,152 @@ db.exec(`
     name TEXT NOT NULL UNIQUE,
     run_on DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    display_name TEXT,
+    role TEXT NOT NULL DEFAULT 'member',
+    status TEXT NOT NULL DEFAULT 'active',
+    allowed_providers TEXT DEFAULT '["*"]',
+    allowed_models TEXT DEFAULT '["*"]',
+    token_limit_5h INTEGER,
+    token_limit_weekly INTEGER,
+    token_limit_per_day INTEGER,
+    token_limit_per_month INTEGER,
+    max_tokens_per_request INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS user_sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS model_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chatId TEXT,
+    messageId TEXT,
+    providerId TEXT NOT NULL,
+    modelKey TEXT NOT NULL,
+    query TEXT,
+    step TEXT NOT NULL DEFAULT 'answer',
+    promptTokens INTEGER NOT NULL DEFAULT 0,
+    completionTokens INTEGER NOT NULL DEFAULT 0,
+    totalTokens INTEGER NOT NULL DEFAULT 0,
+    durationMs INTEGER NOT NULL DEFAULT 0,
+    timeToFirstTokenMs INTEGER,
+    tokensPerSecond REAL,
+    optimizationMode TEXT,
+    status TEXT NOT NULL DEFAULT 'success',
+    errorMessage TEXT,
+    createdAt TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS waypoints (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    icon TEXT DEFAULT 'Waypoints',
+    system_instructions TEXT,
+    user_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS waypoint_crons (
+    id TEXT PRIMARY KEY,
+    waypoint_id TEXT NOT NULL REFERENCES waypoints(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    schedule TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    sources TEXT DEFAULT '[]',
+    optimization_mode TEXT NOT NULL DEFAULT 'balanced',
+    chat_model_provider TEXT NOT NULL,
+    chat_model_key TEXT NOT NULL,
+    embedding_model_provider TEXT,
+    embedding_model_key TEXT,
+    system_instructions TEXT,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    last_run_at TEXT,
+    next_run_at TEXT,
+    last_status TEXT,
+    last_error TEXT,
+    last_chat_id TEXT,
+    user_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS scratchpad_templates (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    icon TEXT DEFAULT 'FileText',
+    content TEXT NOT NULL,
+    system_instructions TEXT,
+    is_builtin INTEGER NOT NULL DEFAULT 0,
+    user_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS scratchpads (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
+    user_id TEXT,
+    waypoint_id TEXT,
+    template_id TEXT,
+    sources TEXT DEFAULT '[]',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS scratchpad_versions (
+    id TEXT PRIMARY KEY,
+    scratchpad_id TEXT NOT NULL REFERENCES scratchpads(id) ON DELETE CASCADE,
+    version_number INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    summary TEXT,
+    prompt TEXT,
+    sources TEXT DEFAULT '[]',
+    author TEXT NOT NULL DEFAULT 'ai',
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS scratchpad_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scratchpad_id TEXT NOT NULL REFERENCES scratchpads(id) ON DELETE CASCADE,
+    message_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    query TEXT NOT NULL,
+    response_blocks TEXT DEFAULT '[]',
+    sources TEXT DEFAULT '[]',
+    metrics TEXT,
+    selected_text TEXT,
+    created_at TEXT NOT NULL
+  );
 `);
+
+
+try { db.exec("ALTER TABLE chats ADD COLUMN userId TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE chats ADD COLUMN waypointId TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE model_stats ADD COLUMN userId TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN token_limit_5h INTEGER;"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN token_limit_weekly INTEGER;"); } catch(e) {}
+try { db.exec("ALTER TABLE scratchpads ADD COLUMN waypoint_id TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE scratchpads ADD COLUMN template_id TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE scratchpad_messages ADD COLUMN metrics TEXT;"); } catch(e) {}
+
+
 
 function sanitizeSql(content: string) {
   const statements = content
@@ -121,6 +266,7 @@ fs.readdirSync(migrationsFolder)
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
             createdAt TEXT NOT NULL,
+            userId TEXT,
             sources TEXT DEFAULT '[]',
             files TEXT DEFAULT '[]'
           );
@@ -131,8 +277,8 @@ fs.readdirSync(migrationsFolder)
           .all();
 
         const insertChat = db.prepare(`
-            INSERT INTO chats_new (id, title, createdAt, sources, files)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO chats_new (id, title, createdAt, userId, sources, files)
+            VALUES (?, ?, ?, ?, ?, ?)
           `);
 
         chats.forEach((chat: any) => {
@@ -145,6 +291,7 @@ fs.readdirSync(migrationsFolder)
             chat.id,
             chat.title,
             chat.createdAt,
+            chat.userId || null,
             '["web"]',
             JSON.stringify(files),
           );
@@ -286,3 +433,12 @@ fs.readdirSync(migrationsFolder)
       throw err;
     }
   });
+
+// Guarantee all essential columns exist after all migrations finish
+try { db.exec("ALTER TABLE chats ADD COLUMN userId TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE model_stats ADD COLUMN userId TEXT;"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN token_limit_5h INTEGER;"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN token_limit_weekly INTEGER;"); } catch(e) {}
+try { db.exec("ALTER TABLE chats ADD COLUMN sources TEXT DEFAULT '[]';"); } catch(e) {}
+try { db.exec("ALTER TABLE chats ADD COLUMN files TEXT DEFAULT '[]';"); } catch(e) {}
+try { db.exec("ALTER TABLE chats ADD COLUMN waypointId TEXT;"); } catch(e) {}

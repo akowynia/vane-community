@@ -8,10 +8,12 @@ import GroqProvider from './groq';
 import LemonadeProvider from './lemonade';
 import AnthropicProvider from './anthropic';
 import LMStudioProvider from './lmstudio';
+import OllamaCloudProvider from './ollama-cloud';
 
 export const providers: Record<string, ProviderConstructor<any>> = {
   openai: OpenAIProvider,
   ollama: OllamaProvider,
+  'ollama-cloud': OllamaCloudProvider,
   gemini: GeminiProvider,
   transformers: TransformersProvider,
   groq: GroqProvider,

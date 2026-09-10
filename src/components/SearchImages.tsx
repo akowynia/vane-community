@@ -1,9 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
 import { ImagesIcon, PlusIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Lightbox from 'yet-another-react-lightbox';
 import 'yet-another-react-lightbox/styles.css';
 import { Message } from './ChatWindow';
+import { useTranslation } from '@/lib/i18n';
 
 type Image = {
   url: string;
@@ -20,57 +21,73 @@ const SearchImages = ({
   chatHistory: [string, string][];
   messageId: string;
 }) => {
+  const { t } = useTranslation();
   const [images, setImages] = useState<Image[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [slides, setSlides] = useState<any[]>([]);
+
+  const fetchImages = useCallback(async () => {
+    setLoading(true);
+
+    const chatModelProvider = localStorage.getItem('chatModelProviderId');
+    const chatModel = localStorage.getItem('chatModelKey');
+
+    try {
+      const res = await fetch(`/api/images`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: query,
+          chatHistory: chatHistory,
+          chatModel: {
+            providerId: chatModelProvider,
+            key: chatModel,
+          },
+        }),
+      });
+
+      const data = await res.json();
+      const images = data.images ?? [];
+      setImages(images);
+      setSlides(
+        images.map((image: Image) => {
+          return {
+            src: image.img_src,
+          };
+        }),
+      );
+    } catch (err) {
+      console.error('Error fetching images:', err);
+      setImages([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [query, chatHistory]);
+
+  useEffect(() => {
+    const isImageQuery =
+      /\b(images?|photos?|pictures?|pics?|wallpapers?|zdjęcia|zdjęcie|obrazy|obrazki|fotografie)\b/i.test(
+        query,
+      );
+    if (isImageQuery && images === null && !loading) {
+      fetchImages();
+    }
+  }, [query, images, loading, fetchImages]);
 
   return (
     <>
       {!loading && images === null && (
         <button
           id={`search-images-${messageId}`}
-          onClick={async () => {
-            setLoading(true);
-
-            const chatModelProvider = localStorage.getItem(
-              'chatModelProviderId',
-            );
-            const chatModel = localStorage.getItem('chatModelKey');
-
-            const res = await fetch(`/api/images`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                query: query,
-                chatHistory: chatHistory,
-                chatModel: {
-                  providerId: chatModelProvider,
-                  key: chatModel,
-                },
-              }),
-            });
-
-            const data = await res.json();
-
-            const images = data.images ?? [];
-            setImages(images);
-            setSlides(
-              images.map((image: Image) => {
-                return {
-                  src: image.img_src,
-                };
-              }),
-            );
-            setLoading(false);
-          }}
+          onClick={fetchImages}
           className="border border-dashed border-light-200 dark:border-dark-200 hover:bg-light-200 dark:hover:bg-dark-200 active:scale-95 duration-200 transition px-4 py-2 flex flex-row items-center justify-between rounded-lg dark:text-white text-sm w-full"
         >
           <div className="flex flex-row items-center space-x-2">
             <ImagesIcon size={17} />
-            <p>Search images</p>
+            <p>{t('chat.searchImages')}</p>
           </div>
           <PlusIcon className="text-[#24A0ED]" size={17} />
         </button>
@@ -137,7 +154,7 @@ const SearchImages = ({
                   ))}
                 </div>
                 <p className="text-black/70 dark:text-white/70 text-xs">
-                  View {images.length - 3} more
+                  {t('common.viewMore', { count: images.length - 3 })}
                 </p>
               </button>
             )}

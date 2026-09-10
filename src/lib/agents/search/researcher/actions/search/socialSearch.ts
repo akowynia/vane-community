@@ -1,10 +1,14 @@
 import z from 'zod';
 import { ResearchAction } from '../../../types';
-import { ResearchBlock } from '@/lib/types';
+import { Chunk, ResearchBlock } from '@/lib/types';
 import { executeSearch } from './baseSearch';
 
 const schema = z.object({
-  queries: z.array(z.string()).describe('List of social search queries'),
+  queries: z
+    .union([z.array(z.string()), z.string()])
+    .optional()
+    .describe('List of social search queries'),
+  query: z.string().optional().describe('A social search query'),
 });
 
 const socialSearchDescription = `
@@ -30,9 +34,25 @@ const socialSearchAction: ResearchAction<typeof schema> = {
     config.classification.classification.skipSearch === false &&
     config.classification.classification.discussionSearch === true,
   execute: async (input, additionalConfig) => {
-    input.queries = (
-      Array.isArray(input.queries) ? input.queries : [input.queries]
-    ).slice(0, 3);
+    const rawQueries = (input as any)?.queries ?? (input as any)?.query;
+    const queries = (
+      Array.isArray(rawQueries)
+        ? rawQueries
+        : typeof rawQueries === 'string'
+          ? [rawQueries]
+          : []
+    )
+      .filter((q): q is string => typeof q === 'string' && q.trim().length > 0)
+      .slice(0, 3);
+
+    input.queries = queries;
+
+    if (queries.length === 0) {
+      return {
+        type: 'search_results',
+        results: [],
+      };
+    }
 
     const researchBlock = additionalConfig.session.getBlock(
       additionalConfig.researchBlockId,
@@ -40,17 +60,24 @@ const socialSearchAction: ResearchAction<typeof schema> = {
 
     if (!researchBlock) throw new Error('Failed to retrieve research block');
 
-    const results = await executeSearch({
-      llm: additionalConfig.llm,
-      embedding: additionalConfig.embedding,
-      mode: additionalConfig.mode,
-      queries: input.queries,
-      researchBlock: researchBlock,
-      session: additionalConfig.session,
-      searchConfig: {
-        engines: ['reddit'],
-      },
-    });
+    let results: Chunk[] = [];
+    try {
+      results = await executeSearch({
+        llm: additionalConfig.llm,
+        embedding: additionalConfig.embedding,
+        mode: additionalConfig.mode,
+        queries: input.queries,
+        researchBlock: researchBlock,
+        session: additionalConfig.session,
+        tokenTracker: additionalConfig.tokenTracker,
+        searchConfig: {
+          engines: ['reddit', 'hackernews', 'stackexchange'],
+        },
+      });
+    } catch (searchErr) {
+      console.warn('Social search encountered an error:', searchErr);
+      results = [];
+    }
 
     return {
       type: 'search_results',

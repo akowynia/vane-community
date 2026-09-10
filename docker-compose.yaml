@@ -1,14 +1,16 @@
 services:
-  vane:
-    image: itzcrazykns1337/vane:latest
+  vane-community:
+    image: vane-community:latest
     build:
       context: .
     ports:
       - '3000:3000'
+    env_file:
+      - .env
     volumes:
-      - data:/home/vane/data
+      - data:/home/vane-community/data
     restart: unless-stopped
 
 volumes:
   data:
-    name: 'vane-data'
+    name: 'vane-community-data'

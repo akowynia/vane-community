@@ -4,12 +4,15 @@ import { useEffect, useState } from 'react';
 import { UIConfigSections } from '@/lib/config/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import SetupConfig from './SetupConfig';
+import { useTranslation } from '@/lib/i18n';
+import { Globe } from 'lucide-react';
 
 const SetupWizard = ({
   configSections,
 }: {
   configSections: UIConfigSections;
 }) => {
+  const { t, locale, setLocale, availableLocales } = useTranslation();
   const [showWelcome, setShowWelcome] = useState(true);
   const [showSetup, setShowSetup] = useState(false);
   const [setupState, setSetupState] = useState(1);
@@ -19,18 +22,37 @@ const SetupWizard = ({
 
   useEffect(() => {
     (async () => {
-      await delay(2500);
+      await delay(2000);
       setShowWelcome(false);
-      await delay(600);
+      await delay(400);
       setShowSetup(true);
       setSetupState(1);
-      await delay(1500);
+      await delay(1200);
       setSetupState(2);
     })();
   }, []);
 
   return (
     <div className="bg-light-primary dark:bg-dark-primary h-screen w-screen fixed inset-0 overflow-hidden">
+      {/* Floating Language Selector in top right corner from 1st second */}
+      <div className="fixed top-4 right-4 z-[100] flex items-center space-x-2 bg-light-secondary/90 dark:bg-[#14110d]/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-light-200 dark:border-[#332a1e] shadow-lg">
+        <Globe size={14} className="text-[#b8864d]" />
+        <select
+          value={locale}
+          onChange={(e) => setLocale(e.target.value as any)}
+          className="bg-transparent text-xs font-medium text-black dark:text-stone-200 focus:outline-none cursor-pointer"
+        >
+          {availableLocales.map((loc) => (
+            <option
+              key={loc.code}
+              value={loc.code}
+              className="bg-light-primary dark:bg-[#14110d] text-black dark:text-stone-200"
+            >
+              {loc.nativeName} ({loc.name})
+            </option>
+          ))}
+        </select>
+      </div>
       <AnimatePresence>
         {showWelcome && (
           <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
@@ -48,7 +70,7 @@ const SetupWizard = ({
               >
                 Welcome to
                 <span className="text-[#24A0ED] italic font-['PP_Editorial']">
-                  Vane
+                  Vane-Community
                 </span>
               </motion.h2>
               <motion.p
@@ -93,7 +115,7 @@ const SetupWizard = ({
                 >
                   Let us get
                   <span className="text-[#24A0ED] italic font-['PP_Editorial']">
-                    Vane
+                    Vane-Community
                   </span>{' '}
                   set up for you
                 </motion.p>

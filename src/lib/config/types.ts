@@ -63,6 +63,34 @@ type ConfigModelProvider = {
 type Config = {
   version: number;
   setupComplete: boolean;
+  instanceMode?: 'single' | 'multi';
+  auth?: {
+    adminPasswordHash?: string;
+    jwtSecret?: string;
+  };
+  network?: {
+    exposeToNetwork?: boolean;
+    trustedProxies?: string[];
+  };
+  guestSettings?: {
+    allowGuestAccess?: boolean;
+    tokenLimit5h?: number;
+    tokenLimitWeekly?: number;
+    tokenLimitPerDay?: number;
+    tokenLimitPerMonth?: number;
+    maxTokensPerRequest?: number;
+    qualityModeMaxTokens?: number | null;
+    allowedProviders?: string[];
+    allowedModels?: string[];
+  };
+  globalLimits?: {
+    tokenLimit5h?: number | null;
+    tokenLimitWeekly?: number | null;
+    tokenLimitPerDay?: number | null;
+    tokenLimitPerMonth?: number | null;
+    maxTokensPerRequest?: number | null;
+    qualityModeMaxTokens?: number | null;
+  };
   preferences: {
     [key: string]: any;
   };

@@ -1,8 +1,8 @@
-# Vane Search API Documentation
+# Vane-Community Search API Documentation
 
 ## Overview
 
-Vane's Search API makes it easy to use our AI-powered search engine. You can run different types of searches, pick the models you want to use, and get the most recent info. Follow the following headings to learn more about Vane's search API.
+Vane-Community's Search API makes it easy to use our AI-powered search engine. You can run different types of searches, pick the models you want to use, and get the most recent info. Follow the following headings to learn more about Vane-Community's search API.
 
 ## Endpoints
 
@@ -53,13 +53,15 @@ Use the `id` field as the `providerId` and the `key` field from the models array
 
 **Full URL**: `http://localhost:3000/api/search`
 
-**Note**: Replace `localhost:3000` with your Vane instance URL if running on a different host or port
+**Note**: Replace `localhost:3000` with your Vane-Community instance URL if running on a different host or port
 
 ### Request
 
 The API accepts a JSON object in the request body, where you define the enabled search `sources`, chat models, embedding models, and your query.
 
 #### Request Body Structure
+
+##### 1. Standard (Nested format - Recommended)
 
 ```json
 {
@@ -83,27 +85,42 @@ The API accepts a JSON object in the request body, where you define the enabled 
 }
 ```
 
-**Note**: The `providerId` must be a valid UUID obtained from the `/api/providers` endpoint. The example above uses a sample UUID for demonstration.
+##### 2. Flat format (Supported for direct integrations)
+
+```json
+{
+  "chatModelProviderId": "550e8400-e29b-41d4-a716-446655440000",
+  "chatModelKey": "gpt-4o-mini",
+  "embeddingModelProviderId": "550e8400-e29b-41d4-a716-446655440000",
+  "embeddingModelKey": "text-embedding-3-large",
+  "sources": ["web"],
+  "query": "What is Vane"
+}
+```
+
+*Note: If `chatModel` or `embeddingModel` is omitted or model keys are provided without providerId, Vane automatically resolves active configured providers.*
 
 ### Request Parameters
 
-- **`chatModel`** (object, required): Defines the chat model to be used for the query. To get available providers and models, send a GET request to `http://localhost:3000/api/providers`.
+- **`query`** (string, required): The search query or question.
 
-  - `providerId` (string): The UUID of the provider. You can get this from the `/api/providers` endpoint response.
-  - `key` (string): The model key/identifier (e.g., `gpt-4o-mini`, `llama3.1:latest`). Use the `key` value from the provider's `chatModels` array, not the display name.
+- **`chatModel`** (object, optional): Defines the chat model to be used for the query. To get available providers and models, send a GET request to `http://localhost:3000/api/providers`.
+  - `providerId` (string): The UUID of the provider.
+  - `key` (string): The model key/identifier (e.g., `gpt-4o-mini`, `llama3.1:latest`).
 
-- **`embeddingModel`** (object, required): Defines the embedding model for similarity-based searching. To get available providers and models, send a GET request to `http://localhost:3000/api/providers`.
+- **`embeddingModel`** (object, optional): Defines the embedding model for similarity-based searching.
+  - `providerId` (string): The UUID of the embedding provider.
+  - `key` (string): The embedding model key (e.g., `text-embedding-3-large`, `nomic-embed-text`).
 
-  - `providerId` (string): The UUID of the embedding provider. You can get this from the `/api/providers` endpoint response.
-  - `key` (string): The embedding model key (e.g., `text-embedding-3-large`, `nomic-embed-text`). Use the `key` value from the provider's `embeddingModels` array, not the display name.
+- **`chatModelKey`** / **`chatModelProviderId`** (string, optional): Flat alternatives for chat model configuration.
 
-- **`sources`** (array, required): Which search sources to enable. Available values:
+- **`embeddingModelKey`** / **`embeddingModelProviderId`** (string, optional): Flat alternatives for embedding model configuration.
 
+- **`sources`** (array, optional): Which search sources to enable. Defaults to `["web"]`. Available values:
   - `web`, `academic`, `discussions`.
 
 - **`optimizationMode`** (string, optional): Specifies the optimization mode to control the balance between performance and quality. Available modes:
-
-  - `speed`: Prioritize speed and return the fastest answer.
+  - `speed` (default): Prioritize speed and return the fastest answer.
   - `balanced`: Provide a balanced answer with good speed and reasonable quality.
   - `quality`: Prioritize answer quality (may be slower).
 
@@ -184,7 +201,59 @@ Clients should process each line as a separate JSON object. The different messag
 
 ### Error Handling
 
-If an error occurs during the search process, the API will return an appropriate error message with an HTTP status code.
-
-- **400**: If the request is malformed or missing required fields (e.g., no `sources` or `query`).
+- **400**: If the request is malformed or missing required fields (e.g., no `query`).
+- **401**: If `API_KEY` is configured on the server and no valid Bearer token or `x-api-key` header was supplied.
 - **500**: If an internal server error occurs during the search.
+
+---
+
+## Integrations (n8n, Docker, Webhooks & Automation)
+
+### Connecting from Dockerized Services (e.g. n8n, Flowise)
+
+When running automation tools like **n8n** in Docker, calling `http://localhost:3000/api/search` from inside the n8n container fails with:
+`ECONNREFUSED 127.0.0.1:3000 (Connection refused)`
+This is because `localhost` inside a Docker container refers to the container itself, not the host machine or other containers.
+
+#### Recommended URLs:
+- **Docker Desktop (macOS / Windows)**:
+  `http://host.docker.internal:3000/api/search`
+- **Shared Docker Network (Docker Compose)**:
+  If Vane and n8n are in the same `docker-compose.yaml` or on the same network:
+  `http://vane-community:3000/api/search`
+- **Linux Host**:
+  `http://172.17.0.1:3000/api/search` or your machine's LAN IP: `http://192.168.x.x:3000/api/search`
+
+### Simplified Payload for n8n HTTP Request Node
+
+Vane automatically resolves models if you provide only the query, simple model names, or provider names:
+
+```json
+{
+  "query": "Explain quantum computing simply",
+  "chatModel": "gpt-4o-mini"
+}
+```
+
+Or using provider names without knowing internal UUIDs:
+```json
+{
+  "query": "Explain quantum computing simply",
+  "chatModel": {
+    "provider": "ollama",
+    "name": "mistral:latest"
+  }
+}
+```
+
+Or omit `chatModel` entirely to use the default active provider configured in Settings:
+```json
+{
+  "query": "Latest AI news",
+  "sources": ["web"]
+}
+```
+
+### CORS & OPTIONS Preflight
+Cross-Origin Resource Sharing (CORS) is enabled with automatic preflight `OPTIONS` handling on all `/api/*` endpoints. You can trigger requests from browser web apps, n8n webhook nodes, or third-party frontends.
+

@@ -1,3 +1,4 @@
+import { cn } from '@/lib/utils';
 import { useChat } from '@/lib/hooks/useChat';
 import {
   Popover,
@@ -11,27 +12,34 @@ import {
   NetworkIcon,
 } from '@phosphor-icons/react';
 import { AnimatePresence, motion } from 'motion/react';
+import { useTranslation } from '@/lib/i18n';
 
-const sourcesList = [
-  {
-    name: 'Web',
-    key: 'web',
-    icon: <GlobeIcon className="h-[16px] w-auto" />,
-  },
-  {
-    name: 'Academic',
-    key: 'academic',
-    icon: <GraduationCapIcon className="h-[16px] w-auto" />,
-  },
-  {
-    name: 'Social',
-    key: 'discussions',
-    icon: <NetworkIcon className="h-[16px] w-auto" />,
-  },
-];
+interface SourcesProps {
+  position?: 'top' | 'bottom';
+  align?: 'left' | 'right';
+}
 
-const Sources = () => {
+const Sources = ({ position = 'bottom', align = 'right' }: SourcesProps) => {
   const { sources, setSources } = useChat();
+  const { t } = useTranslation();
+
+  const sourcesList = [
+    {
+      name: t('focusModes.web'),
+      key: 'web',
+      icon: <GlobeIcon className="h-[16px] w-auto" />,
+    },
+    {
+      name: t('focusModes.academic'),
+      key: 'academic',
+      icon: <GraduationCapIcon className="h-[16px] w-auto" />,
+    },
+    {
+      name: t('focusModes.discussions'),
+      key: 'discussions',
+      icon: <NetworkIcon className="h-[16px] w-auto" />,
+    },
+  ];
 
   return (
     <Popover className="relative">
@@ -44,14 +52,23 @@ const Sources = () => {
             {open && (
               <PopoverPanel
                 static
-                className="absolute z-10 w-64 md:w-[225px] right-0"
+                className={cn(
+                  'absolute z-[60] w-64 md:w-[225px]',
+                  align === 'left' ? 'left-0' : 'right-0',
+                  position === 'top' ? 'bottom-full mb-2' : 'top-full mt-2',
+                )}
               >
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
                   transition={{ duration: 0.1, ease: 'easeOut' }}
-                  className="origin-top-right flex flex-col bg-light-primary dark:bg-dark-primary border rounded-lg border-light-200 dark:border-dark-200 w-full p-1 max-h-[200px] md:max-h-none overflow-y-auto shadow-lg"
+                  className={cn(
+                    'flex flex-col bg-light-primary dark:bg-dark-primary border rounded-lg border-light-200 dark:border-dark-200 w-full p-1 max-h-[200px] md:max-h-none overflow-y-auto shadow-xl',
+                    position === 'top'
+                      ? (align === 'left' ? 'origin-bottom-left' : 'origin-bottom-right')
+                      : (align === 'left' ? 'origin-top-left' : 'origin-top-right'),
+                  )}
                 >
                   {sourcesList.map((source, i) => (
                     <div

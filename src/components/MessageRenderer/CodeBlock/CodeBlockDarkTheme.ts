@@ -85,10 +85,10 @@ const darkTheme = {
   hljs: {
     display: 'block',
     overflowX: 'auto',
-    background: '#0d1117',
+    background: '#12100e',
     color: '#c9d1d9',
     padding: '0.75em',
-    border: '1px solid #21262d',
+    border: '1px solid #28221b',
     borderRadius: '10px',
   },
   'hljs-emphasis': {

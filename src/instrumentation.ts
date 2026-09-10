@@ -9,5 +9,12 @@ export const register = async () => {
     }
 
     await import('./lib/config/index');
+
+    try {
+      const { startCronScheduler } = await import('./lib/cron/scheduler');
+      startCronScheduler();
+    } catch (cronErr) {
+      console.error('Failed to start cron scheduler:', cronErr);
+    }
   }
 };
