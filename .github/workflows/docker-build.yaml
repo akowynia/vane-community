@@ -40,16 +40,16 @@ jobs:
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Build and push AMD64 Docker image (master)
-        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        if: (github.ref == 'refs/heads/master' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
         run: |
           DOCKERFILE=${{ matrix.variant.dockerfile }}
           VARIANT=${{ matrix.variant.name }}
           docker buildx build --platform linux/amd64 \
-            --cache-from=type=registry,ref=akowynia/vane:${VARIANT}-amd64 \
+            --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-amd64 \
             --cache-to=type=inline \
             --provenance false \
             -f $DOCKERFILE \
-            -t akowynia/vane:${VARIANT}-amd64 \
+            -t akowynia/vane-community:${VARIANT}-amd64 \
             --push .
 
       - name: Build and push AMD64 Canary Docker image
@@ -58,11 +58,11 @@ jobs:
           DOCKERFILE=${{ matrix.variant.dockerfile }}
           VARIANT=${{ matrix.variant.name }}
           docker buildx build --platform linux/amd64 \
-            --cache-from=type=registry,ref=akowynia/vane:${VARIANT}-canary-amd64 \
+            --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-canary-amd64 \
             --cache-to=type=inline \
             --provenance false \
             -f $DOCKERFILE \
-            -t akowynia/vane:${VARIANT}-canary-amd64 \
+            -t akowynia/vane-community:${VARIANT}-canary-amd64 \
             --push .
 
       - name: Build and push AMD64 release Docker image
@@ -71,11 +71,11 @@ jobs:
           DOCKERFILE=${{ matrix.variant.dockerfile }}
           VARIANT=${{ matrix.variant.name }}
           docker buildx build --platform linux/amd64 \
-            --cache-from=type=registry,ref=akowynia/vane:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
+            --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
             --cache-to=type=inline \
             --provenance false \
             -f $DOCKERFILE \
-            -t akowynia/vane:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
+            -t akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
             --push .
 
   build-arm64:
@@ -108,16 +108,16 @@ jobs:
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Build and push ARM64 Docker image (master)
-        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        if: (github.ref == 'refs/heads/master' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
         run: |
           DOCKERFILE=${{ matrix.variant.dockerfile }}
           VARIANT=${{ matrix.variant.name }}
           docker buildx build --platform linux/arm64 \
-            --cache-from=type=registry,ref=akowynia/vane:${VARIANT}-arm64 \
+            --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-arm64 \
             --cache-to=type=inline \
             --provenance false \
             -f $DOCKERFILE \
-            -t akowynia/vane:${VARIANT}-arm64 \
+            -t akowynia/vane-community:${VARIANT}-arm64 \
             --push .
 
       - name: Build and push ARM64 Canary Docker image
@@ -126,11 +126,11 @@ jobs:
           DOCKERFILE=${{ matrix.variant.dockerfile }}
           VARIANT=${{ matrix.variant.name }}
           docker buildx build --platform linux/arm64 \
-            --cache-from=type=registry,ref=akowynia/vane:${VARIANT}-canary-arm64 \
+            --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-canary-arm64 \
             --cache-to=type=inline \
             --provenance false \
             -f $DOCKERFILE \
-            -t akowynia/vane:${VARIANT}-canary-arm64 \
+            -t akowynia/vane-community:${VARIANT}-canary-arm64 \
             --push .
 
       - name: Build and push ARM64 release Docker image
@@ -139,11 +139,11 @@ jobs:
           DOCKERFILE=${{ matrix.variant.dockerfile }}
           VARIANT=${{ matrix.variant.name }}
           docker buildx build --platform linux/arm64 \
-            --cache-from=type=registry,ref=akowynia/vane:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64 \
+            --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64 \
             --cache-to=type=inline \
             --provenance false \
             -f $DOCKERFILE \
-            -t akowynia/vane:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64 \
+            -t akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64 \
             --push .
 
   manifest:
@@ -165,54 +165,54 @@ jobs:
         run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Create and push manifest for main
-        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        if: (github.ref == 'refs/heads/master' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
         run: |
           VARIANT=${{ matrix.variant }}
-          docker manifest create akowynia/vane:${VARIANT}-latest \
-            --amend akowynia/vane:${VARIANT}-amd64 \
-            --amend akowynia/vane:${VARIANT}-arm64
-          docker manifest push akowynia/vane:${VARIANT}-latest
+          docker manifest create akowynia/vane-community:${VARIANT}-latest \
+            --amend akowynia/vane-community:${VARIANT}-amd64 \
+            --amend akowynia/vane-community:${VARIANT}-arm64
+          docker manifest push akowynia/vane-community:${VARIANT}-latest
 
           if [ "$VARIANT" = "full" ]; then
-            docker manifest create akowynia/vane:latest \
-              --amend akowynia/vane:${VARIANT}-amd64 \
-              --amend akowynia/vane:${VARIANT}-arm64
-            docker manifest push akowynia/vane:latest
+            docker manifest create akowynia/vane-community:latest \
+              --amend akowynia/vane-community:${VARIANT}-amd64 \
+              --amend akowynia/vane-community:${VARIANT}-arm64
+            docker manifest push akowynia/vane-community:latest
 
-            docker manifest create akowynia/vane:main \
-              --amend akowynia/vane:${VARIANT}-amd64 \
-              --amend akowynia/vane:${VARIANT}-arm64
-            docker manifest push akowynia/vane:main
+            docker manifest create akowynia/vane-community:main \
+              --amend akowynia/vane-community:${VARIANT}-amd64 \
+              --amend akowynia/vane-community:${VARIANT}-arm64
+            docker manifest push akowynia/vane-community:main
           fi
 
       - name: Create and push manifest for canary
         if: github.ref == 'refs/heads/canary' && github.event_name == 'push'
         run: |
           VARIANT=${{ matrix.variant }}
-          docker manifest create akowynia/vane:${VARIANT}-canary \
-            --amend akowynia/vane:${VARIANT}-canary-amd64 \
-            --amend akowynia/vane:${VARIANT}-canary-arm64
-          docker manifest push akowynia/vane:${VARIANT}-canary
+          docker manifest create akowynia/vane-community:${VARIANT}-canary \
+            --amend akowynia/vane-community:${VARIANT}-canary-amd64 \
+            --amend akowynia/vane-community:${VARIANT}-canary-arm64
+          docker manifest push akowynia/vane-community:${VARIANT}-canary
 
           if [ "$VARIANT" = "full" ]; then
-            docker manifest create akowynia/vane:canary \
-              --amend akowynia/vane:${VARIANT}-canary-amd64 \
-              --amend akowynia/vane:${VARIANT}-canary-arm64
-            docker manifest push akowynia/vane:canary
+            docker manifest create akowynia/vane-community:canary \
+              --amend akowynia/vane-community:${VARIANT}-canary-amd64 \
+              --amend akowynia/vane-community:${VARIANT}-canary-arm64
+            docker manifest push akowynia/vane-community:canary
           fi
 
       - name: Create and push manifest for releases
         if: github.event_name == 'release'
         run: |
           VARIANT=${{ matrix.variant }}
-          docker manifest create akowynia/vane:${VARIANT}-${{ env.RELEASE_VERSION }} \
-            --amend akowynia/vane:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
-            --amend akowynia/vane:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64
-          docker manifest push akowynia/vane:${VARIANT}-${{ env.RELEASE_VERSION }}
+          docker manifest create akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }} \
+            --amend akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
+            --amend akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64
+          docker manifest push akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}
 
           if [ "$VARIANT" = "full" ]; then
-            docker manifest create akowynia/vane:${{ env.RELEASE_VERSION }} \
-              --amend akowynia/vane:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
-              --amend akowynia/vane:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64
-            docker manifest push akowynia/vane:${{ env.RELEASE_VERSION }}
+            docker manifest create akowynia/vane-community:${{ env.RELEASE_VERSION }} \
+              --amend akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
+              --amend akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64
+            docker manifest push akowynia/vane-community:${{ env.RELEASE_VERSION }}
           fi
