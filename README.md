@@ -2,6 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
+[![Docker Pulls](https://img.shields.io/docker/pulls/akowynia/vane-community.svg)](https://hub.docker.com/r/akowynia/vane-community)
 
 Vane-Community is a **privacy-focused AI answering engine** that runs entirely on your own hardware. It combines knowledge from the vast internet with support for **local LLMs** (Ollama) and cloud providers (OpenAI, Anthropic Claude, Google Gemini, Groq, and more), delivering accurate answers with **cited sources** while keeping your searches completely private.
 
@@ -83,44 +84,49 @@ There are 2 main ways of running Vane-Community: with Docker (recommended) or wi
 
 ### Getting Started with Docker (Recommended)
 
-Build and start the container with the bundled SearXNG search engine:
+Pull and run the pre-built image from [Docker Hub](https://hub.docker.com/r/akowynia/vane-community) — includes the bundled SearXNG search engine:
 
 ```bash
-# Build image
-docker build -t vane-community .
-
-# Run container
 docker run -d \
   -p 3000:3000 \
   -p 8080:8080 \
   -v vane-community-data:/home/vane-community/data \
   --name vane-community \
-  vane-community
-
+  akowynia/vane-community:latest
 ```
 
 Once running, open your browser and navigate to **http://localhost:3000** to complete the initial setup.
 
 #### Using Vane-Community with Your Own External SearXNG Instance
 
-If you already have SearXNG running externally, you can use the lightweight slim version:
+If you already have SearXNG running externally, use the lightweight `slim` variant instead:
 
 ```bash
-# Build slim image
-docker build -f Dockerfile.slim -t vane-community:slim .
-
-# Run slim container
 docker run -d \
   -p 3000:3000 \
   -e SEARXNG_API_URL=http://your-searxng-url:8080 \
   -v vane-community-data:/home/vane-community/data \
   --name vane-community \
-  vane-community:slim
+  akowynia/vane-community:slim-latest
 ```
 
 **Important**: Make sure your external SearXNG instance has:
 - JSON format enabled in settings (`formats: [html, json]`)
 - Wolfram Alpha search engine enabled
+
+#### Building From Source Instead
+
+Prefer to build the image yourself, e.g. after modifying the code?
+
+```bash
+# Full variant (bundled SearXNG)
+docker build -t vane-community .
+
+# Slim variant (bring your own SearXNG)
+docker build -f Dockerfile.slim -t vane-community:slim .
+```
+
+Then run it the same way as above — just swap the image name in `docker run` for your local tag (`vane-community` or `vane-community:slim`).
 
 ---
 
