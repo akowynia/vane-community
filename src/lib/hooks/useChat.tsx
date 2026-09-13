@@ -837,6 +837,13 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       if (activeWp) {
         handleSetWaypointId(activeWp);
       }
+      if (messages.length > 0 || chatHistory.current.length > 0) {
+        setChatId(crypto.randomBytes(20).toString('hex'));
+        setMessages([]);
+        chatHistory.current = [];
+        setFiles([]);
+        setFileIds([]);
+      }
       sendMessage(
         initialMessage,
         undefined,

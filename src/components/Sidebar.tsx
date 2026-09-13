@@ -106,9 +106,8 @@ const Sidebar = ({ children }: { children: React.ReactNode }) => {
   const isHomeActive = segments.length === 0 || segments.includes('c');
 
   const handleStartNewChat = () => {
-    if (pathname === '/') {
-      resetChat();
-    } else {
+    resetChat();
+    if (pathname !== '/') {
       router.push('/');
     }
   };
