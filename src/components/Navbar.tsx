@@ -15,6 +15,10 @@ import { useTranslation } from '@/lib/i18n';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import WaypointIcon from './Waypoints/WaypointIcon';
+import {
+  buildChatPrintDocumentHtml,
+  executeIframePrint,
+} from '@/lib/utils/printExport';
 
 const downloadFile = (filename: string, content: string, type: string) => {
   const blob = new Blob([content], { type });
@@ -244,16 +248,18 @@ const exportAsMarkdown = (
       let rawText = section.parsedTextBlocks.join('\n\n');
       // Clean think tags
       rawText = rawText.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-      // Clean citation tags to [NUM](URL) or [NUM]
+      // Clean citation tags with arbitrary attributes to [NUM](URL) or [NUM]
       rawText = rawText.replace(
-        /<citation\s+href="([^"]*)"(?:\s+title="[^"]*")?>([\s\S]*?)<\/citation>/gi,
-        (_, href, num) =>
-          href && href.startsWith('http')
-            ? `[${num.trim()}](${href})`
-            : `[${num.trim()}]`,
+        /<citation\b([^>]*)>([\s\S]*?)<\/citation>/gi,
+        (_, rawAttrs, content) => {
+          const num = content.trim();
+          const hrefMatch = rawAttrs.match(/href="([^"]*)"/i);
+          const href = hrefMatch ? hrefMatch[1].trim() : '';
+          return href && href.startsWith('http')
+            ? `[${num}](${href})`
+            : `[${num}]`;
+        },
       );
-      // Also remove any rogue citation tags
-      rawText = rawText.replace(/<citation[^>]*>([\s\S]*?)<\/citation>/gi, '[$1]');
 
       md += `\n---\n`;
       md += `**🤖 ${tr.assistant}**  \n`;
@@ -282,654 +288,52 @@ const exportAsMarkdown = (
   downloadFile(`${title || 'chat'}.md`, md, 'text/markdown');
 };
 
-const exportAsPDF = (
+const exportAsPDF = async (
   sections: Section[],
   title: string,
   locale: string = 'en',
 ) => {
   const tr = getExportLocale(locale);
-  const date = new Date(
-    sections[0]?.message?.createdAt || Date.now(),
-  ).toLocaleString(locale || undefined);
 
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  document.body.appendChild(iframe);
-
-  const escapeHtml = (unsafe: string) => {
-    return (unsafe || '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
-  };
-
-  const formatMarkdownToHtml = (markdownText: string) => {
-    if (!markdownText) return '';
-
-    // Remove thinking block tags <think>...</think>
-    let text = markdownText.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-
-    // Preserve and parse <citation href="..." title="...">NUM</citation>
-    const citationMap: string[] = [];
-    text = text.replace(
-      /<citation\s+href="([^"]*)"(?:\s+title="([^"]*)")?>([\s\S]*?)<\/citation>/gi,
-      (_, href, title, content) => {
-        const idx = citationMap.length;
-        const cleanHref = (href || '').trim();
-        const cleanTitle = (title || cleanHref).trim();
-        const num = content.trim();
-        const isLink =
-          cleanHref.startsWith('http://') || cleanHref.startsWith('https://');
-
-        const citationHtml = isLink
-          ? `<a href="${cleanHref}" title="${escapeHtml(cleanTitle)}" class="citation-ref" target="_blank" rel="noopener noreferrer">${escapeHtml(num)}</a>`
-          : `<span class="citation-ref" title="${escapeHtml(cleanTitle)}">${escapeHtml(num)}</span>`;
-
-        citationMap.push(citationHtml);
-        return `__CITATION_TAG_${idx}__`;
-      },
-    );
-
-    // Preserve code blocks before escaping
-    const codeBlocks: string[] = [];
-    text = text.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, (_, lang, code) => {
-      const idx = codeBlocks.length;
-      codeBlocks.push(
-        `<div class="code-block"><div class="code-header">${escapeHtml(lang || 'code')}</div><pre><code>${escapeHtml(code.trim())}</code></pre></div>`,
-      );
-      return `__CODE_BLOCK_${idx}__`;
-    });
-
-    // Escape remaining HTML
-    text = escapeHtml(text);
-
-    // Inline code `...`
-    text = text.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
-
-    // Headings
-    text = text.replace(/^### (.*$)/gim, '<h3>$1</h3>');
-    text = text.replace(/^## (.*$)/gim, '<h2>$1</h2>');
-    text = text.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-
-    // Blockquotes > ...
-    text = text.replace(/^(?:&gt;|>)[ \t]?(.*)$/gm, '<blockquote>$1</blockquote>');
-    text = text.replace(/<\/blockquote>\n<blockquote>/g, '<br/>');
-
-    // Bold and Italic
-    text = text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    text = text.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-
-    // Citation numbers like [1]
-    text = text.replace(/\[(\d+)\]/g, '<span class="citation-ref">$1</span>');
-
-    // Standard markdown links [text](url)
-    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-
-    // Bullet lists
-    text = text.replace(/^\s*[-*]\s+(.*)$/gm, '<li>$1</li>');
-    text = text.replace(/(<li>[\s\S]*?<\/li>)/gm, '<ul>$1</ul>');
-    text = text.replace(/<\/ul>\s*<ul>/g, '');
-
-    // Paragraphs
-    const paragraphs = text.split(/\n{2,}/);
-    text = paragraphs
-      .map((p) => {
-        p = p.trim();
-        if (!p) return '';
-        if (
-          p.startsWith('<h1') ||
-          p.startsWith('<h2') ||
-          p.startsWith('<h3') ||
-          p.startsWith('__CODE_BLOCK_') ||
-          p.startsWith('<ul') ||
-          p.startsWith('<blockquote')
-        ) {
-          return p;
-        }
-        return `<p>${p.replace(/\n/g, '<br/>')}</p>`;
-      })
-      .join('\n');
-
-    // Restore code blocks
-    codeBlocks.forEach((cbHtml, idx) => {
-      text = text.replace(`__CODE_BLOCK_${idx}__`, cbHtml);
-    });
-
-    // Restore citation badges
-    citationMap.forEach((citHtml, idx) => {
-      text = text.replace(`__CITATION_TAG_${idx}__`, citHtml);
-    });
-
-    // Strip any rogue or unparsed citation tags just in case
-    text = text.replace(/&lt;citation[^&]*&gt;([\s\S]*?)&lt;\/citation&gt;/gi, '<span class="citation-ref">$1</span>');
-    text = text.replace(/<citation[^>]*>([\s\S]*?)<\/citation>/gi, '<span class="citation-ref">$1</span>');
-
-    return text;
-  };
-
-  const vaneLogoSvg = `
-    <svg width="28" height="28" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="vaneGoldGradPdf" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stop-color="#f3d5ab" />
-          <stop offset="45%" stop-color="#d4a373" />
-          <stop offset="100%" stop-color="#9c6d3a" />
-        </linearGradient>
-        <linearGradient id="vaneDarkWingPdf" x1="16" y1="12" x2="16" y2="28" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stop-color="#b8864d" />
-          <stop offset="100%" stop-color="#7a542a" />
-        </linearGradient>
-      </defs>
-      <path d="M6 7L13 26L16.5 26L14.5 13L10.5 7H6Z" fill="url(#vaneGoldGradPdf)" />
-      <path d="M10.5 7L14.5 13L16.5 26L14 26L8.5 7H10.5Z" fill="url(#vaneDarkWingPdf)" fill-opacity="0.4" />
-      <path d="M16 26L26 8H21.5L14.5 22L16 26Z" fill="url(#vaneGoldGradPdf)" />
-      <circle cx="26" cy="7" r="1.5" fill="#f3d5ab" fill-opacity="0.85" />
-    </svg>
-  `;
-
-  let html = `<!DOCTYPE html>
-<html lang="${locale || 'en'}">
-<head>
-  <meta charset="utf-8">
-  <title>${escapeHtml(title || 'Vane Chat Export')}</title>
-  <style>
-    @media print {
-      @page {
-        margin: 12mm 15mm;
-        size: A4 portrait;
-      }
-      body {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        background: #ffffff !important;
-        color: #1c1917 !important;
-      }
-      .no-print { display: none !important; }
-      .user-message { break-inside: avoid; }
-      .message-header { break-inside: avoid; }
-      .citations-card { break-inside: avoid; }
-      .telemetry-row { break-inside: avoid; }
-      h1, h2, h3 { break-after: avoid; }
-      p, li { orphans: 2; widows: 2; }
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      line-height: 1.65;
-      color: #1f1a16;
-      background: #faf8f5;
-      margin: 0;
-      padding: clamp(16px, 3vw, 36px);
-      display: flex;
-      justify-content: center;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    .doc-container {
-      width: 100%;
-      max-width: 820px;
-      background: #ffffff;
-      border: 1px solid #ede5dc;
-      border-radius: 12px;
-      padding: clamp(20px, 4vw, 36px);
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-    }
-
-    /* Brand Header */
-    .brand-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 2px solid #f0e6dc;
-      padding-bottom: 16px;
-      margin-bottom: 24px;
-      gap: 16px;
-      flex-wrap: wrap;
-    }
-
-    .brand-logo-title {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
-    .brand-text {
-      display: flex;
-      flex-direction: column;
-    }
-
-    .brand-name {
-      font-size: 17px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      color: #1c1917;
-      line-height: 1.1;
-    }
-
-    .brand-sub {
-      font-size: 9.5px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #b8864d;
-    }
-
-    .doc-meta {
-      font-size: 11px;
-      color: #78716c;
-      text-align: right;
-      line-height: 1.4;
-    }
-
-    /* Title Section */
-    .doc-title-section {
-      margin-bottom: 26px;
-    }
-
-    .doc-title {
-      font-size: 24px;
-      font-weight: 700;
-      color: #1c1917;
-      letter-spacing: -0.03em;
-      line-height: 1.3;
-      margin: 0 0 8px 0;
-      word-break: break-word;
-    }
-
-    .doc-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 3px 10px;
-      border-radius: 9999px;
-      background: #fdfaf6;
-      border: 1px solid #e8ded3;
-      color: #8c5b28;
-      font-size: 11px;
-      font-weight: 500;
-    }
-
-    /* Turn Conversation Item */
-    .turn-block {
-      margin-bottom: 28px;
-    }
-
-    /* User Query Box */
-    .user-message {
-      background: #fbf8f4;
-      border: 1px solid #ede3d7;
-      border-left: 4px solid #b8864d;
-      border-radius: 8px;
-      padding: 12px 16px;
-      margin-bottom: 18px;
-    }
-
-    .user-message-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 6px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #8c5b28;
-    }
-
-    .user-message-content {
-      font-size: 14.5px;
-      font-weight: 500;
-      color: #292524;
-      line-height: 1.5;
-      word-break: break-word;
-    }
-
-    /* Assistant Response Box */
-    .assistant-message {
-      padding: 0 0 16px 0;
-    }
-
-    .assistant-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid #f2ece4;
-    }
-
-    .assistant-sender {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      color: #1c1917;
-    }
-
-    .assistant-badge {
-      font-size: 9.5px;
-      background: #f5ede4;
-      color: #9c6d3a;
-      padding: 1px 7px;
-      border-radius: 4px;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
-    /* Assistant Content Typography */
-    .content {
-      font-size: 14px;
-      color: #292524;
-      line-height: 1.7;
-      word-break: break-word;
-    }
-
-    .content p {
-      margin: 0 0 12px 0;
-    }
-
-    .content h1, .content h2, .content h3 {
-      color: #1c1917;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin: 18px 0 8px 0;
-    }
-
-    .content h1 { font-size: 18px; }
-    .content h2 { font-size: 15.5px; border-bottom: 1px solid #f2ece4; padding-bottom: 4px; }
-    .content h3 { font-size: 14px; }
-
-    .content ul, .content ol {
-      margin: 0 0 12px 0;
-      padding-left: 22px;
-    }
-
-    .content li {
-      margin-bottom: 4px;
-    }
-
-    .content blockquote {
-      margin: 12px 0;
-      padding: 8px 14px;
-      border-left: 3px solid #d4a373;
-      background: #fdfaf7;
-      color: #57534e;
-      font-style: italic;
-      border-radius: 0 6px 6px 0;
-    }
-
-    .content .inline-code {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 12px;
-      background: #f5ede4;
-      color: #8c5b28;
-      padding: 2px 5px;
-      border-radius: 4px;
-    }
-
-    .code-block {
-      margin: 14px 0;
-      background: #181513;
-      border: 1px solid #28221b;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .code-header {
-      background: #221c17;
-      color: #d7c0a9;
-      font-size: 10px;
-      font-family: monospace;
-      padding: 5px 12px;
-      border-bottom: 1px solid #2e261f;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .code-block pre {
-      margin: 0;
-      padding: 10px 14px;
-      overflow-x: auto;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 12px;
-      line-height: 1.5;
-      color: #f5f0eb;
-    }
-
-    .citation-ref {
-      display: inline-block;
-      font-size: 10px;
-      font-weight: 600;
-      color: #b8864d;
-      background: #fbf5ee;
-      border: 1px solid #eedecf;
-      border-radius: 3px;
-      padding: 0 3px;
-      margin: 0 2px;
-      vertical-align: super;
-      line-height: 1;
-    }
-
-    /* Telemetry Metadata Chips */
-    .telemetry-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 6px;
-      margin-top: 14px;
-      padding-top: 10px;
-      border-top: 1px dashed #e8dfd5;
-      font-size: 10.5px;
-      color: #78716c;
-      font-family: ui-monospace, monospace;
-    }
-
-    .telemetry-tag {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      background: #fcf9f5;
-      border: 1px solid #e8ded3;
-      padding: 2px 7px;
-      border-radius: 5px;
-      color: #57534e;
-    }
-
-    .telemetry-tag.model {
-      color: #8c5b28;
-      font-weight: 600;
-    }
-
-    /* Citations / Sources Box */
-    .citations-card {
-      margin-top: 16px;
-      background: #fcfbfa;
-      border: 1px solid #ede6dc;
-      border-radius: 8px;
-      padding: 12px 14px;
-    }
-
-    .citations-title {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #8c5b28;
-      margin: 0 0 8px 0;
-    }
-
-    .citations-list {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-    }
-
-    .citations-list li {
-      font-size: 11.5px;
-      line-height: 1.4;
-      display: flex;
-      align-items: baseline;
-      gap: 6px;
-    }
-
-    .citations-list a {
-      color: #9c6d3a;
-      text-decoration: none;
-      word-break: break-all;
-    }
-
-    /* Document Footer */
-    .doc-footer {
-      border-top: 1px solid #f0e6dc;
-      margin-top: 32px;
-      padding-top: 14px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 10.5px;
-      color: #a8a29e;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-  </style>
-</head>
-<body>
-  <div class="doc-container">
-    <!-- Brand Header -->
-    <div class="brand-header">
-      <div class="brand-logo-title">
-        ${vaneLogoSvg}
-        <div class="brand-text">
-          <span class="brand-name">Vane</span>
-          <span class="brand-sub">Community</span>
-        </div>
-      </div>
-      <div class="doc-meta">
-        <div><strong>${escapeHtml(tr.exportReport)}</strong></div>
-        <div>${escapeHtml(date)}</div>
-      </div>
-    </div>
-
-    <!-- Title Section -->
-    <div class="doc-title-section">
-      <h1 class="doc-title">${escapeHtml(title || tr.defaultTitle)}</h1>
-      <span class="doc-badge">${escapeHtml(tr.queriesCount(sections.length))}</span>
-    </div>
-`;
-
-  sections.forEach((section, index) => {
-    const userDate = new Date(section.message.createdAt).toLocaleString(
-      locale || undefined,
-    );
-    html += `
-    <div class="turn-block">
-      <!-- User Query -->
-      <div class="user-message">
-        <div class="user-message-header">
-          <span>${escapeHtml(tr.queryNum(index + 1))}</span>
-          <span>${escapeHtml(userDate)}</span>
-        </div>
-        <div class="user-message-content">${escapeHtml(section.message.query)}</div>
-      </div>`;
-
-    if (section.message.responseBlocks.length > 0) {
-      const assistantText = section.parsedTextBlocks.join('\n\n');
-      const renderedHtml = formatMarkdownToHtml(assistantText);
-
-      const sourceBlock = section.message.responseBlocks.find(
-        (b) => b.type === 'source',
-      ) as SourceBlock | undefined;
-
-      const metrics = section.metrics;
-
-      html += `
-      <!-- Assistant Response -->
-      <div class="assistant-message">
-        <div class="assistant-header">
-          <div class="assistant-sender">
-            ${vaneLogoSvg}
-            <span>${escapeHtml(tr.vaneAnswer)}</span>
-            <span class="assistant-badge">AI</span>
-          </div>
-          <span style="font-size: 11px; color: #78716c;">${escapeHtml(userDate)}</span>
-        </div>
-        
-        <div class="content">${renderedHtml}</div>`;
-
-      // Citations
-      if (sourceBlock?.data && sourceBlock.data.length > 0) {
-        html += `
-        <div class="citations-card">
-          <div class="citations-title">${escapeHtml(tr.sourcesTitle(sourceBlock.data.length))}</div>
-          <ul class="citations-list">`;
-        sourceBlock.data.forEach((src: any, i: number) => {
-          const url = src.metadata?.url || '';
-          const name = src.metadata?.title || url;
-          html += `<li><span class="citation-ref">[${i + 1}]</span> <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(name)}</a></li>`;
-        });
-        html += `
-          </ul>
-        </div>`;
-      }
-
-      // Telemetry row
-      if (metrics) {
-        html += `
-        <div class="telemetry-row">
-          ${metrics.modelKey ? `<span class="telemetry-tag model">${escapeHtml(tr.model)}: ${escapeHtml(metrics.modelKey)}</span>` : ''}
-          ${metrics.durationMs ? `<span class="telemetry-tag">${escapeHtml(tr.time)}: ${(metrics.durationMs / 1000).toFixed(1)}s</span>` : ''}
-          ${metrics.totalTokens ? `<span class="telemetry-tag">${escapeHtml(tr.tokens)}: ${metrics.totalTokens}</span>` : ''}
-        </div>`;
-      }
-
-      html += `
-      </div>`;
-    }
-
-    html += `
-    </div>`;
+  const turns = sections.map((section) => {
+    const sourceResponseBlock = section.message.responseBlocks.find(
+      (block) => block.type === 'source',
+    ) as SourceBlock | undefined;
+
+    return {
+      userQuery: section.message.query,
+      userDate: new Date(section.message.createdAt).toLocaleString(
+        locale || undefined,
+      ),
+      assistantText: section.parsedTextBlocks.join('\n\n'),
+      assistantDate: new Date(section.message.createdAt).toLocaleString(
+        locale || undefined,
+      ),
+      sources: sourceResponseBlock?.data || [],
+      metrics: section.metrics,
+    };
   });
 
-  html += `
-    <!-- Document Footer -->
-    <div class="doc-footer">
-      <span>${escapeHtml(tr.generatedBy)}</span>
-      <span>${escapeHtml(date)}</span>
-    </div>
-  </div>
-</body>
-</html>`;
+  const html = await buildChatPrintDocumentHtml({
+    title: title || tr.defaultTitle,
+    locale,
+    turns,
+    labels: {
+      exportReport: tr.exportReport,
+      user: tr.user,
+      assistant: tr.assistant,
+      sourcesTitle: tr.sourcesTitle,
+      generatedBy: tr.generatedBy,
+      queriesCount: tr.queriesCount,
+      queryNum: tr.queryNum,
+      model: tr.model,
+      time: tr.time,
+      tokens: tr.tokens,
+      vaneAnswer: tr.vaneAnswer,
+    },
+  });
 
-  const iframeDoc = iframe.contentWindow?.document;
-  if (iframeDoc) {
-    iframeDoc.open();
-    iframeDoc.write(html);
-    iframeDoc.close();
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 2000);
-    }, 250);
-  }
+  executeIframePrint(html);
 };
 
 const Navbar = () => {

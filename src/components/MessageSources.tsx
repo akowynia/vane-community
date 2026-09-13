@@ -11,7 +11,17 @@ import { Fragment, useState } from 'react';
 import { Chunk } from '@/lib/types';
 import { useTranslation } from '@/lib/i18n';
 
-const MessageSources = ({ sources }: { sources: Chunk[] }) => {
+interface MessageSourcesProps {
+  sources: Chunk[];
+  hoveredSourceIndex?: number | null;
+  onHoverSource?: (index: number | null) => void;
+}
+
+const MessageSources = ({
+  sources,
+  hoveredSourceIndex,
+  onHoverSource,
+}: MessageSourcesProps) => {
   const { t } = useTranslation();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -35,9 +45,18 @@ const MessageSources = ({ sources }: { sources: Chunk[] }) => {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
       {sources.slice(0, 3).map((source, i) => {
+        const sourceNumber = i + 1;
+        const isHovered =
+          hoveredSourceIndex !== null &&
+          hoveredSourceIndex !== undefined &&
+          hoveredSourceIndex === sourceNumber;
         const url = getUrl(source);
         const title = getTitle(source);
-        const isFile = !url || url.includes('file_id://') || url === 'File' || !url.startsWith('http');
+        const isFile =
+          !url ||
+          url.includes('file_id://') ||
+          url === 'File' ||
+          !url.startsWith('http');
 
         const cardContent = (
           <>
@@ -68,17 +87,33 @@ const MessageSources = ({ sources }: { sources: Chunk[] }) => {
               </div>
               <div className="flex flex-row items-center space-x-1 text-black/50 dark:text-white/50 text-xs">
                 <div className="bg-black/50 dark:bg-white/50 h-[4px] w-[4px] rounded-full" />
-                <span>{i + 1}</span>
+                <span
+                  className={`inline-flex items-center justify-center rounded px-1 text-[11px] transition-colors ${
+                    isHovered
+                      ? 'bg-amber-500 text-stone-950 font-bold'
+                      : 'text-black/50 dark:text-white/50'
+                  }`}
+                >
+                  {sourceNumber}
+                </span>
               </div>
             </div>
           </>
         );
 
+        const cardClasses = `rounded-lg p-3 flex flex-col space-y-2 font-medium transition-all duration-200 ${
+          isHovered
+            ? 'bg-amber-500/15 dark:bg-amber-400/15 border border-amber-400 dark:border-amber-500 ring-2 ring-amber-400/60 shadow-md scale-[1.02]'
+            : 'bg-light-100 hover:bg-light-200 dark:bg-dark-100 dark:hover:bg-dark-200 border border-transparent'
+        }`;
+
         if (isFile) {
           return (
             <div
-              className="bg-light-100 dark:bg-dark-100 rounded-lg p-3 flex flex-col space-y-2 font-medium cursor-default"
+              className={`${cardClasses} cursor-default`}
               key={i}
+              onMouseEnter={() => onHoverSource?.(sourceNumber)}
+              onMouseLeave={() => onHoverSource?.(null)}
             >
               {cardContent}
             </div>
@@ -87,11 +122,13 @@ const MessageSources = ({ sources }: { sources: Chunk[] }) => {
 
         return (
           <a
-            className="bg-light-100 hover:bg-light-200 dark:bg-dark-100 dark:hover:bg-dark-200 transition duration-200 rounded-lg p-3 flex flex-col space-y-2 font-medium"
+            className={cardClasses}
             key={i}
             href={url}
             target="_blank"
             rel="noopener noreferrer"
+            onMouseEnter={() => onHoverSource?.(sourceNumber)}
+            onMouseLeave={() => onHoverSource?.(null)}
           >
             {cardContent}
           </a>
@@ -152,9 +189,18 @@ const MessageSources = ({ sources }: { sources: Chunk[] }) => {
                   </DialogTitle>
                   <div className="grid grid-cols-2 gap-2 overflow-auto max-h-[300px] mt-2 pr-2">
                     {sources.map((source, i) => {
+                      const sourceNumber = i + 1;
+                      const isHovered =
+                        hoveredSourceIndex !== null &&
+                        hoveredSourceIndex !== undefined &&
+                        hoveredSourceIndex === sourceNumber;
                       const url = getUrl(source);
                       const title = getTitle(source);
-                      const isFile = !url || url.includes('file_id://') || url === 'File' || !url.startsWith('http');
+                      const isFile =
+                        !url ||
+                        url.includes('file_id://') ||
+                        url === 'File' ||
+                        !url.startsWith('http');
 
                       const modalItemContent = (
                         <>
@@ -180,22 +226,40 @@ const MessageSources = ({ sources }: { sources: Chunk[] }) => {
                                 />
                               )}
                               <p className="text-xs text-black/50 dark:text-white/50 overflow-hidden whitespace-nowrap text-ellipsis">
-                                {isFile ? t('chat.uploadedFile') : formatDomain(url)}
+                                {isFile
+                                  ? t('chat.uploadedFile')
+                                  : formatDomain(url)}
                               </p>
                             </div>
                             <div className="flex flex-row items-center space-x-1 text-black/50 dark:text-white/50 text-xs">
                               <div className="bg-black/50 dark:bg-white/50 h-[4px] w-[4px] rounded-full" />
-                              <span>{i + 1}</span>
+                              <span
+                                className={`inline-flex items-center justify-center rounded px-1 text-[11px] transition-colors ${
+                                  isHovered
+                                    ? 'bg-amber-500 text-stone-950 font-bold'
+                                    : 'text-black/50 dark:text-white/50'
+                                }`}
+                              >
+                                {sourceNumber}
+                              </span>
                             </div>
                           </div>
                         </>
                       );
 
+                      const modalItemClasses = `border rounded-lg p-3 flex flex-col space-y-2 font-medium transition-all duration-200 ${
+                        isHovered
+                          ? 'bg-amber-500/20 dark:bg-amber-400/20 border-amber-400 dark:border-amber-500 ring-2 ring-amber-400/70 shadow-md scale-[1.02]'
+                          : 'bg-light-secondary hover:bg-light-200 dark:bg-dark-secondary dark:hover:bg-dark-200 border-light-200 dark:border-dark-200'
+                      }`;
+
                       if (isFile) {
                         return (
                           <div
-                            className="bg-light-secondary dark:bg-dark-secondary border border-light-200 dark:border-dark-200 rounded-lg p-3 flex flex-col space-y-2 font-medium cursor-default"
+                            className={`${modalItemClasses} cursor-default`}
                             key={i}
+                            onMouseEnter={() => onHoverSource?.(sourceNumber)}
+                            onMouseLeave={() => onHoverSource?.(null)}
                           >
                             {modalItemContent}
                           </div>
@@ -204,11 +268,13 @@ const MessageSources = ({ sources }: { sources: Chunk[] }) => {
 
                       return (
                         <a
-                          className="bg-light-secondary hover:bg-light-200 dark:bg-dark-secondary dark:hover:bg-dark-200 border border-light-200 dark:border-dark-200 transition duration-200 rounded-lg p-3 flex flex-col space-y-2 font-medium"
+                          className={modalItemClasses}
                           key={i}
                           href={url}
                           target="_blank"
                           rel="noopener noreferrer"
+                          onMouseEnter={() => onHoverSource?.(sourceNumber)}
+                          onMouseLeave={() => onHoverSource?.(null)}
                         >
                           {modalItemContent}
                         </a>

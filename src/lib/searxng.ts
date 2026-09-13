@@ -8,7 +8,7 @@ export interface SearxngSearchOptions {
   pageno?: number;
 }
 
-interface SearxngSearchResult {
+export interface SearxngSearchResult {
   title: string;
   url: string;
   img_src?: string;
@@ -17,6 +17,9 @@ interface SearxngSearchResult {
   content?: string;
   author?: string;
   iframe_src?: string;
+  publishedDate?: string;
+  pubdate?: string;
+  published_date?: string;
 }
 
 export interface SearxngUnresponsiveEngine {

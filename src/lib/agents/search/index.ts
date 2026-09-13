@@ -113,15 +113,35 @@ class SearchAgent {
       ) {
         let accumulatedTokens = 0;
         const validFindings: string[] = [];
+        const domainTokenCounts = new Map<string, number>();
+        const MAX_PER_DOMAIN_TOKENS = 2000;
+
         for (let i = 0; i < searchResults.searchFindings.length; i++) {
           const f = searchResults.searchFindings[i];
-          const entry = `<result index=${i + 1} title=${f.metadata.title}>${f.content}</result>`;
+          const rawUrl = f.metadata?.url || '';
+          let domain = '';
+          try {
+            domain = new URL(rawUrl).hostname.toLowerCase().replace(/^www\./, '');
+          } catch {}
+
+          const currentDomainTokens = domain ? domainTokenCounts.get(domain) || 0 : 0;
+          if (domain && currentDomainTokens >= MAX_PER_DOMAIN_TOKENS) {
+            continue;
+          }
+
+          const dateAttr = f.metadata?.publishedDate
+            ? ` date="${f.metadata.publishedDate}"`
+            : '';
+          const entry = `<result index=${i + 1} title="${f.metadata.title}"${dateAttr}>${f.content}</result>`;
           const entryTokens = getTokenCount(entry);
           if (accumulatedTokens + entryTokens > 12000 && validFindings.length > 0) {
             break;
           }
           validFindings.push(entry);
           accumulatedTokens += entryTokens;
+          if (domain) {
+            domainTokenCounts.set(domain, currentDomainTokens + entryTokens);
+          }
         }
         finalContext = validFindings.join('\n');
       }
@@ -140,6 +160,20 @@ class SearchAgent {
           input.config.mode,
           searchResults?.isTokenLimitReached,
         );
+      };
+
+      const sanitizeCitations = (text: string, maxValidIndex: number): string => {
+        if (!text) return text;
+        if (maxValidIndex <= 0) {
+          return text.replace(/\[\d+\]/g, '');
+        }
+        return text.replace(/\[(\d+)\]/g, (match, p1) => {
+          const n = parseInt(p1, 10);
+          if (isNaN(n) || n <= 0 || n > maxValidIndex) {
+            return '';
+          }
+          return match;
+        });
       };
 
       let writerPrompt = buildWriterPrompt(finalContext);
@@ -209,6 +243,24 @@ class SearchAgent {
       try {
         await runWriterStream(writerPrompt);
 
+        // Sanitize citations if any hallucinated source indices were generated
+        const maxSourcesCount = searchResults?.searchFindings?.length || 0;
+        const sanitizedResponse = sanitizeCitations(fullResponseText, maxSourcesCount);
+        if (sanitizedResponse !== fullResponseText && activeResponseBlockId) {
+          const block = session.getBlock(activeResponseBlockId) as TextBlock | null;
+          if (block) {
+            block.data = sanitizedResponse;
+            session.updateBlock(block.id, [
+              {
+                op: 'replace',
+                path: '/data',
+                value: sanitizedResponse,
+              },
+            ]);
+          }
+          fullResponseText = sanitizedResponse;
+        }
+
         const totalDurationMs = Math.round(performance.now() - streamStartTime);
         const promptText =
           writerPrompt +
@@ -271,10 +323,12 @@ class SearchAgent {
             // Emergency truncation: take only the top 5 sources, max 800 chars each
             const conciseContext = searchResults.searchFindings
               .slice(0, 5)
-              .map(
-                (f, index) =>
-                  `<result index=${index + 1} title=${f.metadata.title}>${(f.content || '').slice(0, 800)}</result>`,
-              )
+              .map((f, index) => {
+                const dateAttr = f.metadata?.publishedDate
+                  ? ` date="${f.metadata.publishedDate}"`
+                  : '';
+                return `<result index=${index + 1} title="${f.metadata.title}"${dateAttr}>${(f.content || '').slice(0, 800)}</result>`;
+              })
               .join('\n');
             const fallbackPrompt = buildWriterPrompt(conciseContext);
             fullResponseText = '';
@@ -292,6 +346,24 @@ class SearchAgent {
               }
             }
             await runWriterStream(fallbackPrompt);
+
+            const fallbackSourcesCount = Math.min(5, searchResults.searchFindings.length);
+            const sanitizedFallback = sanitizeCitations(fullResponseText, fallbackSourcesCount);
+            if (sanitizedFallback !== fullResponseText && activeResponseBlockId) {
+              const block = session.getBlock(activeResponseBlockId) as TextBlock | null;
+              if (block) {
+                block.data = sanitizedFallback;
+                session.updateBlock(block.id, [
+                  {
+                    op: 'replace',
+                    path: '/data',
+                    value: sanitizedFallback,
+                  },
+                ]);
+              }
+              fullResponseText = sanitizedFallback;
+            }
+
             const fallbackDurationMs = Math.round(performance.now() - streamStartTime);
             const fallbackPromptTokens = getTokenCount(fallbackPrompt);
             const fallbackCompletionTokens = getTokenCount(fullResponseText);

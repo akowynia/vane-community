@@ -12,6 +12,8 @@ import {
   Plus,
   CornerDownRight,
   AlertCircle,
+  AlertTriangle,
+  Sliders,
   RotateCcw,
   Pencil,
   Trash2,
@@ -31,9 +33,10 @@ import ThinkBox from './ThinkBox';
 import { useChat, Section } from '@/lib/hooks/useChat';
 import Citation from './MessageRenderer/Citation';
 import AssistantSteps from './AssistantSteps';
-import { ResearchBlock } from '@/lib/types';
+import { ResearchBlock, SearchWarningResearchBlock } from '@/lib/types';
 import Renderer from './Widgets/Renderer';
 import CodeBlock from './MessageRenderer/CodeBlock';
+import CalloutBlock from './MessageRenderer/CalloutBlock';
 import { useTranslation } from '@/lib/i18n';
 import ErrorBoundary from './ErrorBoundary';
 
@@ -72,6 +75,7 @@ const MessageBox = ({
     chatHistory,
   } = useChat();
   const { t } = useTranslation();
+  const [hoveredSourceIndex, setHoveredSourceIndex] = React.useState<number | null>(null);
 
   const parsedMessage = section.parsedTextBlocks.join('\n\n');
   const speechMessage = section.speechMessage || '';
@@ -83,6 +87,18 @@ const MessageBox = ({
   );
 
   const sources = sourceBlocks.flatMap((block) => block.data);
+
+  const tokenLimitWarning = section.message.responseBlocks
+    .filter(
+      (block): block is ResearchBlock =>
+        block.type === 'research' && block.data.subSteps.length > 0,
+    )
+    .flatMap((b) => b.data.subSteps)
+    .find(
+      (step): step is SearchWarningResearchBlock =>
+        step.type === 'search_warning' &&
+        step.warningType === 'token_limit_reached',
+    );
 
   const hasContent = section.parsedTextBlocks.length > 0;
 
@@ -113,6 +129,13 @@ const MessageBox = ({
       },
       citation: {
         component: Citation,
+        props: {
+          hoveredSourceIndex,
+          onHoverCitation: setHoveredSourceIndex,
+        },
+      },
+      blockquote: {
+        component: CalloutBlock,
       },
     },
   };
@@ -138,7 +161,11 @@ const MessageBox = ({
                   {t('chat.sources')}
                 </h3>
               </div>
-              <MessageSources sources={sources} />
+              <MessageSources
+                sources={sources}
+                hoveredSourceIndex={hoveredSourceIndex}
+                onHoverSource={setHoveredSourceIndex}
+              />
             </div>
           )}
 
@@ -158,6 +185,42 @@ const MessageBox = ({
                 </ErrorBoundary>
               </div>
             ))}
+
+          {tokenLimitWarning && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 dark:bg-amber-500/10 text-amber-900 dark:text-amber-200">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <div className="text-xs leading-relaxed">
+                  <span className="font-semibold text-amber-950 dark:text-amber-100">
+                    {t('chat.tokenLimitReached') || 'Token budget limit reached'}
+                  </span>
+                  <p className="text-[11px] opacity-85 mt-0.5">
+                    {tokenLimitWarning.message ||
+                      t('chat.tokenLimitExplanation') ||
+                      'The research loop reached the configured token limit for Quality mode. The answer was generated using the sources gathered so far.'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.dispatchEvent(
+                        new CustomEvent('open-access-control', {
+                          detail: { tab: 'limits' },
+                        }),
+                      );
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-500/20 hover:bg-amber-500/30 text-amber-950 dark:text-amber-100 border border-amber-500/30 transition shadow-sm active:scale-95"
+                >
+                  <Sliders className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>{t('chat.manageLimits') || 'Configure Limits'}</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {isLast &&
             loading &&
