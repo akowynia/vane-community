@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.0.1]
+
+### Added
+- Mermaid diagram rendering support in message renderer
+- Callout block formatting and visualization for AI messages
+- Architecture documentation for search and response optimizations
+
+### Changed
+- Refactored print export utilities into dedicated modules
+- Optimized web scraper and search researcher actions
+
+### Fixed
+- Fixed chat state reset and new chat ID generation on starting a new chat
+- Updated documentation to point to the published Docker Hub image
+
 ## [1.0.0] — Independent release
 
 Vane-Community v1.0.0 marks the start of independent development, forked from

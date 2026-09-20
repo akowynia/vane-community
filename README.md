@@ -1,7 +1,7 @@
 # Vane-Community 🔍
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.0.1-blue.svg)](CHANGELOG.md)
 [![Docker Pulls](https://img.shields.io/docker/pulls/akowynia/vane-community.svg)](https://hub.docker.com/r/akowynia/vane-community)
 
 Vane-Community is a **privacy-focused AI answering engine** that runs entirely on your own hardware. It combines knowledge from the vast internet with support for **local LLMs** (Ollama) and cloud providers (OpenAI, Anthropic Claude, Google Gemini, Groq, and more), delivering accurate answers with **cited sources** while keeping your searches completely private.
