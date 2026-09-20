@@ -6,6 +6,7 @@ import { useTheme } from 'next-themes';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import darkTheme from './CodeBlockDarkTheme';
 import lightTheme from './CodeBlockLightTheme';
+import MermaidBlock from '../MermaidBlock';
 
 const SyntaxHighlighterComponent =
   SyntaxHighlighter as unknown as React.ComponentType<any>;
@@ -48,6 +49,10 @@ const CodeBlock = ({
   const codeString = useMemo(() => {
     return extractText(children);
   }, [children]);
+
+  if (language?.toLowerCase() === 'mermaid') {
+    return <MermaidBlock chart={codeString} />;
+  }
 
   return (
     <div className="relative">

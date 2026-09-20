@@ -60,7 +60,7 @@ const WaypointDetailPage = () => {
 
   const { t, locale } = useTranslation();
   const router = useRouter();
-  const { setWaypointId } = useChat();
+  const { setWaypointId, resetChat } = useChat();
 
   const [waypoint, setWaypoint] = useState<ExtendedWaypointItem | null>(null);
   const [chats, setChats] = useState<any[]>([]);
@@ -172,6 +172,7 @@ const WaypointDetailPage = () => {
     if (!query.trim()) return;
     const trimmed = query.trim();
     setQuery('');
+    resetChat();
     setWaypointId(waypointId, waypoint);
     router.push(`/?waypoint=${encodeURIComponent(waypointId)}&q=${encodeURIComponent(trimmed)}`);
   };

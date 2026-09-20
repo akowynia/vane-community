@@ -74,6 +74,70 @@ export const areTitlesSimilar = (title1?: string, title2?: string): boolean => {
   return jaccard >= 0.7;
 };
 
+export const getDomain = (url?: string): string => {
+  if (!url) return '';
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return '';
+  }
+};
+
+export const getDomainAuthorityMultiplier = (url?: string): number => {
+  if (!url) return 1.0;
+  try {
+    const domain = getDomain(url);
+    if (!domain) return 1.0;
+
+    // Highest tier (1.25): Academic, government, scientific repositories, official docs
+    if (
+      domain.endsWith('.gov') ||
+      domain.endsWith('.edu') ||
+      domain === 'arxiv.org' ||
+      domain === 'ncbi.nlm.nih.gov' ||
+      domain === 'pubmed.ncbi.nlm.nih.gov' ||
+      domain === 'nature.com' ||
+      domain === 'sciencedirect.com' ||
+      domain === 'github.com' ||
+      domain.startsWith('docs.') ||
+      domain.startsWith('developer.') ||
+      domain === 'learn.microsoft.com'
+    ) {
+      return 1.25;
+    }
+
+    // High tier (1.10): Major trusted reference, encyclopedic & established news
+    if (
+      domain.endsWith('wikipedia.org') ||
+      domain === 'reuters.com' ||
+      domain === 'bbc.com' ||
+      domain === 'bloomberg.com' ||
+      domain === 'nytimes.com' ||
+      domain === 'techcrunch.com' ||
+      domain === 'theverge.com'
+    ) {
+      return 1.1;
+    }
+
+    // Lower tier (0.95): General social media and opinion forums
+    if (
+      domain === 'reddit.com' ||
+      domain === 'twitter.com' ||
+      domain === 'x.com' ||
+      domain === 'quora.com' ||
+      domain === 'facebook.com' ||
+      domain === 'pinterest.com' ||
+      domain === 'medium.com'
+    ) {
+      return 0.95;
+    }
+
+    return 1.0;
+  } catch {
+    return 1.0;
+  }
+};
+
 const emitSearchWarnings = (
   collectedUnresponsive: SearxngUnresponsiveEngine[],
   totalResultsCount: number,
@@ -249,22 +313,38 @@ export const executeSearch = async (input: {
           const scoredChunks: Chunk[] = res.results.map((r, idx) => {
             const content = contents[idx];
             const chunkEmbedding = chunkEmbeddings[idx] || [];
+            const vectorSim =
+              queryEmbedding && chunkEmbedding.length > 0
+                ? computeSimilarity(queryEmbedding, chunkEmbedding)
+                : 0.5;
+
+            // Reciprocal Rank Fusion (RRF) with Domain Authority Multiplier:
+            // combine SearXNG lexical position rank with vector semantic similarity and source credibility
+            const rankScore = 1 / (60 + (idx + 1));
+            const authorityMultiplier = getDomainAuthorityMultiplier(r.url);
+            const hybridScore =
+              (rankScore * 30 + Math.max(0, vectorSim) * 0.5) * authorityMultiplier;
 
             return {
               content,
               metadata: {
                 title: r.title,
                 url: r.url,
-                similarity:
-                  queryEmbedding && chunkEmbedding.length > 0
-                    ? computeSimilarity(queryEmbedding, chunkEmbedding)
-                    : 1,
+                publishedDate:
+                  r.publishedDate || r.pubdate || r.published_date,
+                similarity: hybridScore,
+                vectorSimilarity: vectorSim,
                 embedding: chunkEmbedding,
               },
             };
           });
 
-          const filtered = scoredChunks.filter((c) => c.metadata.similarity > 0.3);
+          const filtered = scoredChunks.filter(
+            (c, idx) =>
+              (c.metadata as any).vectorSimilarity > 0.25 ||
+              c.metadata.similarity > 0.35 ||
+              idx < 3,
+          );
           resultChunks = filtered.length > 0 ? filtered : scoredChunks;
         } catch (err: any) {
           console.warn(
@@ -273,13 +353,16 @@ export const executeSearch = async (input: {
           );
           resultChunks = res.results.map((r) => {
             const content = r.content || r.title;
+            const authorityMultiplier = getDomainAuthorityMultiplier(r.url);
 
             return {
               content,
               metadata: {
                 title: r.title,
                 url: r.url,
-                similarity: 1,
+                publishedDate:
+                  r.publishedDate || r.pubdate || r.published_date,
+                similarity: 1 * authorityMultiplier,
                 embedding: [],
               },
             };
@@ -345,11 +428,18 @@ export const executeSearch = async (input: {
     results.sort((a, b) => b.metadata.similarity - a.metadata.similarity);
 
     const uniqueSearchResultIndices: Set<number> = new Set();
+    const domainCounts = new Map<string, number>();
+    const maxPerDomain = input.mode === 'speed' ? 2 : 3;
 
     for (let i = 0; i < results.length; i++) {
       let isDuplicate = false;
       const currentUrl = normalizeUrl(results[i].metadata.url);
       const currentTitle = results[i].metadata.title;
+      const domain = getDomain(results[i].metadata.url);
+
+      if (domain && (domainCounts.get(domain) || 0) >= maxPerDomain) {
+        continue;
+      }
 
       for (const indice of uniqueSearchResultIndices.keys()) {
         const existingUrl = normalizeUrl(results[indice].metadata.url);
@@ -392,6 +482,9 @@ export const executeSearch = async (input: {
 
       if (!isDuplicate) {
         uniqueSearchResultIndices.add(i);
+        if (domain) {
+          domainCounts.set(domain, (domainCounts.get(domain) || 0) + 1);
+        }
       }
     }
 
@@ -401,10 +494,34 @@ export const executeSearch = async (input: {
 
         delete uniqueResult.metadata.embedding;
         delete uniqueResult.metadata.similarity;
+        delete (uniqueResult.metadata as any).vectorSimilarity;
 
         return uniqueResult;
       })
       .slice(0, 20);
+
+    // In Balanced mode: lightweight Fast Fetch for top 2 articles to enrich snippets with full readable text
+    if (input.mode === 'balanced' && uniqueSearchResults.length > 0) {
+      const topItems = uniqueSearchResults.slice(0, 2);
+      await Promise.all(
+        topItems.map(async (item) => {
+          try {
+            const scraped = await Scraper.scrape(item.metadata.url, {
+              minLength: 200,
+            });
+            if (
+              scraped &&
+              scraped.content &&
+              scraped.content.length > (item.content || '').length
+            ) {
+              item.content = scraped.content.slice(0, 2500);
+            }
+          } catch {
+            // Keep original snippet on failure
+          }
+        }),
+      );
+    }
 
     return uniqueSearchResults;
   } else if (input.mode === 'quality') {
@@ -482,22 +599,38 @@ export const executeSearch = async (input: {
           const scoredChunks: Chunk[] = cleanResults.map((r, idx) => {
             const content = contents[idx];
             const chunkEmbedding = chunkEmbeddings[idx] || [];
+            const vectorSim =
+              queryEmbedding && chunkEmbedding.length > 0
+                ? computeSimilarity(queryEmbedding, chunkEmbedding)
+                : 0.5;
+
+            // Reciprocal Rank Fusion (RRF) with Domain Authority Multiplier:
+            // combine SearXNG lexical position rank with vector semantic similarity and source credibility
+            const rankScore = 1 / (60 + (idx + 1));
+            const authorityMultiplier = getDomainAuthorityMultiplier(r.url);
+            const hybridScore =
+              (rankScore * 30 + Math.max(0, vectorSim) * 0.5) * authorityMultiplier;
 
             return {
               content,
               metadata: {
                 title: r.title,
                 url: r.url,
-                similarity:
-                  queryEmbedding && chunkEmbedding.length > 0
-                    ? computeSimilarity(queryEmbedding, chunkEmbedding)
-                    : 1,
+                publishedDate:
+                  r.publishedDate || r.pubdate || r.published_date,
+                similarity: hybridScore,
+                vectorSimilarity: vectorSim,
                 embedding: chunkEmbedding,
               },
             };
           });
 
-          const filtered = scoredChunks.filter((c) => c.metadata.similarity > 0.3);
+          const filtered = scoredChunks.filter(
+            (c, idx) =>
+              (c.metadata as any).vectorSimilarity > 0.25 ||
+              c.metadata.similarity > 0.35 ||
+              idx < 3,
+          );
           resultChunks = filtered.length > 0 ? filtered : scoredChunks;
         } catch (embedErr: any) {
           console.warn(
@@ -508,12 +641,15 @@ export const executeSearch = async (input: {
             .filter((r) => !isAntiBotOrBlocked(r.title, r.content))
             .map((r) => {
               const content = r.content || r.title;
+              const authorityMultiplier = getDomainAuthorityMultiplier(r.url);
               return {
                 content,
                 metadata: {
                   title: r.title,
                   url: r.url,
-                  similarity: 1,
+                  publishedDate:
+                    r.publishedDate || r.pubdate || r.published_date,
+                  similarity: 1 * authorityMultiplier,
                   embedding: [],
                 },
               };
@@ -614,9 +750,17 @@ export const executeSearch = async (input: {
     });
 
     const deduplicatedSearchResults: Chunk[] = [];
+    const qualityDomainCounts = new Map<string, number>();
+
     for (const r of searchResults) {
       const rUrl = normalizeUrl(r.metadata?.url);
       const rTitle = r.metadata?.title;
+      const domain = getDomain(r.metadata?.url);
+
+      if (domain && (qualityDomainCounts.get(domain) || 0) >= 3) {
+        continue;
+      }
+
       const isDup = deduplicatedSearchResults.some((u) => {
         const uUrl = normalizeUrl(u.metadata?.url);
         const uTitle = u.metadata?.title;
@@ -626,6 +770,12 @@ export const executeSearch = async (input: {
       });
       if (!isDup) {
         deduplicatedSearchResults.push(r);
+        if (domain) {
+          qualityDomainCounts.set(
+            domain,
+            (qualityDomainCounts.get(domain) || 0) + 1,
+          );
+        }
       }
     }
 

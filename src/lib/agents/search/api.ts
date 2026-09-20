@@ -60,10 +60,12 @@ class APISearchAgent {
 
       const finalContext =
         searchResults?.searchFindings
-          .map(
-            (f, index) =>
-              `<result index=${index + 1} title=${f.metadata.title}>${f.content}</result>`,
-          )
+          .map((f, index) => {
+            const dateAttr = f.metadata?.publishedDate
+              ? ` date="${f.metadata.publishedDate}"`
+              : '';
+            return `<result index=${index + 1} title="${f.metadata.title}"${dateAttr}>${f.content}</result>`;
+          })
           .join('\n') || '';
 
       const widgetContext = widgetOutputs

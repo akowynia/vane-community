@@ -504,8 +504,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         if (!block) return;
         if (block.type === 'text') {
           let processedText = typeof block.data === 'string' ? block.data : String(block.data ?? '');
-          const citationRegex = /\[([^\]]+)\]/g;
-          const regex = /\[(\d+)\]/g;
+          const citationRegex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
+          const regex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
 
           if (processedText.includes('</think>') && !processedText.includes('<think>')) {
             processedText = '<think>' + processedText;
@@ -534,22 +534,37 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
                 const linksHtml = numbers
                   .map((numStr) => {
-                    const number = parseInt(numStr);
+                    const number = parseInt(numStr, 10);
 
                     if (isNaN(number) || number <= 0) {
                       return `[${numStr}]`;
                     }
 
                     const source = sources[number - 1];
-                    const url = source?.metadata?.url || '';
-                    const title = source?.metadata?.title || source?.metadata?.fileName || url || '';
+                    const rawUrl = (source?.metadata?.url || '').trim();
+                    const urlMatch = rawUrl.match(/https?:\/\/[^\s)\]]+/);
+                    const url = urlMatch ? urlMatch[0] : rawUrl;
+                    const title = (
+                      source?.metadata?.title ||
+                      source?.metadata?.fileName ||
+                      url ||
+                      ''
+                    ).trim();
 
                     if (url) {
-                      const cleanUrl = url.replace(/"/g, '&quot;');
-                      const cleanTitle = title.replace(/"/g, '&quot;');
+                      const cleanUrl = url
+                        .replace(/"/g, '&quot;')
+                        .replace(/[\r\n]+/g, ' ')
+                        .trim();
+                      const cleanTitle = title
+                        .replace(/"/g, '&quot;')
+                        .replace(/[\r\n]+/g, ' ')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+
                       return `<citation href="${cleanUrl}" title="${cleanTitle}">${numStr}</citation>`;
                     } else {
-                      return ``;
+                      return `[${numStr}]`;
                     }
                   })
                   .join('');
@@ -836,6 +851,13 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (activeWp) {
         handleSetWaypointId(activeWp);
+      }
+      if (messages.length > 0 || chatHistory.current.length > 0) {
+        setChatId(crypto.randomBytes(20).toString('hex'));
+        setMessages([]);
+        chatHistory.current = [];
+        setFiles([]);
+        setFileIds([]);
       }
       sendMessage(
         initialMessage,
