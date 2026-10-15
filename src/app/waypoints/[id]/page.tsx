@@ -43,6 +43,8 @@ import Optimization from '@/components/MessageInputActions/Optimization';
 import Sources from '@/components/MessageInputActions/Sources';
 import Attach from '@/components/MessageInputActions/Attach';
 import LoginDialog from '@/components/Auth/LoginDialog';
+import BatchSearchTrigger from '@/components/BatchSearch/BatchSearchTrigger';
+import BatchSearchModal from '@/components/BatchSearch/BatchSearchModal';
 import { useChat } from '@/lib/hooks/useChat';
 import CronList from '@/components/Crons/CronList';
 import CreateEditCronDialog, { CronItem } from '@/components/Crons/CreateEditCronDialog';
@@ -486,7 +488,10 @@ const WaypointDetailPage = () => {
                 />
               </div>
               <div className="flex flex-row items-center justify-between mt-3 pt-2 border-t border-light-200/50 dark:border-[#28221b]/70">
-                <Optimization align="left" />
+                <div className="flex flex-row items-center space-x-1.5">
+                  <Optimization align="left" />
+                  <BatchSearchTrigger position="bottom" />
+                </div>
                 <div className="flex flex-row items-center space-x-2">
                   <div className="flex flex-row items-center space-x-1">
                     <Sources />
@@ -503,6 +508,7 @@ const WaypointDetailPage = () => {
                 </div>
               </div>
             </div>
+            <BatchSearchModal />
           </form>
 
           {/* Chats / Threads in this Space */}

@@ -11,6 +11,8 @@ import configManager from '@/lib/config';
 import SetupWizard from '@/components/Setup/SetupWizard';
 import { ChatProvider } from '@/lib/hooks/useChat';
 import { I18nProvider } from '@/lib/i18n';
+import { BatchSearchProvider } from '@/lib/batch-search/context';
+import { BatchFloatingStatus } from '@/components/BatchSearch/BatchFloatingStatus';
 
 const montserrat = Montserrat({
   weight: ['300', '400', '500', '700'],
@@ -39,16 +41,19 @@ export default function RootLayout({
           <I18nProvider>
             {setupComplete ? (
               <ChatProvider>
-                <Sidebar>{children}</Sidebar>
-                <Toaster
-                  toastOptions={{
-                    unstyled: true,
-                    classNames: {
-                      toast:
-                        'bg-light-secondary dark:bg-dark-secondary dark:text-white/70 text-black-70 rounded-lg p-4 flex flex-row items-center space-x-2',
-                    },
-                  }}
-                />
+                <BatchSearchProvider>
+                  <Sidebar>{children}</Sidebar>
+                  <BatchFloatingStatus />
+                  <Toaster
+                    toastOptions={{
+                      unstyled: true,
+                      classNames: {
+                        toast:
+                          'bg-light-secondary dark:bg-dark-secondary dark:text-white/70 text-black-70 rounded-lg p-4 flex flex-row items-center space-x-2',
+                      },
+                    }}
+                  />
+                </BatchSearchProvider>
               </ChatProvider>
             ) : (
               <SetupWizard configSections={configSections} />

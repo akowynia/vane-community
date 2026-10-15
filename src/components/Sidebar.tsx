@@ -131,6 +131,12 @@ const Sidebar = ({ children }: { children: React.ReactNode }) => {
       active: segments.includes('scratchpad'),
       label: t('navigation.scratchpad') || 'Scratchpad',
     },
+    {
+      icon: Layers,
+      href: '/batch-search',
+      active: segments.includes('batch-search'),
+      label: t('navigation.batchSearch') || 'Batch Search',
+    },
     ...(currentUser || isSoloMode
       ? [
           {
