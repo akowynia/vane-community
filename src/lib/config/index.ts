@@ -46,6 +46,8 @@ const ALLOWED_CONFIG_KEYS = new Set([
   'globalLimits.tokenLimitPerMonth',
   'globalLimits.maxTokensPerRequest',
   'globalLimits.qualityModeMaxTokens',
+  'beta.enablePresentations',
+  'beta.presentations',
   'auth.adminPassword',
 ]);
 
@@ -142,6 +144,9 @@ class ConfigManager {
     modelProviders: [],
     search: {
       searxngURL: '',
+    },
+    beta: {
+      enablePresentations: false,
     },
   };
   uiConfigSections: UIConfigSections = {
@@ -260,6 +265,18 @@ class ConfigManager {
         default: '',
         scope: 'server',
         env: 'SEARXNG_API_URL',
+      },
+    ],
+    beta: [
+      {
+        name: 'AI Presentations',
+        key: 'enablePresentations',
+        type: 'switch',
+        required: false,
+        description:
+          'Enable experimental AI Presentation Generator with Deep Research in Scratchpad.',
+        default: false,
+        scope: 'client',
       },
     ],
   };
@@ -512,7 +529,11 @@ class ConfigManager {
   }
 
   private migrateConfig(config: Config): Config {
-    /* TODO: Add migrations */
+    if (!config.beta) {
+      config.beta = {
+        enablePresentations: false,
+      };
+    }
     return config;
   }
 
@@ -724,7 +745,9 @@ class ConfigManager {
     } else if (
       key === 'preferences.autoMediaSearch' ||
       key === 'preferences.showWeatherWidget' ||
-      key === 'preferences.showNewsWidget'
+      key === 'preferences.showNewsWidget' ||
+      key === 'beta.enablePresentations' ||
+      key === 'beta.presentations'
     ) {
       if (typeof val !== 'boolean') {
         throw new Error(`Value for "${key}" must be a boolean.`);

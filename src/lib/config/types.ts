@@ -101,6 +101,9 @@ type Config = {
   search: {
     [key: string]: any;
   };
+  beta?: {
+    [key: string]: any;
+  };
 };
 
 type EnvMap = {
@@ -121,6 +124,7 @@ type UIConfigSections = {
   personalization: UIConfigField[];
   modelProviders: ModelProviderUISection[];
   search: UIConfigField[];
+  beta?: UIConfigField[];
 };
 
 export type {

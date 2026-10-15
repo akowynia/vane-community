@@ -35,6 +35,7 @@ import CreatePresentationDialog, {
   CreatePresentationConfig,
 } from '@/components/Presentation/CreatePresentationDialog';
 import LoginDialog from '@/components/Auth/LoginDialog';
+import { getEnablePresentations } from '@/lib/config/clientRegistry';
 
 interface ScratchpadListItem {
   id: string;
@@ -61,6 +62,7 @@ const ScratchpadListPage = () => {
   const [search, setSearch] = useState('');
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
+  const [presentationsEnabled, setPresentationsEnabled] = useState(false);
 
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState<ScratchpadListItem | null>(null);
@@ -103,6 +105,17 @@ const ScratchpadListPage = () => {
   useEffect(() => {
     fetchCurrentUser();
     fetchItems();
+  }, []);
+
+  useEffect(() => {
+    const checkPresentationFlag = () => {
+      setPresentationsEnabled(getEnablePresentations());
+    };
+    checkPresentationFlag();
+    window.addEventListener('client-config-changed', checkPresentationFlag);
+    return () => {
+      window.removeEventListener('client-config-changed', checkPresentationFlag);
+    };
   }, []);
 
   const handleOpenCreate = () => {
@@ -225,17 +238,19 @@ const ScratchpadListPage = () => {
           </div>
 
           <div className="flex items-center space-x-3">
-            <button
-              type="button"
-              onClick={handleOpenCreatePresentation}
-              className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 font-semibold text-xs hover:brightness-110 active:scale-95 transition shadow-lg shadow-amber-500/20"
-            >
-              <Presentation className="w-4 h-4" />
-              <span>{t('presentation.newPresentation') || 'New Presentation'}</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-stone-950/15 text-stone-950 font-bold tracking-wider">
-                BETA
-              </span>
-            </button>
+            {presentationsEnabled && (
+              <button
+                type="button"
+                onClick={handleOpenCreatePresentation}
+                className="flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 font-semibold text-xs hover:brightness-110 active:scale-95 transition shadow-lg shadow-amber-500/20"
+              >
+                <Presentation className="w-4 h-4" />
+                <span>{t('presentation.newPresentation') || 'New Presentation'}</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-stone-950/15 text-stone-950 font-bold tracking-wider">
+                  BETA
+                </span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -285,17 +300,19 @@ const ScratchpadListPage = () => {
               {t('scratchpad.noSketchesDesc') || 'Create notes, structure research, and collaborate with AI in real time.'}
             </p>
             <div className="flex items-center space-x-3">
-              <button
-                type="button"
-                onClick={handleOpenCreatePresentation}
-                className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 font-semibold text-xs hover:brightness-110 active:scale-95 transition shadow-lg shadow-amber-500/20"
-              >
-                <Presentation className="w-4 h-4" />
-                <span>{t('presentation.newPresentation') || 'New Presentation'}</span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-stone-950/15 text-stone-950 font-bold tracking-wider">
-                  BETA
-                </span>
-              </button>
+              {presentationsEnabled && (
+                <button
+                  type="button"
+                  onClick={handleOpenCreatePresentation}
+                  className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-stone-950 font-semibold text-xs hover:brightness-110 active:scale-95 transition shadow-lg shadow-amber-500/20"
+                >
+                  <Presentation className="w-4 h-4" />
+                  <span>{t('presentation.newPresentation') || 'New Presentation'}</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-stone-950/15 text-stone-950 font-bold tracking-wider">
+                    BETA
+                  </span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleOpenCreate}

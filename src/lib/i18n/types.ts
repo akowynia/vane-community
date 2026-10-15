@@ -168,6 +168,12 @@ export interface Translations {
     modelsDesc: string;
     search: string;
     searchDesc: string;
+    betaOptions: string;
+    betaOptionsDesc: string;
+    betaPresentations: string;
+    betaPresentationsDesc: string;
+    betaBannerTitle: string;
+    betaBannerDesc: string;
     theme: string;
     themeDesc: string;
     light: string;

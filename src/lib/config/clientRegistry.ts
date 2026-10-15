@@ -20,6 +20,9 @@ export const getShowWeatherWidget = () =>
 export const getShowNewsWidget = () =>
   getClientConfig('showNewsWidget', 'true') === 'true';
 
+export const getEnablePresentations = () =>
+  getClientConfig('enablePresentations', 'false') === 'true';
+
 export const getMeasurementUnit = () => {
   const value =
     getClientConfig('measureUnit') ??

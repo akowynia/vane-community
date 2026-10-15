@@ -22,6 +22,8 @@ const fieldTitleKeys: Record<string, string> = {
   showNewsWidget: 'settings.showNewsWidget',
   systemInstructions: 'settings.systemInstructions',
   searxngURL: 'settings.searxngUrl',
+  enablePresentations: 'settings.betaPresentations',
+  presentations: 'settings.betaPresentations',
 };
 
 const fieldDescKeys: Record<string, string> = {
@@ -33,6 +35,8 @@ const fieldDescKeys: Record<string, string> = {
   showNewsWidget: 'settings.showNewsWidgetDesc',
   systemInstructions: 'settings.systemInstructionsDesc',
   searxngURL: 'settings.searxngUrlDesc',
+  enablePresentations: 'settings.betaPresentationsDesc',
+  presentations: 'settings.betaPresentationsDesc',
 };
 
 const optionLabelKeys: Record<string, string> = {
