@@ -19,7 +19,7 @@ The **Scratchpad** is an advanced workspace in Vane (the equivalent of *Canvas* 
    - The user can browse earlier versions of the document, compare changes, and restore any archived version at any time.
 5. **Template system (built-in and user-defined)**:
    - Ready-made starting patterns (research analysis, technical specification, study plan, meeting notes, article).
-   - Full localization of the skeleton content (Markdown) and the AI system instructions for all 12 languages (`src/lib/scratchpad/builtinTemplates.ts`).
+   - Full localization of the skeleton content (Markdown) and the AI system instructions for all 12 languages (builtin templates module).
    - Any note can be saved as a reusable template with dedicated instructions for the AI.
 6. **Dynamic table of contents (TOC)**:
    - Automatically generated live from the note's headings, with quick navigation and AI actions per section (*"✨ Expand with AI"*).
@@ -119,19 +119,19 @@ export const scratchpadTemplates = sqliteTable('scratchpad_templates', {
 
 ## 4. UI Architecture (UI/UX)
 
-1. **Navigation menu (`Sidebar.tsx`)**:
+1. **Navigation menu (Sidebar component)**:
    - A new menu item: `Scratchpad`, placed under `Waypoints`.
    - Icon: `NotebookPen` from the `lucide-react` library.
    - Path: `/scratchpad`.
-2. **Main view (`src/app/scratchpad/page.tsx`)**:
+2. **Main view (Scratchpad page)**:
    - A scratchpad search box, a *New scratchpad* button, a template-selection dialog, and a tile grid with previews and metadata.
-3. **Working view (`src/app/scratchpad/[id]/page.tsx`)**:
+3. **Working view (Scratchpad canvas page)**:
    - **Full-bleed widescreen workspace**:
-     - The artificial width constraint (`max-w-screen-lg`) in the main `Layout.tsx` was removed, letting the scratchpad use the full available screen width (from the sidebar edge to the right edge of the window).
+     - The artificial width constraint (`max-w-screen-lg`) in the main layout was removed, letting the scratchpad use the full available screen width (from the sidebar edge to the right edge of the window).
      - The AI chat column has an ergonomic, optimal width (`lg:w-[400px] xl:w-[460px] 2xl:w-[500px]`), while the editor takes up all remaining space (`flex-1 min-w-0`), providing a comfortable experience with live preview and an open sources/TOC panel even on smaller laptop screens and 4K monitors.
    - **Left column**: AI chat, streaming, thinking, sources, and an action bar (`ModelSelector`, `Optimization`, `Sources`, `Attach`, `WaypointSelector`).
    - **Right column**: the Markdown editor, formatting toolbar, mode switcher (edit / split / preview), a collapsible side panel with a tab switcher (**Table of Contents (TOC)** and **Sources & References panel**), version history, and export.
-5. **Document export and printing with a sources option (`ScratchpadExportDialog.tsx`)**:
+5. **Document export and printing with a sources option**:
    - **Include-sources toggle**: in the export dialog, the user can decide whether the document should include footnotes and a bibliography, or be generated as plain text.
    - **Automatic text cleanup (when sources are disabled)**:
      - All footnote markers `[number]` and `[number, number]` are precisely stripped from the text, along with any leading spaces before punctuation marks (e.g. `baseline condition [10] .` -> `baseline condition.`).
@@ -139,16 +139,16 @@ export const scratchpadTemplates = sqliteTable('scratchpad_templates', {
    - **Full bibliography formatting (when sources are enabled)**:
      - In the text, footnotes are formatted as neat superscripts, `<sup class="citation">[$1]</sup>`, placed directly before punctuation marks.
      - At the end of the printed/PDF document and the exported Markdown/TXT file, a *Sources and Bibliography* section is automatically generated with source cards, links, domains, and quoted excerpts.
-6. **Token tracking and model telemetry in the scratchpad chat (`ScratchpadChat.tsx`)**:
+6. **Token tracking and model telemetry in the scratchpad chat**:
    - Every assistant reply in the chat records and displays telemetry badges identical to those in Vane's main chat:
      - **Model identifier**: a `Cpu` icon with the model key (e.g. `gpt-4o`, `claude-3-5-sonnet`) and the provider name.
      - **Generation time**: a `Clock` icon with the measured response time in seconds (e.g. `2.4s`).
      - **Token usage**: a `Zap` icon with the total token count (e.g. `850 tok.`) and a tooltip with a detailed breakdown of input (prompt) and output (completion) tokens.
    - Metrics are stored in the database in the `scratchpad_messages` table (`metrics` column) and in the global `model_stats` statistics system.
-7. **Model task-queue button integration (`QueueTrigger.tsx` & `page.tsx`)**:
-   - The floating queue widget (`fixed top-20 right-3`) is automatically hidden on the working subpage `/scratchpad/[id]` so it doesn't cover the toolbar and the editor mode-switch buttons (`Edit` / `Split` / `Preview`).
+7. **Model task-queue button integration**:
+   - The floating queue widget is automatically hidden on the working subpage `/scratchpad/[id]` so it doesn't cover the toolbar and the editor mode-switch buttons (`Edit` / `Split` / `Preview`).
    - Direct access to the model task-queue drawer has been integrated into the top action bar of the scratchpad header with a dedicated `Layers` icon, giving convenient access without visual collisions.
-8. **Edit lock while the AI is generating (`ScratchpadEditor.tsx` & `page.tsx`)**:
+8. **Edit lock while the AI is generating**:
    - The moment a prompt is sent and the AI assistant is generating/streaming content (`isAiGenerating === true`), user editing is automatically locked.
    - **Note title field**: disabled (`disabled`) while the AI is working.
    - **Editor field (textarea)**: read-only mode (`readOnly`), with text entry blocked and an informational cursor.
@@ -156,11 +156,11 @@ export const scratchpadTemplates = sqliteTable('scratchpad_templates', {
    - **Status indicator**: an animated informational badge appears in the toolbar and the bottom status bar (`✨ AI is editing the note...`), preventing concurrent-editing conflicts.
 
 9. **Interactive query clarification and disambiguation**:
-   - **Ambiguity detection (`src/lib/agents/scratchpad/clarifier.ts`)**:
+   - **Ambiguity detection (Clarifier agent)**:
      - Before starting research and generation, the assistant analyzes the user's prompt in the context of the current document and history.
      - If the request is general or has several distinct substantive directions (e.g. *"make a note about recursion"* -> mathematical vs. programming vs. optimization; *"add a chapter on security"* -> web vs. infosec vs. auth), the model does not immediately produce a shallow note, but instead formulates a clarifying question with 2–4 concrete options.
      - Precise instructions (e.g. *"change the code to Python"*, *"fix the heading"*) are executed immediately without clarification.
-   - **Interactive widget in the chat (`ScratchpadClarificationBox.tsx`)**:
+   - **Interactive widget in the chat**:
      - The user sees a neat card with the assistant's question, selectable options, a field to type a custom option, and *"Confirm and draft the note"* / *"Skip (general note)"* buttons.
      - Once confirmed, the assistant searches the web from the chosen angle and drafts the note, and the widget in the chat history collapses into a readable summary of the chosen option.
    - **Support for ongoing editing**:
@@ -172,9 +172,9 @@ export const scratchpadTemplates = sqliteTable('scratchpad_templates', {
     - Clicking a suggestion immediately runs it as the next chat command (with the `skipClarification: true` flag), automatically expanding the content in the editor.
 
 11. **Visual diff highlighting and version comparison**:
-    - **LCS diff algorithm (`src/lib/scratchpad/diff.ts`)**:
+    - **LCS diff algorithm (Diff module)**:
       - Precisely compares document versions line by line, computing change statistics (`added`, `removed`, `unchanged`).
-    - **Comparison interface in the history dialog (`ScratchpadVersionHistory.tsx`)**:
+    - **Comparison interface in the history dialog**:
       - **Mode switcher**: the user can toggle between *"What changed (Diff)"* mode and *"Preview"* mode (full Markdown render).
       - **Baseline version selector**: compares against the immediately preceding version (`v[N-1]`) by default, with the option to pick any other archived or the current version.
       - **Visual highlighting**:
@@ -189,15 +189,15 @@ export const scratchpadTemplates = sqliteTable('scratchpad_templates', {
     - The AI assistant edits only the note's content (`content`) inside the `<note_update>` block, and does not overwrite the document's title on subsequent messages and chat additions.
 
 13. **Template structure information in the editor**:
-    - **Informational banner in the editor (`ScratchpadEditor.tsx`)**:
+    - **Informational banner in the editor**:
       - When a note is opened/created from a template (or a template structure with a section skeleton and placeholders is detected), a clear, dismissible informational banner (`Layers`) appears at the top of the editor.
       - The banner tells the user that the template below defines the layout, appearance, and building blocks of the finished document, and that a command issued in the chat will have the AI fill in the individual sections.
-    - **Hint in the Copilot chat (`ScratchpadChat.tsx`)**:
+    - **Hint in the Copilot chat**:
       - In the chat's initial view, an additional label is shown, indicating the active template and that content will be generated based on the skeleton in the editor.
     - **Multi-language support**:
-      - All messages related to the template banner and hint have been localized into 12 languages (`src/lib/i18n/locales/*.ts`).
+      - All messages related to the template banner and hint have been localized into 12 languages (localization files across 12 languages).
 
-14. **Set of built-in content templates (`builtinTemplates.ts`)**:
+14. **Set of built-in content templates**:
     - The Scratchpad module defines 7 specialized templates optimized for deep research, analysis, and knowledge synthesis:
       1. **Topic research and analysis (`tpl-research`)** – a structured write-up of a topic split into theses, evidence, analysis, and sources.
       2. **Technology/tool comparison (`tpl-tech-comparison`)** – a feature table, selection criteria, pros, cons, and scenario-based recommendations.
@@ -211,15 +211,28 @@ export const scratchpadTemplates = sqliteTable('scratchpad_templates', {
 15. **Safe rendering and formatting of Markdown tables (comparison table)**:
     - **Root cause**: the previous citation-highlighting algorithm for `[1], [2]` matched text across column delimiters `|`, injecting `<span className="citation-wrapper">...</span>` tags at the start of a row, which broke table syntax in the Markdown parser (`markdown-to-jsx`). In addition, overly long paragraphs generated inside cells caused the table to stretch awkwardly.
     - **Fix architecture**:
-      - **Table- and code-block-safe parser (`ScratchpadEditor.tsx`)**:
+      - **Table- and code-block-safe parser**:
         - Line-by-line parsing that detects code blocks (` ``` `) and leaves code text unmodified.
         - Header delimiter rows (`| :--- | :--- |`) are ignored.
         - In table rows, cell processing happens strictly within the `|...|` boundaries without disturbing the pipe characters.
-      - **Dedicated table components in `markdown-to-jsx` (`ScratchpadEditor.tsx`, `ScratchpadChat.tsx`, `ScratchpadVersionHistory.tsx`)**:
+      - **Dedicated table components in `markdown-to-jsx`**:
         - The `table` container is wrapped in a responsive scroll area (`overflow-x-auto rounded-xl border`), preventing it from pushing the editor out of shape in split mode (`split`).
         - `thead` / `th` header styling with clear emphasis and `whitespace-nowrap`.
         - Word wrapping (`break-words`) and top alignment for `td` cells (`align-top`).
-      - **AI prompt rules (`chat/route.ts` & `builtinTemplates.ts`)**:
+      - **AI prompt rules**:
         - A cell-conciseness rule (keywords, metrics, statuses instead of long blocks of text).
         - Detailed descriptions, pros, and cons are moved to dedicated sections below the table.
         - Raw newline characters inside table cells are strictly forbidden, and pipe characters must be escaped (`\|` or `` ` ``...`` ` ``).
+
+16. **High-Volume Batch Document Resilience & Export (100+ queries)**:
+    - **Lifecycle-aware Print & PDF Generation**:
+      - Previous implementations destroyed the hidden print iframe on a rigid timer (2.5s). On multi-hundred page documents, browser layout engines require 4-8 seconds to compute print geometry, resulting in detached frame crashes and tab freezes.
+      - Replaced with an `onafterprint` / `matchMedia('print')` lifecycle listener combined with a 3-minute safety cleanup fallback, returning a Promise that resolves when the print dialog opens successfully.
+    - **O(N) Markdown & Citation Restoration**:
+      - Converted placeholder replacement pipelines for code blocks and citation pills to single-pass regular expression handlers. This eliminates quadratic time/memory blowups when parsing multi-megabyte Markdown strings.
+    - **Section Pagination in Canvas Preview**:
+      - Bulk batch documents containing multiple sections (`---`) automatically switch to a paginated Batch Research View (10 sections per page) with navigation controls, while maintaining a one-click toggle to show the complete document.
+      - Editing latency is decoupled using `useDeferredValue`, ensuring 60 FPS typing performance even with >50,000 words.
+    - **Segmented Range Export & Standalone HTML Reports**:
+      - Documents with >25 queries offer segmented export options (e.g., Part 1: 1-50, Part 2: 51-100) to prevent browser spooling bottlenecks.
+      - Added direct "Download HTML Report (.html)" generation that packages complete styles, typography, and citation metadata into a single portable file.

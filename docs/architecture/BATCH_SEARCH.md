@@ -60,7 +60,8 @@ The **Batch Search** module introduces an asynchronous, high-throughput research
    - Optional reference links and source bibliography footer.
    - Multi-format export: Markdown (`.md`), Plain Text (`.txt`), and CSV (`.csv`).
    - One-click copy to system clipboard.
-   - Seamless integration with Scratchpad: directly create a collaborative Canvas note.
+   - Seamless integration with Scratchpad: directly create a collaborative Canvas note with batch metadata.
+   - High-volume batch optimizations: Queue and results tables support pagination (10, 25, 50, 100, All) and row-level memoization to eliminate render lag across 100+ queries, while Scratchpad canvas receives section-aware pagination and lifecycle-managed export to prevent browser freezing.
 
 ---
 

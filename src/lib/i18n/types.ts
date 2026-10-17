@@ -1029,6 +1029,25 @@ export interface Translations {
     navigatedToSectionToast?: string;
     sectionContextSetToast?: string;
     highlightedSourceToast?: string;
+    batchViewTitle?: string;
+    sectionsCount?: string;
+    itemsCount?: string;
+    showAll?: string;
+    paginateView?: string;
+    largeDocNotice?: string;
+    largeDocNoticeDesc?: string;
+    exportAllSections?: string;
+    exportRangePart1?: string;
+    exportRangePart2?: string;
+    exportRangePart3?: string;
+    downloadHtml?: string;
+    downloadHtmlDesc?: string;
+    downloadHtmlSuccess?: string;
+    htmlExportError?: string;
+    printInitiated?: string;
+    preparingPrint?: string;
+    generatingReport?: string;
+    printError?: string;
   };
   presentation?: {
     newPresentation?: string;

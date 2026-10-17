@@ -18,6 +18,7 @@ import {
   Copy,
   Download,
   NotebookPen,
+  ChevronLeft,
   ChevronRight,
   ExternalLink,
   Edit3,
@@ -46,6 +47,225 @@ import {
   exportToCsv,
 } from '@/lib/batch-search/parser';
 import { useBatchSearch } from '@/lib/batch-search/context';
+
+interface BatchItemRowProps {
+  item: BatchQueryItem;
+  idx: number;
+  isRunningThis: boolean;
+  memoizedModelOptions: { value: string; label: string }[];
+  onToggleSelect: (idx: number) => void;
+  onUpdateNumber: (idx: number, num: string) => void;
+  onUpdateQuery: (idx: number, q: string) => void;
+  onToggleSource: (idx: number, src: 'web' | 'academic' | 'discussions') => void;
+  onUpdateOptimization: (idx: number, opt: 'speed' | 'balanced' | 'quality') => void;
+  onUpdateModel: (idx: number, pId: string, mKey: string) => void;
+  onDelete: (idx: number) => void;
+  t: any;
+}
+
+const BatchItemRow = React.memo<BatchItemRowProps>(({
+  item,
+  idx,
+  isRunningThis,
+  memoizedModelOptions,
+  onToggleSelect,
+  onUpdateNumber,
+  onUpdateQuery,
+  onToggleSource,
+  onUpdateOptimization,
+  onUpdateModel,
+  onDelete,
+  t,
+}) => {
+  return (
+    <tr
+      className={cn(
+        'hover:bg-light-secondary/50 dark:hover:bg-[#16120e] transition',
+        isRunningThis && 'bg-[#b8864d]/10 dark:bg-[#b8864d]/10',
+        item.status === 'completed' && 'dark:bg-emerald-950/10',
+        item.status === 'error' && 'dark:bg-red-950/15',
+      )}
+    >
+      {/* Checkbox */}
+      <td className="p-3 text-center">
+        <input
+          type="checkbox"
+          checked={item.selected}
+          onChange={() => onToggleSelect(idx)}
+          className="rounded text-[#b8864d] focus:ring-[#b8864d] border-light-300 dark:border-[#2f251c] dark:bg-[#1a1511]"
+        />
+      </td>
+
+      {/* Number input */}
+      <td className="p-3">
+        <input
+          type="text"
+          value={item.number}
+          onChange={(e) => onUpdateNumber(idx, e.target.value)}
+          className="w-12 px-1.5 py-1 rounded bg-light-primary dark:bg-[#18130f] border border-light-200 dark:border-[#28211a] font-mono text-center text-xs focus:outline-none focus:border-[#b8864d]"
+        />
+      </td>
+
+      {/* Query text input */}
+      <td className="p-3">
+        <input
+          type="text"
+          value={item.query}
+          onChange={(e) => onUpdateQuery(idx, e.target.value)}
+          placeholder="Enter research question or concept..."
+          className="w-full px-2.5 py-1.5 rounded-lg bg-light-primary dark:bg-[#18130f] border border-light-200 dark:border-[#28211a] text-xs focus:outline-none focus:border-[#b8864d]"
+        />
+        {item.error && (
+          <p className="text-[11px] text-red-400 mt-1 flex items-center space-x-1">
+            <AlertCircle className="w-3 h-3 shrink-0" />
+            <span>{item.error}</span>
+          </p>
+        )}
+      </td>
+
+      {/* Sources toggles (Web, Academic, Discussions) */}
+      <td className="p-3">
+        <div className="flex items-center space-x-1">
+          <button
+            type="button"
+            onClick={() => onToggleSource(idx, 'web')}
+            title="Web search"
+            className={cn(
+              'px-2 py-1 rounded-md text-[11px] font-medium flex items-center space-x-1 transition',
+              item.sources.includes('web')
+                ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40 font-semibold'
+                : 'bg-light-200 dark:bg-[#1a1410] text-stone-500 hover:text-stone-300 border border-transparent',
+            )}
+          >
+            <Globe className="w-3 h-3" />
+            <span>Web</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onToggleSource(idx, 'academic')}
+            title="Academic sources"
+            className={cn(
+              'px-2 py-1 rounded-md text-[11px] font-medium flex items-center space-x-1 transition',
+              item.sources.includes('academic')
+                ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40 font-semibold'
+                : 'bg-light-200 dark:bg-[#1a1410] text-stone-500 hover:text-stone-300 border border-transparent',
+            )}
+          >
+            <GraduationCap className="w-3 h-3" />
+            <span>Acad</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onToggleSource(idx, 'discussions')}
+            title="Discussions and forums"
+            className={cn(
+              'px-2 py-1 rounded-md text-[11px] font-medium flex items-center space-x-1 transition',
+              item.sources.includes('discussions')
+                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 font-semibold'
+                : 'bg-light-200 dark:bg-[#1a1410] text-stone-500 hover:text-stone-300 border border-transparent',
+            )}
+          >
+            <MessageSquare className="w-3 h-3" />
+            <span>Disc</span>
+          </button>
+        </div>
+      </td>
+
+      {/* Optimization mode */}
+      <td className="p-3">
+        <select
+          value={item.optimizationMode}
+          onChange={(e) =>
+            onUpdateOptimization(
+              idx,
+              e.target.value as 'speed' | 'balanced' | 'quality',
+            )
+          }
+          className="w-full px-2 py-1 rounded bg-light-primary dark:bg-[#18130f] border border-light-200 dark:border-[#28211a] text-xs focus:outline-none focus:border-[#b8864d]"
+        >
+          <option value="speed">⚡ Speed</option>
+          <option value="balanced">⚖️ Balanced</option>
+          <option value="quality">⭐ Quality</option>
+        </select>
+      </td>
+
+      {/* AI Model selection */}
+      <td className="p-3">
+        <select
+          value={
+            item.modelKey && item.providerId
+              ? `${item.providerId}:::${item.modelKey}`
+              : ''
+          }
+          onChange={(e) => {
+            const val = e.target.value;
+            if (!val) {
+              onUpdateModel(idx, '', '');
+            } else {
+              const [pId, mKey] = val.split(':::');
+              onUpdateModel(idx, pId, mKey);
+            }
+          }}
+          className="w-full px-2 py-1 rounded bg-light-primary dark:bg-[#18130f] border border-light-200 dark:border-[#28211a] text-xs focus:outline-none focus:border-[#b8864d] truncate"
+        >
+          <option value="">Default AI Model</option>
+          {memoizedModelOptions.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
+      </td>
+
+      {/* Status */}
+      <td className="p-3">
+        {item.status === 'pending' && (
+          <span className="inline-flex items-center space-x-1 text-stone-500 font-medium">
+            <Clock className="w-3.5 h-3.5" />
+            <span>{t('batchSearch.statusPending') || 'Pending'}</span>
+          </span>
+        )}
+        {item.status === 'searching' && (
+          <span className="inline-flex items-center space-x-1.5 text-[#b8864d] font-medium">
+            <span className="w-3.5 h-3.5 border-2 border-[#b8864d] border-t-transparent rounded-full animate-spin" />
+            <span>{t('batchSearch.statusSearching') || 'Searching...'}</span>
+          </span>
+        )}
+        {item.status === 'completed' && (
+          <span className="inline-flex items-center space-x-1 text-emerald-500 font-medium">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>{t('batchSearch.statusCompleted') || 'Done'}</span>
+            {item.durationMs && (
+              <span className="text-[10px] text-stone-500 ml-1">
+                ({(item.durationMs / 1000).toFixed(1)}s)
+              </span>
+            )}
+          </span>
+        )}
+        {item.status === 'error' && (
+          <span className="inline-flex items-center space-x-1 text-red-400 font-medium">
+            <AlertCircle className="w-3.5 h-3.5" />
+            <span>{t('batchSearch.statusError') || 'Error'}</span>
+          </span>
+        )}
+      </td>
+
+      {/* Actions */}
+      <td className="p-3 text-center">
+        <button
+          type="button"
+          onClick={() => onDelete(idx)}
+          title="Delete row"
+          className="p-1 rounded text-stone-400 hover:text-red-400 hover:bg-red-500/10 transition"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </td>
+    </tr>
+  );
+});
+
+BatchItemRow.displayName = 'BatchItemRow';
 
 interface BatchSearchWorkspaceProps {
   onClose?: () => void;
@@ -111,6 +331,43 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
 
   const [isDragging, setIsDragging] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+
+  // Pagination states for smooth 60fps rendering with 100+ items
+  const [queuePage, setQueuePage] = useState(0);
+  const [queuePageSize, setQueuePageSize] = useState<number | 'all'>(25);
+
+  const [resultsPage, setResultsPage] = useState(0);
+  const [resultsPageSize, setResultsPageSize] = useState<number | 'all'>(10);
+
+  // Memoized models list for fast select options
+  const memoizedModelOptions = useMemo(() => {
+    return availableModelsList.map((m) => ({
+      value: `${m.providerId}:::${m.modelKey}`,
+      label: `${m.modelName} (${m.providerName})`,
+    }));
+  }, [availableModelsList]);
+
+  // Paginated queue items
+  const paginatedQueueItems = useMemo(() => {
+    if (queuePageSize === 'all') return items.map((item, idx) => ({ item, idx }));
+    const start = queuePage * queuePageSize;
+    return items
+      .map((item, idx) => ({ item, idx }))
+      .slice(start, start + queuePageSize);
+  }, [items, queuePage, queuePageSize]);
+
+  // Paginated results items
+  const completedOrHasResponseItems = useMemo(() => {
+    return items
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ item }) => item.response || item.status === 'completed');
+  }, [items]);
+
+  const paginatedResultsItems = useMemo(() => {
+    if (resultsPageSize === 'all') return completedOrHasResponseItems;
+    const start = resultsPage * resultsPageSize;
+    return completedOrHasResponseItems.slice(start, start + resultsPageSize);
+  }, [completedOrHasResponseItems, resultsPage, resultsPageSize]);
 
   // Drag & drop file handlers
   const handleFileDrop = (e: React.DragEvent) => {
@@ -220,6 +477,11 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
           title: `Batch Research: ${items[0]?.query || 'Queries'} (${items.length} items)`,
           content: compiledMarkdown,
           type: 'note',
+          metadata: {
+            isBatchExport: true,
+            batchCount: items.length,
+            generatedAt: new Date().toISOString(),
+          },
         }),
       });
 
@@ -890,203 +1152,89 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-light-200 dark:divide-[#201812]">
-                      {items.map((item, idx) => {
-                        const isRunningThis = currentRunningIndex === idx;
-
-                        return (
-                          <tr
-                            key={item.id}
-                            className={cn(
-                              'hover:bg-light-secondary/50 dark:hover:bg-[#16120e] transition',
-                              isRunningThis && 'bg-[#b8864d]/10 dark:bg-[#b8864d]/10',
-                              item.status === 'completed' && 'dark:bg-emerald-950/10',
-                              item.status === 'error' && 'dark:bg-red-950/15',
-                            )}
-                          >
-                            {/* Checkbox */}
-                            <td className="p-3 text-center">
-                              <input
-                                type="checkbox"
-                                checked={item.selected}
-                                onChange={() => handleToggleSelect(idx)}
-                                className="rounded text-[#b8864d] focus:ring-[#b8864d] border-light-300 dark:border-[#2f251c] dark:bg-[#1a1511]"
-                              />
-                            </td>
-
-                            {/* Number input */}
-                            <td className="p-3">
-                              <input
-                                type="text"
-                                value={item.number}
-                                onChange={(e) => handleUpdateItemNumber(idx, e.target.value)}
-                                className="w-12 px-1.5 py-1 rounded bg-light-primary dark:bg-[#18130f] border border-light-200 dark:border-[#28211a] font-mono text-center text-xs focus:outline-none focus:border-[#b8864d]"
-                              />
-                            </td>
-
-                            {/* Query text input */}
-                            <td className="p-3">
-                              <input
-                                type="text"
-                                value={item.query}
-                                onChange={(e) => handleUpdateItemQuery(idx, e.target.value)}
-                                placeholder="Enter research question or concept..."
-                                className="w-full px-2.5 py-1.5 rounded-lg bg-light-primary dark:bg-[#18130f] border border-light-200 dark:border-[#28211a] text-xs focus:outline-none focus:border-[#b8864d]"
-                              />
-                              {item.error && (
-                                <p className="text-[11px] text-red-400 mt-1 flex items-center space-x-1">
-                                  <AlertCircle className="w-3 h-3 shrink-0" />
-                                  <span>{item.error}</span>
-                                </p>
-                              )}
-                            </td>
-
-                            {/* Sources toggles (Web, Academic, Discussions) */}
-                            <td className="p-3">
-                              <div className="flex items-center space-x-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleItemSource(idx, 'web')}
-                                  title="Web search"
-                                  className={cn(
-                                    'px-2 py-1 rounded-md text-[11px] font-medium flex items-center space-x-1 transition',
-                                    item.sources.includes('web')
-                                      ? 'bg-sky-500/20 text-sky-400 border border-sky-500/40 font-semibold'
-                                      : 'bg-light-200 dark:bg-[#1a1410] text-stone-500 hover:text-stone-300 border border-transparent',
-                                  )}
-                                >
-                                  <Globe className="w-3 h-3" />
-                                  <span>Web</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleItemSource(idx, 'academic')}
-                                  title="Academic sources"
-                                  className={cn(
-                                    'px-2 py-1 rounded-md text-[11px] font-medium flex items-center space-x-1 transition',
-                                    item.sources.includes('academic')
-                                      ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40 font-semibold'
-                                      : 'bg-light-200 dark:bg-[#1a1410] text-stone-500 hover:text-stone-300 border border-transparent',
-                                  )}
-                                >
-                                  <GraduationCap className="w-3 h-3" />
-                                  <span>Acad</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleItemSource(idx, 'discussions')}
-                                  title="Discussions and forums"
-                                  className={cn(
-                                    'px-2 py-1 rounded-md text-[11px] font-medium flex items-center space-x-1 transition',
-                                    item.sources.includes('discussions')
-                                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40 font-semibold'
-                                      : 'bg-light-200 dark:bg-[#1a1410] text-stone-500 hover:text-stone-300 border border-transparent',
-                                  )}
-                                >
-                                  <MessageSquare className="w-3 h-3" />
-                                  <span>Disc</span>
-                                </button>
-                              </div>
-                            </td>
-
-                            {/* Optimization mode */}
-                            <td className="p-3">
-                              <select
-                                value={item.optimizationMode}
-                                onChange={(e) =>
-                                  handleUpdateItemOptimization(
-                                    idx,
-                                    e.target.value as 'speed' | 'balanced' | 'quality',
-                                  )
-                                }
-                                className="w-full px-2 py-1 rounded bg-light-primary dark:bg-[#18130f] border border-light-200 dark:border-[#28211a] text-xs focus:outline-none focus:border-[#b8864d]"
-                              >
-                                <option value="speed">⚡ Speed</option>
-                                <option value="balanced">⚖️ Balanced</option>
-                                <option value="quality">⭐ Quality</option>
-                              </select>
-                            </td>
-
-                            {/* AI Model selection */}
-                            <td className="p-3">
-                              <select
-                                value={
-                                  item.modelKey && item.providerId
-                                    ? `${item.providerId}:::${item.modelKey}`
-                                    : ''
-                                }
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  if (!val) {
-                                    handleUpdateItemModel(idx, '', '');
-                                  } else {
-                                    const [pId, mKey] = val.split(':::');
-                                    handleUpdateItemModel(idx, pId, mKey);
-                                  }
-                                }}
-                                className="w-full px-2 py-1 rounded bg-light-primary dark:bg-[#18130f] border border-light-200 dark:border-[#28211a] text-xs focus:outline-none focus:border-[#b8864d] truncate"
-                              >
-                                <option value="">Default AI Model</option>
-                                {availableModelsList.map((m) => (
-                                  <option
-                                    key={`${m.providerId}:::${m.modelKey}`}
-                                    value={`${m.providerId}:::${m.modelKey}`}
-                                  >
-                                    {m.modelName} ({m.providerName})
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
-
-                            {/* Status */}
-                            <td className="p-3">
-                              {item.status === 'pending' && (
-                                <span className="inline-flex items-center space-x-1 text-stone-500 font-medium">
-                                  <Clock className="w-3.5 h-3.5" />
-                                  <span>{t('batchSearch.statusPending') || 'Pending'}</span>
-                                </span>
-                              )}
-                              {item.status === 'searching' && (
-                                <span className="inline-flex items-center space-x-1.5 text-[#b8864d] font-medium">
-                                  <span className="w-3.5 h-3.5 border-2 border-[#b8864d] border-t-transparent rounded-full animate-spin" />
-                                  <span>{t('batchSearch.statusSearching') || 'Searching...'}</span>
-                                </span>
-                              )}
-                              {item.status === 'completed' && (
-                                <span className="inline-flex items-center space-x-1 text-emerald-500 font-medium">
-                                  <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>{t('batchSearch.statusCompleted') || 'Done'}</span>
-                                  {item.durationMs && (
-                                    <span className="text-[10px] text-stone-500 ml-1">
-                                      ({(item.durationMs / 1000).toFixed(1)}s)
-                                    </span>
-                                  )}
-                                </span>
-                              )}
-                              {item.status === 'error' && (
-                                <span className="inline-flex items-center space-x-1 text-red-400 font-medium">
-                                  <AlertCircle className="w-3.5 h-3.5" />
-                                  <span>{t('batchSearch.statusError') || 'Error'}</span>
-                                </span>
-                              )}
-                            </td>
-
-                            {/* Actions */}
-                            <td className="p-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteItem(idx)}
-                                title="Delete row"
-                                className="p-1 rounded text-stone-400 hover:text-red-400 hover:bg-red-500/10 transition"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
+                      {paginatedQueueItems.map(({ item, idx }) => (
+                        <BatchItemRow
+                          key={item.id}
+                          item={item}
+                          idx={idx}
+                          isRunningThis={currentRunningIndex === idx}
+                          memoizedModelOptions={memoizedModelOptions}
+                          onToggleSelect={handleToggleSelect}
+                          onUpdateNumber={handleUpdateItemNumber}
+                          onUpdateQuery={handleUpdateItemQuery}
+                          onToggleSource={handleToggleItemSource}
+                          onUpdateOptimization={handleUpdateItemOptimization}
+                          onUpdateModel={handleUpdateItemModel}
+                          onDelete={handleDeleteItem}
+                          t={t}
+                        />
+                      ))}
                     </tbody>
                   </table>
                 </div>
+
+                {/* Queue Pagination Footer */}
+                {items.length > 25 && (
+                  <div className="p-3 border-t border-light-200 dark:border-[#201812] bg-light-secondary/40 dark:bg-[#16120e] flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div className="text-stone-500">
+                      <span>
+                        Showing {queuePageSize === 'all' ? 1 : queuePage * queuePageSize + 1}–
+                        {queuePageSize === 'all'
+                          ? items.length
+                          : Math.min(items.length, (queuePage + 1) * queuePageSize)}{' '}
+                        of {items.length} queries
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1">
+                        <span className="text-stone-400 text-[11px]">Per page:</span>
+                        <select
+                          value={queuePageSize}
+                          onChange={(e) => {
+                            const val = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+                            setQueuePageSize(val);
+                            setQueuePage(0);
+                          }}
+                          className="px-2 py-0.5 rounded bg-light-primary dark:bg-[#191410] border border-light-200 dark:border-[#28211a] text-xs font-medium focus:outline-none focus:border-[#b8864d]"
+                        >
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                          <option value="all">All</option>
+                        </select>
+                      </div>
+
+                      {queuePageSize !== 'all' && (
+                        <div className="flex items-center space-x-1">
+                          <button
+                            type="button"
+                            disabled={queuePage === 0}
+                            onClick={() => setQueuePage((p) => Math.max(0, p - 1))}
+                            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 transition"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <span className="font-mono text-stone-500 px-1">
+                            {queuePage + 1} / {Math.ceil(items.length / queuePageSize)}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={(queuePage + 1) * queuePageSize >= items.length}
+                            onClick={() =>
+                              setQueuePage((p) =>
+                                (p + 1) * queuePageSize < items.length ? p + 1 : p,
+                              )
+                            }
+                            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 transition"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1183,7 +1331,7 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
               </div>
             )}
 
-            {items.filter((i) => i.response || i.status === 'completed').length === 0 ? (
+            {completedOrHasResponseItems.length === 0 ? (
               <div className="text-center py-16 border border-dashed border-light-300 dark:border-[#282119] rounded-2xl p-6">
                 <FileText className="w-8 h-8 text-stone-400 mx-auto mb-2" />
                 <h3 className="text-sm font-semibold text-stone-300">
@@ -1202,9 +1350,7 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
               </div>
             ) : (
               <div className="space-y-4">
-                {items.map((item, idx) => {
-                  if (!item.response && item.status !== 'completed') return null;
-
+                {paginatedResultsItems.map(({ item, idx }) => {
                   const isEditingThis = editingItemIndex === idx;
 
                   return (
@@ -1293,6 +1439,70 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                     </div>
                   );
                 })}
+
+                {/* Results Pagination Controls */}
+                {completedOrHasResponseItems.length > 10 && (
+                  <div className="p-3.5 rounded-xl border border-light-200 dark:border-[#251e18] bg-light-secondary/40 dark:bg-[#140f0c] flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <span className="text-stone-500">
+                      Showing {resultsPageSize === 'all' ? 1 : resultsPage * resultsPageSize + 1}–
+                      {resultsPageSize === 'all'
+                        ? completedOrHasResponseItems.length
+                        : Math.min(
+                            completedOrHasResponseItems.length,
+                            (resultsPage + 1) * resultsPageSize,
+                          )}{' '}
+                      of {completedOrHasResponseItems.length} notes
+                    </span>
+
+                    <div className="flex items-center space-x-2">
+                      <div className="flex items-center space-x-1">
+                        <span className="text-stone-400 text-[11px]">Per page:</span>
+                        <select
+                          value={resultsPageSize}
+                          onChange={(e) => {
+                            const val = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+                            setResultsPageSize(val);
+                            setResultsPage(0);
+                          }}
+                          className="px-2 py-0.5 rounded bg-light-primary dark:bg-[#191410] border border-light-200 dark:border-[#28211a] text-xs font-medium focus:outline-none focus:border-[#b8864d]"
+                        >
+                          <option value={10}>10</option>
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                          <option value="all">All</option>
+                        </select>
+                      </div>
+
+                      {resultsPageSize !== 'all' && (
+                        <div className="flex items-center space-x-1">
+                          <button
+                            type="button"
+                            disabled={resultsPage === 0}
+                            onClick={() => setResultsPage((p) => Math.max(0, p - 1))}
+                            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 transition"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </button>
+                          <span className="font-mono text-stone-500 px-1">
+                            {resultsPage + 1} / {Math.ceil(completedOrHasResponseItems.length / resultsPageSize)}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={(resultsPage + 1) * resultsPageSize >= completedOrHasResponseItems.length}
+                            onClick={() =>
+                              setResultsPage((p) =>
+                                (p + 1) * resultsPageSize < completedOrHasResponseItems.length ? p + 1 : p,
+                              )
+                            }
+                            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 transition"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

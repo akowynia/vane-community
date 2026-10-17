@@ -211,18 +211,15 @@ export const convertMarkdownToPrintHtml = async (
   );
 
   // Step 3: Extract and render code blocks & Mermaid diagrams
-  const codeBlocks: string[] = [];
+  const codeBlocksHtml: string[] = [];
   const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
   let codeMatch: RegExpExecArray | null;
-  const rawCodeReplacements: Array<{ placeholder: string; html: string }> = [];
 
   // Identify all code blocks first
   while ((codeMatch = codeBlockRegex.exec(text)) !== null) {
     const lang = (codeMatch[1] || '').trim().toLowerCase();
     const code = codeMatch[2].trim();
-    const idx = codeBlocks.length;
-    const placeholder = `%%VANECODEBLOCK${idx}%%`;
-    codeBlocks.push(code);
+    const idx = codeBlocksHtml.length;
 
     let blockHtml = '';
 
@@ -271,13 +268,14 @@ export const convertMarkdownToPrintHtml = async (
       `;
     }
 
-    rawCodeReplacements.push({ placeholder, html: blockHtml });
+    codeBlocksHtml.push(blockHtml);
   }
 
-  // Replace code blocks in text with placeholders
+  // Replace code blocks in text with index-based placeholders
+  let codeBlockCounter = 0;
   text = text.replace(
     /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g,
-    () => rawCodeReplacements.shift()?.placeholder || '',
+    () => `%%VANECODEBLOCK${codeBlockCounter++}%%`,
   );
 
   // Step 4: Parse lines and block structures
@@ -540,14 +538,16 @@ export const convertMarkdownToPrintHtml = async (
 
   let finalHtml = htmlParts.join('\n');
 
-  // Restore code blocks
-  rawCodeReplacements.forEach(({ placeholder, html }) => {
-    finalHtml = finalHtml.replace(placeholder, html);
+  // Restore code blocks with single regex O(N)
+  finalHtml = finalHtml.replace(/%%VANECODEBLOCK(\d+)%%/g, (_, idxStr) => {
+    const idx = parseInt(idxStr, 10);
+    return codeBlocksHtml[idx] ?? '';
   });
 
-  // Restore citation tags
-  citationMap.forEach((citHtml, idx) => {
-    finalHtml = finalHtml.replace(`%%VANECITATION${idx}%%`, citHtml);
+  // Restore citation tags with single regex O(N)
+  finalHtml = finalHtml.replace(/%%VANECITATION(\d+)%%/g, (_, idxStr) => {
+    const idx = parseInt(idxStr, 10);
+    return citationMap[idx] ?? '';
   });
 
   // Step 5: Append Sources / Bibliography if requested
@@ -1364,37 +1364,85 @@ export const buildNotePrintDocumentHtml = async (
 };
 
 /**
- * Creates an isolated hidden iframe and triggers browser print
+ * Creates an isolated hidden iframe and triggers browser print safely
  */
-export const executeIframePrint = (html: string): void => {
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  document.body.appendChild(iframe);
+export const executeIframePrint = (html: string): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.style.visibility = 'hidden';
+    document.body.appendChild(iframe);
 
-  const iframeDoc = iframe.contentWindow?.document;
-  if (!iframeDoc) {
-    if (document.body.contains(iframe)) {
-      document.body.removeChild(iframe);
+    let isCleanedUp = false;
+    const cleanup = () => {
+      if (isCleanedUp) return;
+      isCleanedUp = true;
+      try {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      } catch {}
+    };
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (!iframeDoc) {
+      cleanup();
+      resolve(false);
+      return;
     }
-    return;
-  }
 
-  iframeDoc.open();
-  iframeDoc.write(html);
-  iframeDoc.close();
+    try {
+      iframe.contentWindow?.addEventListener('afterprint', cleanup);
+    } catch {}
 
-  setTimeout(() => {
-    iframe.contentWindow?.focus();
-    iframe.contentWindow?.print();
-    setTimeout(() => {
-      if (document.body.contains(iframe)) {
-        document.body.removeChild(iframe);
+    // Safe fallback timeout (3 minutes) - ensures browser print preview has full time to render
+    setTimeout(cleanup, 180000);
+
+    iframeDoc.open();
+    iframeDoc.write(html);
+    iframeDoc.close();
+
+    const triggerPrint = () => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        resolve(true);
+      } catch (err) {
+        console.error('Print trigger failed:', err);
+        cleanup();
+        resolve(false);
       }
-    }, 2500);
-  }, 300);
+    };
+
+    if (iframe.contentWindow?.document.readyState === 'complete') {
+      setTimeout(triggerPrint, 300);
+    } else {
+      iframe.onload = () => setTimeout(triggerPrint, 300);
+      // Fallback in case onload does not fire
+      setTimeout(triggerPrint, 1200);
+    }
+  });
+};
+
+/**
+ * Downloads the full styled print document as a standalone HTML file
+ */
+export const downloadPrintDocumentHtml = (
+  html: string,
+  filename: string = 'research_report.html',
+): void => {
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };
