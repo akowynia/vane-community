@@ -64,6 +64,9 @@ export interface Translations {
     confirmDelete: string;
     copy: string;
     copied: string;
+    previous?: string;
+    next?: string;
+    of?: string;
   };
   navigation: {
     home: string;
@@ -281,6 +284,14 @@ export interface Translations {
     chatsCount: string;
     pastChatsCount: string;
     loading: string;
+    tabsBatch?: string;
+    activeBatchSession?: string;
+    noBatchSearchesTitle?: string;
+    noBatchSearchesDesc?: string;
+    openBatchStudio?: string;
+    viewBatchNotes?: string;
+    viewBatchNotesDesc?: string;
+    batchNotesCount?: string;
   };
   discover: {
     title: string;
@@ -1048,6 +1059,11 @@ export interface Translations {
     preparingPrint?: string;
     generatingReport?: string;
     printError?: string;
+    categoryAll?: string;
+    categoryNotes?: string;
+    categoryBatch?: string;
+    badgeBatch?: string;
+    queries?: string;
   };
   presentation?: {
     newPresentation?: string;
@@ -1240,5 +1256,11 @@ export interface Translations {
     floatingStatusTitle?: string;
     defaultConfigTitle?: string;
     defaultConfigHint?: string;
+    regenerateAll?: string;
+    regenerateSelected?: string;
+    regenerateSelectedDesc?: string;
+    regenerateQuery?: string;
+    regenerateNote?: string;
+    newBatchSearch?: string;
   };
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -27,7 +27,7 @@ import {
 } from '@headlessui/react';
 import { toast } from 'sonner';
 import { useTranslation } from '@/lib/i18n';
-import { formatTimeDifference } from '@/lib/utils';
+import { formatTimeDifference, cn } from '@/lib/utils';
 import ScratchpadTemplateDialog, {
   ScratchpadTemplate,
 } from '@/components/Scratchpad/ScratchpadTemplateDialog';
@@ -41,7 +41,7 @@ interface ScratchpadListItem {
   id: string;
   title: string;
   excerpt: string;
-  type?: 'note' | 'presentation';
+  type?: 'note' | 'presentation' | 'batch';
   metadata?: any;
   userId?: string | null;
   waypointId?: string | null;
@@ -60,6 +60,7 @@ const ScratchpadListPage = () => {
   const [items, setItems] = useState<ScratchpadListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'note' | 'batch' | 'presentation'>('all');
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
   const [presentationsEnabled, setPresentationsEnabled] = useState(false);
@@ -209,11 +210,24 @@ const ScratchpadListPage = () => {
     }
   };
 
-  const filteredItems = items.filter(
-    (item) =>
-      item.title.toLowerCase().includes(search.toLowerCase()) ||
-      item.excerpt.toLowerCase().includes(search.toLowerCase()),
-  );
+  const notesCount = useMemo(() => items.filter((i) => !i.type || i.type === 'note').length, [items]);
+  const batchCount = useMemo(() => items.filter((i) => i.type === 'batch').length, [items]);
+  const presentationCount = useMemo(() => items.filter((i) => i.type === 'presentation').length, [items]);
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const matchesSearch =
+        item.title.toLowerCase().includes(search.toLowerCase()) ||
+        item.excerpt.toLowerCase().includes(search.toLowerCase());
+      if (!matchesSearch) return false;
+
+      if (selectedCategory === 'all') return true;
+      if (selectedCategory === 'note') return !item.type || item.type === 'note';
+      if (selectedCategory === 'batch') return item.type === 'batch';
+      if (selectedCategory === 'presentation') return item.type === 'presentation';
+      return true;
+    });
+  }, [items, search, selectedCategory]);
 
   return (
     <div className="flex flex-col min-h-screen bg-light-primary dark:bg-[#0c0a09] text-stone-900 dark:text-stone-100">
@@ -266,16 +280,89 @@ const ScratchpadListPage = () => {
 
       {/* Main Container */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full flex-1 flex flex-col">
-        {/* Search Bar */}
-        <div className="relative mb-6">
-          <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('scratchpad.searchPlaceholder') || 'Search notes and drafts...'}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-light-200 dark:border-[#26201a] bg-light-secondary dark:bg-[#16120f] text-xs text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-[#b8864d] transition"
-          />
+        {/* Category Tabs & Search Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('all')}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition shrink-0',
+                selectedCategory === 'all'
+                  ? 'bg-[#b8864d]/15 text-[#b8864d] border border-[#b8864d]/30 shadow-sm'
+                  : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-light-200 dark:hover:bg-[#181411]',
+              )}
+            >
+              <span>{t('scratchpad.categoryAll') || 'All'}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-light-300 dark:bg-[#201b16] font-semibold">
+                {items.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('note')}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition shrink-0',
+                selectedCategory === 'note'
+                  ? 'bg-[#b8864d]/15 text-[#b8864d] border border-[#b8864d]/30 shadow-sm'
+                  : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-light-200 dark:hover:bg-[#181411]',
+              )}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>{t('scratchpad.categoryNotes') || 'Notes'}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-light-300 dark:bg-[#201b16] font-semibold">
+                {notesCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('batch')}
+              className={cn(
+                'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition shrink-0',
+                selectedCategory === 'batch'
+                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-sm font-semibold'
+                  : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-light-200 dark:hover:bg-[#181411]',
+              )}
+            >
+              <Layers className="w-3.5 h-3.5 text-cyan-400" />
+              <span>{t('scratchpad.categoryBatch') || 'Batch Research'}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-light-300 dark:bg-[#201b16] font-semibold">
+                {batchCount}
+              </span>
+            </button>
+
+            {presentationsEnabled && (
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('presentation')}
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition shrink-0',
+                  selectedCategory === 'presentation'
+                    ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30 shadow-sm font-semibold'
+                    : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-light-200 dark:hover:bg-[#181411]',
+                )}
+              >
+                <Presentation className="w-3.5 h-3.5 text-amber-500" />
+                <span>{t('presentation.newPresentation') || 'Presentations'}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-light-300 dark:bg-[#201b16] font-semibold">
+                  {presentationCount}
+                </span>
+              </button>
+            )}
+          </div>
+
+          <div className="relative w-full sm:w-72 shrink-0">
+            <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('scratchpad.searchPlaceholder') || 'Search notes and drafts...'}
+              className="w-full pl-10 pr-4 py-2 rounded-xl border border-light-200 dark:border-[#26201a] bg-light-secondary dark:bg-[#16120f] text-xs text-stone-900 dark:text-stone-100 placeholder:text-stone-400 focus:outline-none focus:border-[#b8864d] transition"
+            />
+          </div>
         </div>
 
         {/* Content List */}
@@ -327,15 +414,17 @@ const ScratchpadListPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredItems.map((item) => {
               const isPres = item.type === 'presentation';
+              const isBatch = item.type === 'batch';
               return (
                 <div
                   key={item.id}
                   onClick={() => router.push(`/scratchpad/${item.id}`)}
-                  className={`group relative flex flex-col justify-between p-5 rounded-2xl bg-light-secondary dark:bg-[#16120f] border transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-black/20 ${
-                    isPres
-                      ? 'border-amber-500/30 hover:border-amber-500/70 hover:bg-amber-500/[0.02]'
-                      : 'border-light-200 dark:border-[#241e18] hover:border-[#b8864d]/60'
-                  }`}
+                  className={cn(
+                    'group relative flex flex-col justify-between p-5 rounded-2xl bg-light-secondary dark:bg-[#16120f] border transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-black/20',
+                    isPres && 'border-amber-500/30 hover:border-amber-500/70 hover:bg-amber-500/[0.02]',
+                    isBatch && 'border-cyan-500/30 hover:border-cyan-500/70 hover:bg-cyan-500/[0.02]',
+                    !isPres && !isBatch && 'border-light-200 dark:border-[#241e18] hover:border-[#b8864d]/60',
+                  )}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-2 gap-1.5">
@@ -344,6 +433,11 @@ const ScratchpadListPage = () => {
                           <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 text-[10px] font-bold tracking-wider uppercase flex items-center space-x-1 shrink-0">
                             <Presentation className="w-2.5 h-2.5" />
                             <span>{t('presentation.badgePresentation') || 'PRESENTATION'}</span>
+                          </span>
+                        ) : isBatch ? (
+                          <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[10px] font-bold tracking-wider uppercase flex items-center space-x-1 shrink-0">
+                            <Layers className="w-2.5 h-2.5" />
+                            <span>{t('scratchpad.badgeBatch') || 'BATCH RESEARCH'}</span>
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-full bg-[#b8864d]/15 text-[#b8864d] text-[10px] font-semibold tracking-wider uppercase shrink-0">
@@ -365,9 +459,12 @@ const ScratchpadListPage = () => {
                       </button>
                     </div>
 
-                    <h3 className={`text-sm font-semibold text-stone-900 dark:text-stone-100 transition line-clamp-1 mb-1.5 ${
-                      isPres ? 'group-hover:text-amber-500' : 'group-hover:text-[#b8864d]'
-                    }`}>
+                    <h3 className={cn(
+                      'text-sm font-semibold text-stone-900 dark:text-stone-100 transition line-clamp-1 mb-1.5',
+                      isPres && 'group-hover:text-amber-500',
+                      isBatch && 'group-hover:text-cyan-400',
+                      !isPres && !isBatch && 'group-hover:text-[#b8864d]',
+                    )}>
                       {item.title || t('scratchpad.untitled') || 'Untitled'}
                     </h3>
 
@@ -384,6 +481,11 @@ const ScratchpadListPage = () => {
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">
+                      {item.metadata?.batchCount && (
+                        <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-medium text-[10px]">
+                          {item.metadata.batchCount} {t('scratchpad.queries') || 'queries'}
+                        </span>
+                      )}
                       {item.versionsCount > 1 && (
                         <span className="px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 font-mono text-[10px]">
                           v{item.versionsCount}

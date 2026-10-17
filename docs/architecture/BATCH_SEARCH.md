@@ -30,6 +30,10 @@ The **Batch Search** module introduces an asynchronous, high-throughput research
    - Per-item status tracking: Pending, Searching, Completed, and Error.
    - Full playback controls: Pause, Resume, Stop, and Retry Failed items.
    - Dedicated "Continue Search" action automatically processes remaining uncompleted or interrupted items.
+   - **Search Regeneration (Regenerate / Re-run)**:
+     - Global batch regeneration button appears when all or part of queries are complete, allowing full or selected re-runs.
+     - Per-row regeneration button in the Queue table actions to re-query specific items.
+     - Individual note card regeneration button in the Results & Review tab for immediate re-synthesis without re-importing the dataset.
    - Real-time telemetry displaying duration and source discovery counts.
 
 4. **Floating Action Bar & Quick Controls**:
@@ -45,9 +49,10 @@ The **Batch Search** module introduces an asynchronous, high-throughput research
    - Users can inspect synthesized findings before final document compilation.
    - Dual-mode card interface: Rendered Markdown preview and live note editor.
    - Inline source citation links with external navigation.
+   - Note-level regeneration button for refreshing individual concepts.
    - Embedded status banner with direct "Continue remaining queries" button when viewing partially completed batches.
 
-6. **Compiled Document Export**:
+6. **Compiled Document Export & Scratchpad Integration**:
    - Automatically builds a compiled, structured document adhering to:
      ```markdown
      # Pytanie / pojęcie [nr]
@@ -60,7 +65,10 @@ The **Batch Search** module introduces an asynchronous, high-throughput research
    - Optional reference links and source bibliography footer.
    - Multi-format export: Markdown (`.md`), Plain Text (`.txt`), and CSV (`.csv`).
    - One-click copy to system clipboard.
-   - Seamless integration with Scratchpad: directly create a collaborative Canvas note with batch metadata.
+   - **Seamless Scratchpad Integration & Source Retention**:
+     - Automatically aggregates, normalizes, and deduplicates all discovered research sources across all batch questions.
+     - Passes full source metadata directly to Scratchpad, ensuring complete source citation cards, favicons, and links appear in the Scratchpad canvas.
+     - Tagged with dedicated `batch` note type and question count metadata.
    - High-volume batch optimizations: Queue and results tables support pagination (10, 25, 50, 100, All) and row-level memoization to eliminate render lag across 100+ queries, while Scratchpad canvas receives section-aware pagination and lifecycle-managed export to prevent browser freezing.
 
 ---
@@ -79,12 +87,13 @@ flowchart TD
     H --> I["Floating Action Bar (Preview / Continue / Abort)"]
     H --> J["Review & Note Editor"]
     J --> K["Document Compiler"]
-    K --> L["Download (.md, .txt, .csv) / Save to Scratchpad"]
+    K --> L["Download (.md, .txt, .csv) / Save to Scratchpad with Sources"]
+    L --> M["Library & Scratchpad Batch Studio Views"]
 ```
 
 ---
 
-## 4. UI Entry Points
+## 4. UI Entry Points & Library Integration
 
 1. **Unified Search & Input Panels**:
    - Entry point trigger badge positioned alongside Optimization controls in the primary search input panels.
@@ -93,10 +102,20 @@ flowchart TD
 2. **Dedicated Workspace Page**:
    - Dedicated full-page route accessible directly via navigation rail and URL.
 
-3. **Floating Quick-Access Bar**:
+3. **Dedicated Batch Search Tab in Library**:
+   - The Library features a dedicated "Batch Search" tab alongside All Chats and Schedules.
+   - Displays real-time active session banner with progress indicators, status, and quick link to return to the active studio session.
+   - Lists all saved Batch Research documents from Scratchpad with direct navigation, question counts, and discovered sources count.
+   - Quick action to launch new batch research workflows.
+
+4. **Scratchpad Batch Category**:
+   - Scratchpad workspace contains dedicated category tabs (`All`, `Notes`, `Batch Research`, `Presentations`).
+   - Batch notes are highlighted with specialized cyan badges, query counts, and filtered views.
+
+5. **Floating Quick-Access Bar**:
    - Persists unobtrusively at the bottom corner for immediate preview, continuation, and stopping from anywhere in the app.
 
-4. **Global Event System**:
+6. **Global Event System**:
    - Dispatches and listens to standard window events for seamless modal invocation from any view.
 
 ---

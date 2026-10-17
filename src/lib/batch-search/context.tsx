@@ -62,7 +62,13 @@ interface BatchSearchContextType {
   availableModelsList: AvailableModelInfo[];
 
   // Action methods
-  startBatchSearch: (retryOnlyErrors?: boolean) => Promise<void>;
+  startBatchSearch: (
+    retryOnlyErrors?: boolean,
+    forceRegenerate?: boolean,
+    targetIndices?: number[],
+  ) => Promise<void>;
+  regenerateBatchSearch: (retryOnlyErrors?: boolean, targetIndices?: number[]) => Promise<void>;
+  regenerateSingleQuery: (idx: number) => Promise<void>;
   pauseBatchSearch: () => void;
   resumeBatchSearch: () => void;
   stopBatchSearch: () => void;
@@ -509,7 +515,11 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
 
   // Batch orchestrator
   const startBatchSearch = useCallback(
-    async (retryOnlyErrors = false) => {
+    async (
+      retryOnlyErrors = false,
+      forceRegenerate = false,
+      targetIndices?: number[],
+    ) => {
       if (items.length === 0) {
         toast.error(t('batchSearch.noItemsLoaded') || 'No queries to process.');
         return;
@@ -522,9 +532,13 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
 
       const targets = items
         .map((item, idx) => ({ item, idx }))
-        .filter(({ item }) => {
+        .filter(({ item, idx }) => {
+          if (targetIndices && targetIndices.length > 0) {
+            return targetIndices.includes(idx);
+          }
           if (!item.selected) return false;
           if (retryOnlyErrors) return item.status === 'error';
+          if (forceRegenerate) return true;
           return item.status !== 'completed';
         });
 
@@ -618,6 +632,37 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
     [items, defaultModelKey, defaultProviderId, t],
   );
 
+  const regenerateBatchSearch = useCallback(
+    async (retryOnlyErrors = false, targetIndices?: number[]) => {
+      setItems((prev) =>
+        prev.map((it, idx) => {
+          const isTarget = targetIndices ? targetIndices.includes(idx) : it.selected;
+          if (isTarget) {
+            return {
+              ...it,
+              status: 'pending',
+              response: undefined,
+              error: undefined,
+              sourcesList: undefined,
+              durationMs: undefined,
+            };
+          }
+          return it;
+        }),
+      );
+      return startBatchSearch(retryOnlyErrors, true, targetIndices);
+    },
+    [startBatchSearch],
+  );
+
+  const regenerateSingleQuery = useCallback(
+    async (idx: number) => {
+      if (idx < 0 || idx >= items.length) return;
+      return regenerateBatchSearch(false, [idx]);
+    },
+    [items.length, regenerateBatchSearch],
+  );
+
   const pauseBatchSearch = useCallback(() => {
     setIsPaused(true);
     isPausedRef.current = true;
@@ -691,6 +736,8 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
         setIncludeSources,
         availableModelsList,
         startBatchSearch,
+        regenerateBatchSearch,
+        regenerateSingleQuery,
         pauseBatchSearch,
         resumeBatchSearch,
         stopBatchSearch,

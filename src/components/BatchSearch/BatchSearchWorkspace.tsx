@@ -60,6 +60,7 @@ interface BatchItemRowProps {
   onUpdateOptimization: (idx: number, opt: 'speed' | 'balanced' | 'quality') => void;
   onUpdateModel: (idx: number, pId: string, mKey: string) => void;
   onDelete: (idx: number) => void;
+  onRegenerate: (idx: number) => void;
   t: any;
 }
 
@@ -75,6 +76,7 @@ const BatchItemRow = React.memo<BatchItemRowProps>(({
   onUpdateOptimization,
   onUpdateModel,
   onDelete,
+  onRegenerate,
   t,
 }) => {
   return (
@@ -252,14 +254,26 @@ const BatchItemRow = React.memo<BatchItemRowProps>(({
 
       {/* Actions */}
       <td className="p-3 text-center">
-        <button
-          type="button"
-          onClick={() => onDelete(idx)}
-          title="Delete row"
-          className="p-1 rounded text-stone-400 hover:text-red-400 hover:bg-red-500/10 transition"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center justify-center space-x-1">
+          <button
+            type="button"
+            disabled={isRunningThis}
+            onClick={() => onRegenerate(idx)}
+            title={t('batchSearch.regenerateQuery') || 'Regenerate this query'}
+            className="p-1 rounded text-stone-400 hover:text-[#b8864d] hover:bg-[#b8864d]/10 transition disabled:opacity-40"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            disabled={isRunningThis}
+            onClick={() => onDelete(idx)}
+            title="Delete row"
+            className="p-1 rounded text-stone-400 hover:text-red-400 hover:bg-red-500/10 transition disabled:opacity-40"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </td>
     </tr>
   );
@@ -304,6 +318,8 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
     currentRunningQuery,
     availableModelsList,
     startBatchSearch,
+    regenerateBatchSearch,
+    regenerateSingleQuery,
     pauseBatchSearch,
     resumeBatchSearch,
     stopBatchSearch,
@@ -470,16 +486,44 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
 
   const handleSaveToScratchpad = async () => {
     try {
+      // Collect and deduplicate all sources from completed items
+      const aggregatedSources: any[] = [];
+      const seenUrls = new Set<string>();
+
+      items.forEach((item, itemIdx) => {
+        const itemSources = Array.isArray(item.sourcesList) ? item.sourcesList : [];
+        itemSources.forEach((src: any) => {
+          const url = src?.metadata?.url || src?.url || '';
+          const title = src?.metadata?.title || src?.title || `Query ${item.number}`;
+          const dedupKey = url ? url.toLowerCase().trim() : `${title.toLowerCase().trim()}-${itemIdx}`;
+          if (!seenUrls.has(dedupKey)) {
+            seenUrls.add(dedupKey);
+            aggregatedSources.push({
+              pageContent: src?.pageContent || src?.snippet || src?.metadata?.snippet || src?.content || '',
+              metadata: {
+                title,
+                url,
+                queryNumber: item.number,
+                queryText: item.query,
+                ...(src?.metadata || {}),
+              },
+            });
+          }
+        });
+      });
+
       const res = await fetch('/api/scratchpad', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: `Batch Research: ${items[0]?.query || 'Queries'} (${items.length} items)`,
           content: compiledMarkdown,
-          type: 'note',
+          type: 'batch',
+          sources: aggregatedSources,
           metadata: {
             isBatchExport: true,
             batchCount: items.length,
+            sourcesCount: aggregatedSources.length,
             generatedAt: new Date().toISOString(),
           },
         }),
@@ -922,19 +966,43 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
               <div className="flex flex-wrap items-center gap-2">
                 {!isSearching ? (
                   <>
-                    {completedCount > 0 && completedCount < totalQueries ? (
+                    {completedCount === totalQueries && totalQueries > 0 ? (
                       <button
                         type="button"
                         disabled={selectedCount === 0}
-                        onClick={() => handleStartBatchSearch(false)}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium text-xs disabled:opacity-40 hover:brightness-110 active:scale-95 transition shadow-sm flex items-center space-x-1.5"
+                        onClick={() => regenerateBatchSearch(false)}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#b8864d] to-[#d4a373] text-[#0c0a09] font-medium text-xs disabled:opacity-40 hover:brightness-110 active:scale-95 transition shadow-sm flex items-center space-x-1.5"
                       >
-                        <Play className="w-3.5 h-3.5 fill-white" />
+                        <RotateCcw className="w-3.5 h-3.5" />
                         <span>
-                          {t('batchSearch.continueSearch') || 'Continue Search'} (
-                          {totalQueries - completedCount} {t('batchSearch.remaining') || 'remaining'})
+                          {t('batchSearch.regenerateAll') || 'Regenerate queries'} ({selectedCount})
                         </span>
                       </button>
+                    ) : completedCount > 0 && completedCount < totalQueries ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={selectedCount === 0}
+                          onClick={() => handleStartBatchSearch(false)}
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium text-xs disabled:opacity-40 hover:brightness-110 active:scale-95 transition shadow-sm flex items-center space-x-1.5"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-white" />
+                          <span>
+                            {t('batchSearch.continueSearch') || 'Continue Search'} (
+                            {totalQueries - completedCount} {t('batchSearch.remaining') || 'remaining'})
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={selectedCount === 0}
+                          onClick={() => regenerateBatchSearch(false)}
+                          className="px-3 py-2 rounded-xl border border-[#b8864d]/60 text-[#b8864d] hover:bg-[#b8864d]/10 text-xs font-medium transition flex items-center space-x-1.5"
+                          title={t('batchSearch.regenerateSelectedDesc') || 'Re-run selected queries'}
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>{t('batchSearch.regenerateSelected') || 'Regenerate'}</span>
+                        </button>
+                      </>
                     ) : (
                       <button
                         type="button"
@@ -1166,6 +1234,7 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                           onUpdateOptimization={handleUpdateItemOptimization}
                           onUpdateModel={handleUpdateItemModel}
                           onDelete={handleDeleteItem}
+                          onRegenerate={regenerateSingleQuery}
                           t={t}
                         />
                       ))}
@@ -1385,6 +1454,16 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                           >
                             {isEditingThis ? <Eye className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
                             <span>{isEditingThis ? 'Preview' : t('batchSearch.editNote') || 'Edit Note'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => regenerateSingleQuery(idx)}
+                            disabled={isSearching}
+                            title={t('batchSearch.regenerateNote') || 'Regenerate Note'}
+                            className="px-2.5 py-1 rounded-lg text-xs font-medium border border-light-300 dark:border-[#2c2219] text-stone-600 dark:text-stone-300 hover:border-[#b8864d] hover:text-[#b8864d] transition flex items-center space-x-1 disabled:opacity-40"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>{t('batchSearch.regenerateNote') || 'Regenerate'}</span>
                           </button>
                         </div>
                       </div>
