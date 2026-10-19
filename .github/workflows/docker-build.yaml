@@ -2,15 +2,126 @@ name: Build & Push Docker Images
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches:
-  #     - master
-  #     - canary
-  # release:
-  #   types: [published]
+    inputs:
+      git_ref:
+        description: 'Git branch, tag or commit SHA to build (e.g. v1.0.0, master)'
+        required: false
+        default: 'master'
+      release_version:
+        description: 'Docker image tag version override (e.g. 1.0.0 or v1.0.0; leave blank to detect)'
+        required: false
+        default: ''
+      publish_latest:
+        description: 'Also update latest / slim-latest tags'
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches:
+      - master
+      - canary
+    tags:
+      - 'v*'
+      - 'vane-community-*'
+  release:
+    types: [published]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
 
 jobs:
+  prep:
+    runs-on: ubuntu-latest
+    outputs:
+      build_type: ${{ steps.detect.outputs.build_type }}
+      git_ref: ${{ steps.detect.outputs.git_ref }}
+      tag_id: ${{ steps.detect.outputs.tag_id }}
+      version_raw: ${{ steps.detect.outputs.version_raw }}
+      version_clean: ${{ steps.detect.outputs.version_clean }}
+      publish_latest: ${{ steps.detect.outputs.publish_latest }}
+    steps:
+      - name: Compute build parameters
+        id: detect
+        shell: bash
+        run: |
+          EVENT="${{ github.event_name }}"
+          REF="${{ github.ref }}"
+          INPUT_REF="${{ inputs.git_ref }}"
+          INPUT_VERSION="${{ inputs.release_version }}"
+          INPUT_LATEST="${{ inputs.publish_latest }}"
+
+          TARGET_REF="$REF"
+          if [ "$EVENT" = "workflow_dispatch" ] && [ -n "$INPUT_REF" ]; then
+            TARGET_REF="$INPUT_REF"
+          fi
+
+          BUILD_TYPE="master"
+          VERSION_RAW=""
+          VERSION_CLEAN=""
+          PUBLISH_LATEST="false"
+
+          if [ "$EVENT" = "release" ]; then
+            BUILD_TYPE="release"
+            VERSION_RAW="${REF#refs/tags/}"
+            PUBLISH_LATEST="true"
+            if [[ "$VERSION_RAW" == *"-"* ]]; then
+              PUBLISH_LATEST="false"
+            fi
+          elif [ "$EVENT" = "push" ] && [[ "$REF" == refs/tags/* ]]; then
+            BUILD_TYPE="release"
+            VERSION_RAW="${REF#refs/tags/}"
+            PUBLISH_LATEST="true"
+            if [[ "$VERSION_RAW" == *"-"* ]]; then
+              PUBLISH_LATEST="false"
+            fi
+          elif [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/canary" ]; then
+            BUILD_TYPE="canary"
+          elif [ "$EVENT" = "workflow_dispatch" ]; then
+            if [ -n "$INPUT_VERSION" ]; then
+              BUILD_TYPE="release"
+              VERSION_RAW="$INPUT_VERSION"
+              PUBLISH_LATEST="$INPUT_LATEST"
+            elif [[ "$TARGET_REF" == v* ]] || [[ "$TARGET_REF" == refs/tags/v* ]] || [[ "$TARGET_REF" == vane-community-* ]]; then
+              BUILD_TYPE="release"
+              VERSION_RAW="${TARGET_REF#refs/tags/}"
+              PUBLISH_LATEST="$INPUT_LATEST"
+            elif [ "$TARGET_REF" = "canary" ] || [ "$TARGET_REF" = "refs/heads/canary" ]; then
+              BUILD_TYPE="canary"
+            elif [ "$TARGET_REF" = "master" ] || [ "$TARGET_REF" = "refs/heads/master" ]; then
+              BUILD_TYPE="master"
+              PUBLISH_LATEST="true"
+            else
+              BUILD_TYPE="master"
+              PUBLISH_LATEST="$INPUT_LATEST"
+            fi
+          fi
+
+          if [ -n "$VERSION_RAW" ]; then
+            if [[ "$VERSION_RAW" =~ ([0-9]+\.[0-9]+(\.[0-9]+)?(-[a-zA-Z0-9.]+)?)$ ]]; then
+              VERSION_CLEAN="${BASH_REMATCH[1]}"
+            else
+              VERSION_CLEAN="$VERSION_RAW"
+            fi
+          fi
+
+          if [ "$BUILD_TYPE" = "release" ]; then
+            TAG_ID="${VERSION_CLEAN:-$VERSION_RAW}"
+          elif [ "$BUILD_TYPE" = "canary" ]; then
+            TAG_ID="canary"
+          else
+            TAG_ID="latest"
+          fi
+
+          echo "build_type=$BUILD_TYPE" >> $GITHUB_OUTPUT
+          echo "git_ref=$TARGET_REF" >> $GITHUB_OUTPUT
+          echo "tag_id=$TAG_ID" >> $GITHUB_OUTPUT
+          echo "version_raw=$VERSION_RAW" >> $GITHUB_OUTPUT
+          echo "version_clean=$VERSION_CLEAN" >> $GITHUB_OUTPUT
+          echo "publish_latest=$PUBLISH_LATEST" >> $GITHUB_OUTPUT
+
   build-amd64:
+    needs: [prep]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -21,64 +132,43 @@ jobs:
             dockerfile: Dockerfile.slim
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prep.outputs.git_ref }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
         with:
           install: true
 
       - name: Log in to DockerHub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract version from release tag
-        if: github.event_name == 'release'
-        id: version
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-      - name: Build and push AMD64 Docker image (master)
-        if: (github.ref == 'refs/heads/master' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
+      - name: Build and push AMD64 Docker image
         run: |
-          DOCKERFILE=${{ matrix.variant.dockerfile }}
-          VARIANT=${{ matrix.variant.name }}
+          DOCKERFILE="${{ matrix.variant.dockerfile }}"
+          VARIANT="${{ matrix.variant.name }}"
+          TAG_ID="${{ needs.prep.outputs.tag_id }}"
+          IMAGE_TAG="akowynia/vane-community:${VARIANT}-${TAG_ID}-amd64"
+
+          EXTRA_TAGS=""
+          if [ "${{ needs.prep.outputs.build_type }}" = "master" ]; then
+            EXTRA_TAGS="-t akowynia/vane-community:${VARIANT}-amd64"
+          fi
+
           docker buildx build --platform linux/amd64 \
             --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-amd64 \
             --cache-to=type=inline \
             --provenance false \
-            -f $DOCKERFILE \
-            -t akowynia/vane-community:${VARIANT}-amd64 \
-            --push .
-
-      - name: Build and push AMD64 Canary Docker image
-        if: github.ref == 'refs/heads/canary' && github.event_name == 'push'
-        run: |
-          DOCKERFILE=${{ matrix.variant.dockerfile }}
-          VARIANT=${{ matrix.variant.name }}
-          docker buildx build --platform linux/amd64 \
-            --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-canary-amd64 \
-            --cache-to=type=inline \
-            --provenance false \
-            -f $DOCKERFILE \
-            -t akowynia/vane-community:${VARIANT}-canary-amd64 \
-            --push .
-
-      - name: Build and push AMD64 release Docker image
-        if: github.event_name == 'release'
-        run: |
-          DOCKERFILE=${{ matrix.variant.dockerfile }}
-          VARIANT=${{ matrix.variant.name }}
-          docker buildx build --platform linux/amd64 \
-            --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
-            --cache-to=type=inline \
-            --provenance false \
-            -f $DOCKERFILE \
-            -t akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
+            -f "$DOCKERFILE" \
+            -t "$IMAGE_TAG" $EXTRA_TAGS \
             --push .
 
   build-arm64:
+    needs: [prep]
     runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
@@ -89,130 +179,121 @@ jobs:
             dockerfile: Dockerfile.slim
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prep.outputs.git_ref }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
         with:
           install: true
 
       - name: Log in to DockerHub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract version from release tag
-        if: github.event_name == 'release'
-        id: version
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-      - name: Build and push ARM64 Docker image (master)
-        if: (github.ref == 'refs/heads/master' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
+      - name: Build and push ARM64 Docker image
         run: |
-          DOCKERFILE=${{ matrix.variant.dockerfile }}
-          VARIANT=${{ matrix.variant.name }}
+          DOCKERFILE="${{ matrix.variant.dockerfile }}"
+          VARIANT="${{ matrix.variant.name }}"
+          TAG_ID="${{ needs.prep.outputs.tag_id }}"
+          IMAGE_TAG="akowynia/vane-community:${VARIANT}-${TAG_ID}-arm64"
+
+          EXTRA_TAGS=""
+          if [ "${{ needs.prep.outputs.build_type }}" = "master" ]; then
+            EXTRA_TAGS="-t akowynia/vane-community:${VARIANT}-arm64"
+          fi
+
           docker buildx build --platform linux/arm64 \
             --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-arm64 \
             --cache-to=type=inline \
             --provenance false \
-            -f $DOCKERFILE \
-            -t akowynia/vane-community:${VARIANT}-arm64 \
-            --push .
-
-      - name: Build and push ARM64 Canary Docker image
-        if: github.ref == 'refs/heads/canary' && github.event_name == 'push'
-        run: |
-          DOCKERFILE=${{ matrix.variant.dockerfile }}
-          VARIANT=${{ matrix.variant.name }}
-          docker buildx build --platform linux/arm64 \
-            --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-canary-arm64 \
-            --cache-to=type=inline \
-            --provenance false \
-            -f $DOCKERFILE \
-            -t akowynia/vane-community:${VARIANT}-canary-arm64 \
-            --push .
-
-      - name: Build and push ARM64 release Docker image
-        if: github.event_name == 'release'
-        run: |
-          DOCKERFILE=${{ matrix.variant.dockerfile }}
-          VARIANT=${{ matrix.variant.name }}
-          docker buildx build --platform linux/arm64 \
-            --cache-from=type=registry,ref=akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64 \
-            --cache-to=type=inline \
-            --provenance false \
-            -f $DOCKERFILE \
-            -t akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64 \
+            -f "$DOCKERFILE" \
+            -t "$IMAGE_TAG" $EXTRA_TAGS \
             --push .
 
   manifest:
-    needs: [build-amd64, build-arm64]
+    needs: [prep, build-amd64, build-arm64]
     runs-on: ubuntu-latest
     strategy:
       matrix:
         variant: [full, slim]
     steps:
       - name: Log in to DockerHub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract version from release tag
-        if: github.event_name == 'release'
-        id: version
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
-
-      - name: Create and push manifest for main
-        if: (github.ref == 'refs/heads/master' && github.event_name == 'push') || github.event_name == 'workflow_dispatch'
+      - name: Create and push multi-arch manifests
         run: |
-          VARIANT=${{ matrix.variant }}
-          docker manifest create akowynia/vane-community:${VARIANT}-latest \
-            --amend akowynia/vane-community:${VARIANT}-amd64 \
-            --amend akowynia/vane-community:${VARIANT}-arm64
-          docker manifest push akowynia/vane-community:${VARIANT}-latest
+          VARIANT="${{ matrix.variant }}"
+          BUILD_TYPE="${{ needs.prep.outputs.build_type }}"
+          TAG_ID="${{ needs.prep.outputs.tag_id }}"
+          VERSION_RAW="${{ needs.prep.outputs.version_raw }}"
+          VERSION_CLEAN="${{ needs.prep.outputs.version_clean }}"
+          PUBLISH_LATEST="${{ needs.prep.outputs.publish_latest }}"
 
-          if [ "$VARIANT" = "full" ]; then
-            docker manifest create akowynia/vane-community:latest \
-              --amend akowynia/vane-community:${VARIANT}-amd64 \
-              --amend akowynia/vane-community:${VARIANT}-arm64
-            docker manifest push akowynia/vane-community:latest
+          AMD64_IMAGE="akowynia/vane-community:${VARIANT}-${TAG_ID}-amd64"
+          ARM64_IMAGE="akowynia/vane-community:${VARIANT}-${TAG_ID}-arm64"
 
-            docker manifest create akowynia/vane-community:main \
-              --amend akowynia/vane-community:${VARIANT}-amd64 \
-              --amend akowynia/vane-community:${VARIANT}-arm64
-            docker manifest push akowynia/vane-community:main
-          fi
+          push_manifest() {
+            local target_tag="$1"
+            echo "Publishing manifest: $target_tag"
+            docker manifest rm "$target_tag" 2>/dev/null || true
+            docker manifest create "$target_tag" --amend "$AMD64_IMAGE" --amend "$ARM64_IMAGE"
+            docker manifest push "$target_tag"
+          }
 
-      - name: Create and push manifest for canary
-        if: github.ref == 'refs/heads/canary' && github.event_name == 'push'
-        run: |
-          VARIANT=${{ matrix.variant }}
-          docker manifest create akowynia/vane-community:${VARIANT}-canary \
-            --amend akowynia/vane-community:${VARIANT}-canary-amd64 \
-            --amend akowynia/vane-community:${VARIANT}-canary-arm64
-          docker manifest push akowynia/vane-community:${VARIANT}-canary
+          if [ "$BUILD_TYPE" = "canary" ]; then
+            push_manifest "akowynia/vane-community:${VARIANT}-canary"
+            if [ "$VARIANT" = "full" ]; then
+              push_manifest "akowynia/vane-community:canary"
+            fi
 
-          if [ "$VARIANT" = "full" ]; then
-            docker manifest create akowynia/vane-community:canary \
-              --amend akowynia/vane-community:${VARIANT}-canary-amd64 \
-              --amend akowynia/vane-community:${VARIANT}-canary-arm64
-            docker manifest push akowynia/vane-community:canary
-          fi
+          elif [ "$BUILD_TYPE" = "release" ]; then
+            if [ -n "$VERSION_RAW" ]; then
+              push_manifest "akowynia/vane-community:${VARIANT}-${VERSION_RAW}"
+            fi
 
-      - name: Create and push manifest for releases
-        if: github.event_name == 'release'
-        run: |
-          VARIANT=${{ matrix.variant }}
-          docker manifest create akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }} \
-            --amend akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
-            --amend akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64
-          docker manifest push akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}
+            if [ -n "$VERSION_CLEAN" ]; then
+              if [ "$VERSION_CLEAN" != "$VERSION_RAW" ]; then
+                push_manifest "akowynia/vane-community:${VARIANT}-${VERSION_CLEAN}"
+              fi
+              # Ensure v-prefixed version exists as well (e.g. slim-v1.0.0 and slim-1.0.0)
+              if [[ "$VERSION_CLEAN" != v* ]]; then
+                push_manifest "akowynia/vane-community:${VARIANT}-v${VERSION_CLEAN}"
+              fi
+            fi
 
-          if [ "$VARIANT" = "full" ]; then
-            docker manifest create akowynia/vane-community:${{ env.RELEASE_VERSION }} \
-              --amend akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-amd64 \
-              --amend akowynia/vane-community:${VARIANT}-${{ env.RELEASE_VERSION }}-arm64
-            docker manifest push akowynia/vane-community:${{ env.RELEASE_VERSION }}
+            if [ "$VARIANT" = "full" ]; then
+              if [ -n "$VERSION_RAW" ]; then
+                push_manifest "akowynia/vane-community:${VERSION_RAW}"
+              fi
+              if [ -n "$VERSION_CLEAN" ]; then
+                if [ "$VERSION_CLEAN" != "$VERSION_RAW" ]; then
+                  push_manifest "akowynia/vane-community:${VERSION_CLEAN}"
+                fi
+                if [[ "$VERSION_CLEAN" != v* ]]; then
+                  push_manifest "akowynia/vane-community:v${VERSION_CLEAN}"
+                fi
+              fi
+            fi
+
+            if [ "$PUBLISH_LATEST" = "true" ]; then
+              push_manifest "akowynia/vane-community:${VARIANT}-latest"
+              if [ "$VARIANT" = "full" ]; then
+                push_manifest "akowynia/vane-community:latest"
+                push_manifest "akowynia/vane-community:main"
+              fi
+            fi
+
+          else
+            push_manifest "akowynia/vane-community:${VARIANT}-latest"
+            if [ "$VARIANT" = "full" ]; then
+              push_manifest "akowynia/vane-community:latest"
+              push_manifest "akowynia/vane-community:main"
+            fi
           fi

@@ -59,3 +59,4 @@ For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation d
 - [Search & Response Pipeline Optimizations](SEARCH_AND_RESPONSE_OPTIMIZATIONS.md)
 - [Beta Options & Feature Flags](BETA_OPTIONS.md)
 - [Batch Search & CSV Processing](BATCH_SEARCH.md)
+- [Docker Multi-Architecture Build & Versioning Pipeline](DOCKER_RELEASE_PIPELINE.md)
