@@ -206,6 +206,11 @@ export const ensureWaypointCronsTable = () => {
         "ALTER TABLE waypoint_crons ADD COLUMN timezone TEXT DEFAULT 'UTC';",
       );
     } catch {}
+    try {
+      sqlite.exec(
+        "ALTER TABLE waypoint_crons ADD COLUMN webhooks TEXT DEFAULT '[]';",
+      );
+    } catch {}
   } catch (e) {
     console.warn('ensureWaypointCronsTable error:', e);
   }
@@ -537,9 +542,39 @@ A summary of the state of knowledge, plus theoretical and practical implications
   }
 };
 
-// Ensure scratchpad tables on initial load
+export const ensureMcpLogsTable = () => {
+  try {
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS mcp_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        direction TEXT NOT NULL,
+        server_name TEXT NOT NULL,
+        method TEXT NOT NULL,
+        tool_name TEXT,
+        caller_user TEXT,
+        api_key_id TEXT,
+        api_key_name TEXT,
+        client_ip TEXT,
+        user_agent TEXT,
+        input_payload TEXT,
+        output_summary TEXT,
+        status TEXT NOT NULL DEFAULT 'success',
+        error_message TEXT,
+        duration_ms INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_mcp_logs_created_at ON mcp_logs(created_at);
+      CREATE INDEX IF NOT EXISTS idx_mcp_logs_tool_name ON mcp_logs(tool_name);
+    `);
+  } catch (e) {
+    console.warn('ensureMcpLogsTable error:', e);
+  }
+};
+
+// Ensure scratchpad & MCP tables on initial load
 if (!isBuildPhase) {
   ensureScratchpadTables();
+  ensureMcpLogsTable();
 }
 
 const db = drizzle(sqlite, {

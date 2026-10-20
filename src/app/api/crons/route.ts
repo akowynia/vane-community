@@ -17,7 +17,7 @@ const createCronSchema = z.object({
   schedule: z.string().min(1, 'Schedule is required'),
   prompt: z.string().min(1, 'Prompt content is required'),
   sources: z.array(z.string()).optional().default(['web']),
-  optimizationMode: z.enum(['speed', 'balanced', 'quality']).optional().default('balanced'),
+  optimizationMode: z.enum(['speed', 'balanced', 'quality', 'deep']).optional().default('balanced'),
   chatModelProvider: z.string().min(1, 'Chat model provider is required'),
   chatModelKey: z.string().min(1, 'Chat model key is required'),
   embeddingModelProvider: z.string().optional().nullable(),
@@ -25,6 +25,7 @@ const createCronSchema = z.object({
   systemInstructions: z.string().optional().nullable(),
   timezone: z.string().optional().default('UTC'),
   enabled: z.boolean().optional().default(true),
+  webhooks: z.array(z.any()).optional().default([]),
 });
 
 export const GET = async (req: Request) => {
@@ -94,6 +95,15 @@ export const GET = async (req: Request) => {
           }
         }
 
+        let parsedWebhooks = (cron as any).webhooks;
+        if (typeof parsedWebhooks === 'string') {
+          try {
+            parsedWebhooks = JSON.parse(parsedWebhooks);
+          } catch {
+            parsedWebhooks = [];
+          }
+        }
+
         const isOwner =
           instanceMode === 'single' ||
           Boolean(user && (user.role === 'admin' || user.id === cron.userId || (wp && wp.userId === user.id)));
@@ -101,6 +111,7 @@ export const GET = async (req: Request) => {
         return {
           ...cron,
           sources: Array.isArray(parsedSources) ? parsedSources : [],
+          webhooks: Array.isArray(parsedWebhooks) ? parsedWebhooks : [],
           waypointName: wp?.name || 'Unknown space',
           waypointIcon: wp?.icon || 'Waypoints',
           waypointIsPublic: wp?.userId === null,
@@ -208,6 +219,7 @@ export const POST = async (req: Request) => {
       systemInstructions: data.systemInstructions?.trim() || null,
       timezone: targetTimezone,
       enabled: data.enabled !== undefined ? Boolean(data.enabled) : true,
+      webhooks: data.webhooks || [],
       lastRunAt: null,
       nextRunAt: nextRun ? nextRun.toISOString() : null,
       lastStatus: null,

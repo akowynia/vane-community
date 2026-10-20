@@ -104,6 +104,7 @@ type Config = {
   beta?: {
     [key: string]: any;
   };
+  mcpServers?: string;
 };
 
 type EnvMap = {

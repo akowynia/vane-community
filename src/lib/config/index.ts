@@ -49,6 +49,7 @@ const ALLOWED_CONFIG_KEYS = new Set([
   'beta.enablePresentations',
   'beta.presentations',
   'auth.adminPassword',
+  'mcpServers',
 ]);
 
 const ALLOWED_LANGUAGES = new Set([
