@@ -132,3 +132,26 @@ export async function verifySessionToken(
     return null;
   }
 }
+
+/**
+ * Determine whether a cookie should have the Secure flag.
+ * Over plain HTTP (common in local docker / self-hosted environments without SSL),
+ * Secure must be false; otherwise browsers reject and discard the cookie per RFC 6265bis.
+ */
+export function isSecureCookie(req?: Request | any | null): boolean {
+  if (process.env.COOKIE_SECURE === 'true') return true;
+  if (process.env.COOKIE_SECURE === 'false') return false;
+  if (!req) return false;
+
+  const forwardedProto =
+    typeof req.headers?.get === 'function'
+      ? req.headers.get('x-forwarded-proto')
+      : null;
+
+  if (forwardedProto) {
+    return forwardedProto.toLowerCase().trim() === 'https';
+  }
+
+  const urlProto = req.nextUrl?.protocol || (req.url ? new URL(req.url, 'http://localhost').protocol : '');
+  return urlProto.replace(':', '').toLowerCase() === 'https';
+}

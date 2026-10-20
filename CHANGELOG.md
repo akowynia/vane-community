@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.2]
+
+### Fixed
+- Fixed internal server error (500) on Docker deployments with local data volumes by fixing permission handling and directory initialization
+- Fixed session cookie rejection over HTTP deployments by dynamically checking connection security (RFC 6265bis compliance)
+- Fixed session handling in single-user onboarding to automatically authenticate admin users upon completing setup
+- Fixed Ollama model listing timeout and request blocking during response generation
+- Added Docker host-gateway mapping to enable connectivity with local host LLM instances
+- Improved resiliency across all model providers with safe fallback handling for uninitialized configurations
+
 ## [1.0.1]
 
 ### Added

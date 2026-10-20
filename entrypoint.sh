@@ -1,9 +1,17 @@
 #!/bin/sh
 set -e
 
+# Ensure data and uploads directories exist and have proper permissions for vane-community user
+DATA_DIR_PATH="${DATA_DIR:-/home/vane-community/data}"
+UPLOADS_DIR_PATH="/home/vane-community/uploads"
+
+mkdir -p "$DATA_DIR_PATH" "$UPLOADS_DIR_PATH" 2>/dev/null || true
+chown -R vane-community:vane-community "$DATA_DIR_PATH" "$UPLOADS_DIR_PATH" 2>/dev/null || true
+chmod 775 "$DATA_DIR_PATH" "$UPLOADS_DIR_PATH" 2>/dev/null || true
+
 echo "Starting SearXNG..."
 
-# Inicjalizacja trwałej konfiguracji SearXNG w wolumenie danych
+# Initialize persistent SearXNG configuration in data volume
 DATA_SETTINGS="/home/vane-community/data/searxng-settings.yml"
 ETC_SETTINGS="/etc/searxng/settings.yml"
 
@@ -20,7 +28,7 @@ fi
 export SEARXNG_SETTINGS_PATH="$ETC_SETTINGS"
 export FLASK_APP=searx/webapp.py
 
-# Uruchomienie uWSGI / SearXNG pod użytkownikiem searxng w tle
+# Run uWSGI / SearXNG under searxng user in the background
 gosu searxng /usr/local/searxng/searx-pyenv/bin/uwsgi \
   --http-socket 0.0.0.0:8080 \
   --ini /etc/searxng/uwsgi.ini &

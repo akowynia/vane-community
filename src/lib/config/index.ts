@@ -130,8 +130,8 @@ function parseLegacyToml(
 
 class ConfigManager {
   configPath: string = path.join(
-    process.env.DATA_DIR || process.cwd(),
-    '/data/config.json',
+    path.resolve(process.env.DATA_DIR || path.join(process.cwd(), 'data')),
+    'config.json',
   );
   configVersion = 1;
   currentConfig: Config = {
@@ -300,7 +300,20 @@ class ConfigManager {
       });
     }
 
-    fs.writeFileSync(this.configPath, JSON.stringify(diskConfig, null, 2));
+    const configDir = path.dirname(this.configPath);
+    if (!fs.existsSync(configDir)) {
+      try {
+        fs.mkdirSync(configDir, { recursive: true });
+      } catch (err) {
+        console.error(`Failed to create config directory at ${configDir}:`, err);
+      }
+    }
+
+    try {
+      fs.writeFileSync(this.configPath, JSON.stringify(diskConfig, null, 2));
+    } catch (writeErr) {
+      console.error(`Failed to save config to ${this.configPath}:`, writeErr);
+    }
   }
 
   private tryImportLegacyToml() {
@@ -443,13 +456,26 @@ class ConfigManager {
   }
 
   private initializeConfig() {
+    const configDir = path.dirname(this.configPath);
+    if (!fs.existsSync(configDir)) {
+      try {
+        fs.mkdirSync(configDir, { recursive: true });
+      } catch (err) {
+        console.error(`Failed to create config directory at ${configDir}:`, err);
+      }
+    }
+
     const exists = fs.existsSync(this.configPath);
     if (!exists) {
       this.tryImportLegacyToml();
-      fs.writeFileSync(
-        this.configPath,
-        JSON.stringify(this.currentConfig, null, 2),
-      );
+      try {
+        fs.writeFileSync(
+          this.configPath,
+          JSON.stringify(this.currentConfig, null, 2),
+        );
+      } catch (writeErr) {
+        console.error(`Failed to write initial config file at ${this.configPath}:`, writeErr);
+      }
     } else {
       try {
         this.currentConfig = JSON.parse(
