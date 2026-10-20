@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { PHASE_PRODUCTION_BUILD } from 'next/constants';
 import * as schema from './schema';
 import fs from 'fs';
+import path from 'path';
 
 const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const dbDir = path.resolve(dataDir);
