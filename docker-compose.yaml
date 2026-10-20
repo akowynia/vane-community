@@ -6,9 +6,12 @@ services:
     ports:
       - '3000:3000'
     env_file:
-      - .env
+      - path: .env
+        required: false
     volumes:
       - data:/home/vane-community/data
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     restart: unless-stopped
 
 volumes:

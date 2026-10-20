@@ -2,10 +2,18 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import Database from 'better-sqlite3';
 import { PHASE_PRODUCTION_BUILD } from 'next/constants';
 import * as schema from './schema';
-import path from 'path';
+import fs from 'fs';
 
-const DATA_DIR = process.env.DATA_DIR || process.cwd();
-const sqlite = new Database(path.join(DATA_DIR, './data/db.sqlite'));
+const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+const dbDir = path.resolve(dataDir);
+if (!fs.existsSync(dbDir)) {
+  try {
+    fs.mkdirSync(dbDir, { recursive: true });
+  } catch (err) {
+    console.error(`Failed to create database directory at ${dbDir}:`, err);
+  }
+}
+const sqlite = new Database(path.join(dbDir, 'db.sqlite'));
 
 // `next build` collects page data by importing every route module in several parallel
 // worker processes. Each import would otherwise re-run the schema initialization below
