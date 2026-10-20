@@ -24,7 +24,7 @@ dist/
 config.toml
 
 # Log files
-logs/
+/logs/
 *.log
 
 # Testing
