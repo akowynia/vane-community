@@ -19,6 +19,8 @@ jobs:
             dockerfile: Dockerfile
           - name: slim
             dockerfile: Dockerfile.slim
+          - name: mcp
+            dockerfile: Dockerfile.mcp
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -87,6 +89,8 @@ jobs:
             dockerfile: Dockerfile
           - name: slim
             dockerfile: Dockerfile.slim
+          - name: mcp
+            dockerfile: Dockerfile.mcp
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -151,7 +155,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        variant: [full, slim]
+        variant: [full, slim, mcp]
     steps:
       - name: Log in to DockerHub
         uses: docker/login-action@v2
@@ -183,6 +187,13 @@ jobs:
               --amend akowynia/vane-community:${VARIANT}-amd64 \
               --amend akowynia/vane-community:${VARIANT}-arm64
             docker manifest push akowynia/vane-community:main
+          fi
+
+          if [ "$VARIANT" = "mcp" ]; then
+            docker manifest create akowynia/vane-community:mcp \
+              --amend akowynia/vane-community:${VARIANT}-amd64 \
+              --amend akowynia/vane-community:${VARIANT}-arm64
+            docker manifest push akowynia/vane-community:mcp
           fi
 
       - name: Create and push manifest for canary

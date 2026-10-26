@@ -114,6 +114,42 @@ docker run -d \
 - JSON format enabled in settings (`formats: [html, json]`)
 - Wolfram Alpha search engine enabled
 
+#### Using Vane as a Standalone Model Context Protocol (MCP) Server
+
+You can also run Vane as a dedicated, standalone **MCP Server** for Claude Desktop, Cursor, or any external AI assistant.
+
+**Connecting with Claude Desktop / Cursor (stdio):**
+
+```json
+{
+  "mcpServers": {
+    "vane": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "SEARXNG_API_URL=http://host.docker.internal:8080",
+        "akowynia/vane-community:mcp-latest"
+      ]
+    }
+  }
+}
+```
+
+**Running as an HTTP / SSE Server:**
+
+```bash
+docker run -d \
+  -p 3000:3000 \
+  -e SEARXNG_API_URL=http://your-searxng-url:8080 \
+  --name vane-mcp \
+  akowynia/vane-community:mcp-latest
+```
+
+The endpoint will be available at `http://localhost:3000/api/mcp` (or `http://localhost:3000/mcp`).
+
 #### Building From Source Instead
 
 Prefer to build the image yourself, e.g. after modifying the code?
@@ -124,9 +160,12 @@ docker build -t vane-community .
 
 # Slim variant (bring your own SearXNG)
 docker build -f Dockerfile.slim -t vane-community:slim .
+
+# MCP variant (dedicated MCP server)
+docker build -f Dockerfile.mcp -t vane-community:mcp .
 ```
 
-Then run it the same way as above — just swap the image name in `docker run` for your local tag (`vane-community` or `vane-community:slim`).
+Then run it the same way as above — just swap the image name in `docker run` for your local tag (`vane-community`, `vane-community:slim`, or `vane-community:mcp`).
 
 ---
 
