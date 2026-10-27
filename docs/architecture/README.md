@@ -62,3 +62,4 @@ For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation d
 - [Deep Research & Recursive Autonomous Exploration](DEEP_RESEARCH.md)
 - [Waypoint Cron Webhooks & Proactive Notifications](WAYPOINT_CRON_WEBHOOKS.md)
 - [Model Context Protocol (MCP) Integration](MCP_INTEGRATION.md)
+- [Multi-Theme Architecture (Modern & Retro Themes)](UI_THEMES.md)

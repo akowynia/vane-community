@@ -36,7 +36,36 @@ export default function RootLayout({
 
   return (
     <html className="h-full" lang="en" suppressHydrationWarning>
-      <body className={cn('h-full antialiased', montserrat.className)}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var t = localStorage.getItem('theme') || 'dark';
+                  var isLight = t === 'light' || t === 'vintage-paper';
+                  var el = document.documentElement;
+                  if (isLight) {
+                    el.classList.remove('dark');
+                    el.classList.add('light');
+                  } else {
+                    el.classList.add('dark');
+                    el.classList.remove('light');
+                  }
+                  el.classList.add(t);
+                  el.setAttribute('data-theme', t);
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
+      <body
+        className={cn(
+          'h-full antialiased bg-light-primary dark:bg-dark-primary text-black dark:text-white transition-colors duration-200',
+          montserrat.className,
+        )}
+      >
         <ThemeProvider>
           <I18nProvider>
             {setupComplete ? (

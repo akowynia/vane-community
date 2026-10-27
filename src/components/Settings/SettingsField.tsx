@@ -9,9 +9,10 @@ import { useState } from 'react';
 import Select from '../ui/Select';
 import { toast } from 'sonner';
 import { useTheme } from 'next-themes';
-import { Loader2, Activity, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, Activity, AlertCircle, CheckCircle2, Check } from 'lucide-react';
 import { Switch } from '@headlessui/react';
 import { useTranslation } from '@/lib/i18n';
+import { THEMES, ThemeCategory, ThemeId } from '@/lib/theme';
 
 const fieldTitleKeys: Record<string, string> = {
   theme: 'settings.theme',
@@ -40,8 +41,14 @@ const fieldDescKeys: Record<string, string> = {
 };
 
 const optionLabelKeys: Record<string, string> = {
-  light: 'settings.light',
-  dark: 'settings.dark',
+  light: 'settings.themeLight',
+  dark: 'settings.themeDark',
+  cyberpunk: 'settings.themeCyberpunk',
+  nord: 'settings.themeNord',
+  'retro-terminal': 'settings.themeRetroTerminal',
+  synthwave: 'settings.themeSynthwave',
+  'vintage-paper': 'settings.themeVintagePaper',
+  matrix: 'settings.themeMatrix',
   Imperial: 'settings.imperial',
   Metric: 'settings.metric',
 };
@@ -50,6 +57,156 @@ const emitClientConfigChanged = () => {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('client-config-changed'));
   }
+};
+
+const ThemePickerCards = ({
+  currentTheme,
+  onSelectTheme,
+  loading,
+}: {
+  currentTheme: string;
+  onSelectTheme: (themeId: ThemeId) => void;
+  loading: boolean;
+}) => {
+  const { t } = useTranslation();
+  const [categoryFilter, setCategoryFilter] = useState<'all' | ThemeCategory>('all');
+
+  const filteredThemes = THEMES.filter((item) => {
+    if (categoryFilter === 'all') return true;
+    return item.category === categoryFilter;
+  });
+
+  return (
+    <div className="space-y-3 pt-1">
+      <div className="flex items-center gap-1.5 pb-1">
+        <button
+          type="button"
+          onClick={() => setCategoryFilter('all')}
+          className={`px-3 py-1 text-xs rounded-lg font-medium transition-all ${
+            categoryFilter === 'all'
+              ? 'bg-bronze-500 text-white shadow-sm'
+              : 'bg-light-200/60 dark:bg-dark-200/60 text-black/70 dark:text-white/70 hover:bg-light-200 dark:hover:bg-dark-200'
+          }`}
+        >
+          {t('common.all') || 'All'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setCategoryFilter('modern')}
+          className={`px-3 py-1 text-xs rounded-lg font-medium transition-all ${
+            categoryFilter === 'modern'
+              ? 'bg-bronze-500 text-white shadow-sm'
+              : 'bg-light-200/60 dark:bg-dark-200/60 text-black/70 dark:text-white/70 hover:bg-light-200 dark:hover:bg-dark-200'
+          }`}
+        >
+          {t('settings.themeModern' as any) || 'Modern'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setCategoryFilter('retro')}
+          className={`px-3 py-1 text-xs rounded-lg font-medium transition-all ${
+            categoryFilter === 'retro'
+              ? 'bg-bronze-500 text-white shadow-sm'
+              : 'bg-light-200/60 dark:bg-dark-200/60 text-black/70 dark:text-white/70 hover:bg-light-200 dark:hover:bg-dark-200'
+          }`}
+        >
+          {t('settings.themeRetro' as any) || 'Retro'}
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {filteredThemes.map((item) => {
+          const isSelected = (currentTheme || 'dark') === item.id;
+          const themeName = t(item.nameKey as any) || item.id;
+          const themeDesc = t(item.descKey as any) || '';
+
+          return (
+            <button
+              key={item.id}
+              type="button"
+              disabled={loading}
+              onClick={() => onSelectTheme(item.id)}
+              className={`group relative flex flex-col justify-between text-left p-3 rounded-xl border transition-all duration-200 ${
+                isSelected
+                  ? 'border-bronze-500 ring-2 ring-bronze-500/40 bg-light-secondary dark:bg-dark-secondary shadow-md scale-[1.01]'
+                  : 'border-light-200 dark:border-dark-200 hover:border-light-300 dark:hover:border-dark-300 bg-light-primary dark:bg-dark-primary/60 hover:bg-light-secondary/60 dark:hover:bg-dark-secondary/60'
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between gap-1 mb-2">
+                  <span className="font-semibold text-xs sm:text-sm text-black dark:text-white truncate">
+                    {themeName}
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`text-[9.5px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full ${
+                        item.category === 'retro'
+                          ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                          : 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/20'
+                      }`}
+                    >
+                      {item.category === 'retro'
+                        ? t('settings.themeRetro' as any) || 'Retro'
+                        : t('settings.themeModern' as any) || 'Modern'}
+                    </span>
+                    {isSelected && (
+                      <span className="flex items-center justify-center w-4 h-4 rounded-full bg-bronze-500 text-white">
+                        <Check size={11} strokeWidth={3} />
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  className="w-full h-11 rounded-lg border p-1.5 flex items-center justify-between overflow-hidden shadow-inner mb-2"
+                  style={{
+                    backgroundColor: item.colors.primaryBg,
+                    borderColor: item.colors.borderColor,
+                  }}
+                >
+                  <div className="flex items-center gap-1.5">
+                    <div
+                      className="w-2.5 h-7 rounded-sm"
+                      style={{ backgroundColor: item.colors.secondaryBg }}
+                    />
+                    <div className="flex flex-col gap-1">
+                      <div
+                        className="w-10 h-1.5 rounded-full"
+                        style={{ backgroundColor: item.colors.textColor, opacity: 0.75 }}
+                      />
+                      <div
+                        className="w-6 h-1 rounded-full"
+                        style={{ backgroundColor: item.colors.textColor, opacity: 0.4 }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 pr-1">
+                    <div
+                      className="w-3.5 h-3.5 rounded-full shadow-sm ring-1 ring-white/10"
+                      style={{ backgroundColor: item.colors.accentColor }}
+                      title="Accent"
+                    />
+                    {item.colors.secondaryAccentColor && (
+                      <div
+                        className="w-2.5 h-2.5 rounded-full shadow-sm ring-1 ring-white/10"
+                        style={{ backgroundColor: item.colors.secondaryAccentColor }}
+                        title="Secondary Accent"
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-black/60 dark:text-white/60 line-clamp-2 leading-relaxed">
+                  {themeDesc}
+                </p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 };
 
 const SettingsSelect = ({
@@ -65,7 +222,7 @@ const SettingsSelect = ({
 }) => {
   const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
 
   const handleSave = async (newValue: any) => {
     setLoading(true);
@@ -105,28 +262,47 @@ const SettingsSelect = ({
   const title = fieldTitleKeys[field.key] ? t(fieldTitleKeys[field.key] as any) : field.name;
   const desc = fieldDescKeys[field.key] ? t(fieldDescKeys[field.key] as any) : field.description;
 
+  const isThemeField = field.key === 'theme';
+  const activeValue = isThemeField ? (theme || value || 'dark') : value;
+
   return (
     <section className="rounded-xl border border-light-200 bg-light-primary/80 p-4 lg:p-6 transition-colors dark:border-dark-200 dark:bg-dark-primary/80">
       <div className="space-y-3 lg:space-y-5">
         <div>
-          <h4 className="text-sm lg:text-sm text-black dark:text-white">
+          <h4 className="text-sm lg:text-sm text-black dark:text-white font-medium">
             {title}
           </h4>
           <p className="text-[11px] lg:text-xs text-black/50 dark:text-white/50">
             {desc}
           </p>
         </div>
-        <Select
-          value={value}
-          onChange={(event) => handleSave(event.target.value)}
-          options={field.options.map((option) => ({
-            value: option.value,
-            label: optionLabelKeys[option.value] ? t(optionLabelKeys[option.value] as any) : option.name,
-          }))}
-          className="!text-xs lg:!text-sm"
-          loading={loading}
-          disabled={loading}
-        />
+
+        {isThemeField && (
+          <ThemePickerCards
+            currentTheme={activeValue}
+            onSelectTheme={(themeId) => handleSave(themeId)}
+            loading={loading}
+          />
+        )}
+
+        <div className={isThemeField ? 'pt-2' : ''}>
+          {isThemeField && (
+            <label className="block text-[11px] uppercase tracking-wider text-black/40 dark:text-white/40 mb-1.5 font-semibold">
+              {t('settings.themeLabel' as any) || 'Dropdown Selection'}
+            </label>
+          )}
+          <Select
+            value={activeValue}
+            onChange={(event) => handleSave(event.target.value)}
+            options={field.options.map((option) => ({
+              value: option.value,
+              label: optionLabelKeys[option.value] ? t(optionLabelKeys[option.value] as any) : option.name,
+            }))}
+            className="!text-xs lg:!text-sm"
+            loading={loading}
+            disabled={loading}
+          />
+        </div>
       </div>
     </section>
   );

@@ -158,16 +158,40 @@ class ConfigManager {
         type: 'select',
         options: [
           {
-            name: 'Light',
+            name: 'Dark (Modern)',
+            value: 'dark',
+          },
+          {
+            name: 'Light (Minimal)',
             value: 'light',
           },
           {
-            name: 'Dark',
-            value: 'dark',
+            name: 'Cyberpunk (Neon)',
+            value: 'cyberpunk',
+          },
+          {
+            name: 'Nordic (Frost)',
+            value: 'nord',
+          },
+          {
+            name: 'Retro CRT Terminal',
+            value: 'retro-terminal',
+          },
+          {
+            name: '80s Synthwave',
+            value: 'synthwave',
+          },
+          {
+            name: 'Vintage Paper',
+            value: 'vintage-paper',
+          },
+          {
+            name: 'Matrix Digital Rain',
+            value: 'matrix',
           },
         ],
         required: false,
-        description: 'Choose between light and dark layouts for the app.',
+        description: 'Choose between modern and retro layouts for the app.',
         default: 'dark',
         scope: 'client',
       },
@@ -756,8 +780,20 @@ class ConfigManager {
 
     // Strict type and value validation per config key
     if (key === 'preferences.theme') {
-      if (val !== 'light' && val !== 'dark') {
-        throw new Error('Theme must be either "light" or "dark".');
+      const allowedThemes = new Set([
+        'dark',
+        'light',
+        'cyberpunk',
+        'nord',
+        'retro-terminal',
+        'synthwave',
+        'vintage-paper',
+        'matrix',
+      ]);
+      if (!allowedThemes.has(val)) {
+        throw new Error(
+          `Theme must be one of: ${Array.from(allowedThemes).join(', ')}.`,
+        );
       }
     } else if (key === 'preferences.language') {
       if (typeof val !== 'string' || !ALLOWED_LANGUAGES.has(val)) {
