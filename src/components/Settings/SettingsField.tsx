@@ -25,6 +25,8 @@ const fieldTitleKeys: Record<string, string> = {
   searxngURL: 'settings.searxngUrl',
   enablePresentations: 'settings.betaPresentations',
   presentations: 'settings.betaPresentations',
+  pdfExportStyle: 'settings.pdfExportStyle',
+  pdfShowBranding: 'settings.pdfShowBranding',
 };
 
 const fieldDescKeys: Record<string, string> = {
@@ -38,6 +40,8 @@ const fieldDescKeys: Record<string, string> = {
   searxngURL: 'settings.searxngUrlDesc',
   enablePresentations: 'settings.betaPresentationsDesc',
   presentations: 'settings.betaPresentationsDesc',
+  pdfExportStyle: 'settings.pdfExportStyleDesc',
+  pdfShowBranding: 'settings.pdfShowBrandingDesc',
 };
 
 const optionLabelKeys: Record<string, string> = {
@@ -51,6 +55,10 @@ const optionLabelKeys: Record<string, string> = {
   matrix: 'settings.themeMatrix',
   Imperial: 'settings.imperial',
   Metric: 'settings.metric',
+  vane: 'settings.pdfExportStyleVane',
+  minimal: 'settings.pdfExportStyleMinimal',
+  corporate: 'settings.pdfExportStyleCorporate',
+  academic: 'settings.pdfExportStyleAcademic',
 };
 
 const emitClientConfigChanged = () => {
@@ -209,6 +217,172 @@ const ThemePickerCards = ({
   );
 };
 
+interface PdfStyleCardItem {
+  id: 'vane' | 'minimal' | 'corporate' | 'academic';
+  nameKey: string;
+  descKey: string;
+  badge: string;
+  accent: string;
+  bgPreview: string;
+  borderPreview: string;
+  headerAccent: string;
+  userBorder: string;
+  isSerif?: boolean;
+}
+
+const PDF_STYLE_ITEMS: PdfStyleCardItem[] = [
+  {
+    id: 'vane',
+    nameKey: 'settings.pdfExportStyleVane',
+    descKey: 'settings.pdfExportStyleVaneDesc',
+    badge: 'Vane Brand',
+    accent: '#b8864d',
+    bgPreview: '#faf8f5',
+    borderPreview: '#ede5dc',
+    headerAccent: '#b8864d',
+    userBorder: '#b8864d',
+  },
+  {
+    id: 'minimal',
+    nameKey: 'settings.pdfExportStyleMinimal',
+    descKey: 'settings.pdfExportStyleMinimalDesc',
+    badge: 'White-label',
+    accent: '#64748b',
+    bgPreview: '#ffffff',
+    borderPreview: '#e2e8f0',
+    headerAccent: '#cbd5e1',
+    userBorder: '#64748b',
+  },
+  {
+    id: 'corporate',
+    nameKey: 'settings.pdfExportStyleCorporate',
+    descKey: 'settings.pdfExportStyleCorporateDesc',
+    badge: 'Executive',
+    accent: '#1e3a8a',
+    bgPreview: '#f8fafc',
+    borderPreview: '#cbd5e1',
+    headerAccent: '#1e3a8a',
+    userBorder: '#1e3a8a',
+  },
+  {
+    id: 'academic',
+    nameKey: 'settings.pdfExportStyleAcademic',
+    descKey: 'settings.pdfExportStyleAcademicDesc',
+    badge: 'Formal Serif',
+    accent: '#1c1917',
+    bgPreview: '#fcfbfa',
+    borderPreview: '#d6d3d1',
+    headerAccent: '#1c1917',
+    userBorder: '#1c1917',
+    isSerif: true,
+  },
+];
+
+const PdfExportStyleCards = ({
+  currentStyle,
+  onSelectStyle,
+  loading,
+}: {
+  currentStyle: string;
+  onSelectStyle: (styleId: string) => void;
+  loading: boolean;
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
+      {PDF_STYLE_ITEMS.map((item) => {
+        const isSelected = (currentStyle || 'vane') === item.id;
+        const styleName = t(item.nameKey as any) || item.id;
+        const styleDesc = t(item.descKey as any) || '';
+
+        return (
+          <button
+            key={item.id}
+            type="button"
+            disabled={loading}
+            onClick={() => onSelectStyle(item.id)}
+            className={`group relative flex flex-col justify-between text-left p-3 rounded-xl border transition-all duration-200 ${
+              isSelected
+                ? 'border-bronze-500 ring-2 ring-bronze-500/40 bg-light-secondary dark:bg-dark-secondary shadow-md scale-[1.01]'
+                : 'border-light-200 dark:border-dark-200 hover:border-light-300 dark:hover:border-dark-300 bg-light-primary dark:bg-dark-primary/60 hover:bg-light-secondary/60 dark:hover:bg-dark-secondary/60'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between gap-1 mb-2">
+                <span
+                  className={`font-semibold text-xs sm:text-sm text-black dark:text-white truncate ${
+                    item.isSerif ? 'font-serif' : ''
+                  }`}
+                >
+                  {styleName}
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[9.5px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-full bg-light-200 dark:bg-dark-200 text-black/70 dark:text-white/70 border border-light-300 dark:border-dark-300">
+                    {item.badge}
+                  </span>
+                  {isSelected && (
+                    <span className="flex items-center justify-center w-4 h-4 rounded-full bg-bronze-500 text-white">
+                      <Check size={11} strokeWidth={3} />
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Miniature PDF preview mockup */}
+              <div
+                className="w-full h-16 rounded-lg border p-2 flex flex-col justify-between overflow-hidden shadow-inner mb-2"
+                style={{
+                  backgroundColor: item.bgPreview,
+                  borderColor: item.borderPreview,
+                }}
+              >
+                <div
+                  className="flex items-center justify-between pb-1 border-b"
+                  style={{ borderColor: item.headerAccent }}
+                >
+                  <div className="flex items-center gap-1">
+                    {item.id === 'vane' && (
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: item.accent }}
+                      />
+                    )}
+                    <div
+                      className="w-10 h-1.5 rounded-sm"
+                      style={{ backgroundColor: item.accent, opacity: 0.85 }}
+                    />
+                  </div>
+                  <div className="w-6 h-1 rounded-sm bg-neutral-400/40" />
+                </div>
+
+                <div
+                  className="px-1.5 py-0.5 rounded-sm flex items-center gap-1"
+                  style={{
+                    backgroundColor: 'rgba(0,0,0,0.03)',
+                    borderLeft: `2px solid ${item.userBorder}`,
+                  }}
+                >
+                  <div className="w-14 h-1 rounded-sm bg-neutral-700/60" />
+                </div>
+
+                <div className="flex flex-col gap-0.5">
+                  <div className="w-full h-1 rounded-sm bg-neutral-400/50" />
+                  <div className="w-4/5 h-1 rounded-sm bg-neutral-400/30" />
+                </div>
+              </div>
+
+              <p className="text-[11px] text-black/60 dark:text-white/60 line-clamp-2 leading-relaxed">
+                {styleDesc}
+              </p>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
 const SettingsSelect = ({
   field,
   value,
@@ -263,6 +437,7 @@ const SettingsSelect = ({
   const desc = fieldDescKeys[field.key] ? t(fieldDescKeys[field.key] as any) : field.description;
 
   const isThemeField = field.key === 'theme';
+  const isPdfStyleField = field.key === 'pdfExportStyle';
   const activeValue = isThemeField ? (theme || value || 'dark') : value;
 
   return (
@@ -285,10 +460,23 @@ const SettingsSelect = ({
           />
         )}
 
-        <div className={isThemeField ? 'pt-2' : ''}>
+        {isPdfStyleField && (
+          <PdfExportStyleCards
+            currentStyle={activeValue}
+            onSelectStyle={(styleId) => handleSave(styleId)}
+            loading={loading}
+          />
+        )}
+
+        <div className={isThemeField || isPdfStyleField ? 'pt-2' : ''}>
           {isThemeField && (
             <label className="block text-[11px] uppercase tracking-wider text-black/40 dark:text-white/40 mb-1.5 font-semibold">
               {t('settings.themeLabel' as any) || 'Dropdown Selection'}
+            </label>
+          )}
+          {isPdfStyleField && (
+            <label className="block text-[11px] uppercase tracking-wider text-black/40 dark:text-white/40 mb-1.5 font-semibold">
+              {t('settings.pdfExportStyleDropdown' as any) || 'Select Style Variant'}
             </label>
           )}
           <Select

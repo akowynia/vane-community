@@ -32,3 +32,17 @@ export const getMeasurementUnit = () => {
 
   return value.toLowerCase();
 };
+
+export type PdfExportStyle = 'vane' | 'minimal' | 'corporate' | 'academic';
+
+export const getPdfExportStyle = (): PdfExportStyle => {
+  const val = getClientConfig('pdfExportStyle', 'vane');
+  if (['vane', 'minimal', 'corporate', 'academic'].includes(val)) {
+    return val as PdfExportStyle;
+  }
+  return 'vane';
+};
+
+export const getPdfShowBranding = (): boolean => {
+  return getClientConfig('pdfShowBranding', 'true') === 'true';
+};

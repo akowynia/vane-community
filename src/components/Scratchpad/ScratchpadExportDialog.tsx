@@ -27,6 +27,10 @@ import {
   executeIframePrint,
   downloadPrintDocumentHtml,
 } from '@/lib/utils/printExport';
+import {
+  getPdfExportStyle,
+  getPdfShowBranding,
+} from '@/lib/config/clientRegistry';
 
 interface ScratchpadExportDialogProps {
   isOpen: boolean;
@@ -242,6 +246,8 @@ const ScratchpadExportDialog: React.FC<ScratchpadExportDialogProps> = ({
         sourcesHeading: t('scratchpad.sourcesHeading') || 'Sources and References',
         untitledText: t('scratchpad.untitled') || 'Untitled Note',
         metaSubtitle: `Vane Scratchpad • ${title || t('scratchpad.untitled') || 'Untitled Note'}`,
+        pdfStyle: getPdfExportStyle(),
+        pdfShowBranding: getPdfShowBranding(),
       });
 
       const fileRangeSuffix = batchRange !== 'all' ? `_part_${batchRange}` : '';
@@ -274,6 +280,8 @@ const ScratchpadExportDialog: React.FC<ScratchpadExportDialogProps> = ({
         sourcesHeading: t('scratchpad.sourcesHeading') || 'Sources and References',
         untitledText: t('scratchpad.untitled') || 'Untitled Note',
         metaSubtitle: `Vane Scratchpad • ${title || t('scratchpad.untitled') || 'Untitled Note'}`,
+        pdfStyle: getPdfExportStyle(),
+        pdfShowBranding: getPdfShowBranding(),
       });
 
       const initiated = await executeIframePrint(fullHtml);

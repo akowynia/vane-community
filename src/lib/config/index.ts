@@ -22,6 +22,8 @@ const ALLOWED_CONFIG_KEYS = new Set([
   'preferences.autoMediaSearch',
   'preferences.showWeatherWidget',
   'preferences.showNewsWidget',
+  'preferences.pdfExportStyle',
+  'preferences.pdfShowBranding',
   'personalization.systemInstructions',
   'search.searxngURL',
   'search.braveApiKey',
@@ -262,6 +264,44 @@ class ConfigManager {
         type: 'switch',
         required: false,
         description: 'Display the recent news card on the home screen.',
+        default: true,
+        scope: 'client',
+      },
+      {
+        name: 'PDF Export Style',
+        key: 'pdfExportStyle',
+        type: 'select',
+        options: [
+          {
+            name: 'Vane Classic (Branded)',
+            value: 'vane',
+          },
+          {
+            name: 'Minimal Neutral (Clean)',
+            value: 'minimal',
+          },
+          {
+            name: 'Corporate Executive',
+            value: 'corporate',
+          },
+          {
+            name: 'Academic Paper',
+            value: 'academic',
+          },
+        ],
+        required: false,
+        description:
+          'Choose the visual styling and layout for exported PDF documents and reports.',
+        default: 'vane',
+        scope: 'client',
+      },
+      {
+        name: 'Vane Branding in PDF',
+        key: 'pdfShowBranding',
+        type: 'switch',
+        required: false,
+        description:
+          'Include Vane logo, header badge, and community attribution in exported PDF documents.',
         default: true,
         scope: 'client',
       },
