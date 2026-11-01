@@ -1,7 +1,7 @@
 import z from 'zod';
 import { ResearchAction } from '../../types';
 import { Chunk, ReadingResearchBlock } from '@/lib/types';
-import Scraper from '@/lib/scraper';
+import Scraper, { getScraperEngineLabel } from '@/lib/scraper';
 import { splitText } from '@/lib/utils/splitText';
 import { validateUrlForSSRF } from '@/lib/security/ssrf';
 
@@ -137,6 +137,12 @@ const scrapeURLAction: ResearchAction<typeof schema> = {
             return;
           }
 
+          const engineLabel = getScraperEngineLabel(scraped.extractor);
+          const mcpFallback =
+            scraped.attemptedMcp && !scraped.extractor?.startsWith('mcp_')
+              ? scraped.attemptedMcp
+              : undefined;
+
           if (
             !readingEmitted &&
             researchBlock &&
@@ -152,6 +158,10 @@ const scrapeURLAction: ResearchAction<typeof schema> = {
                   metadata: {
                     url,
                     title: scraped.title,
+                    extractor: scraped.extractor,
+                    scraperEngine: engineLabel,
+                    mcpFallback,
+                    mcpError: scraped.mcpError,
                   },
                 },
               ],
@@ -185,6 +195,10 @@ const scrapeURLAction: ResearchAction<typeof schema> = {
               metadata: {
                 url,
                 title: scraped.title,
+                extractor: scraped.extractor,
+                scraperEngine: engineLabel,
+                mcpFallback,
+                mcpError: scraped.mcpError,
               },
             });
 
@@ -248,6 +262,10 @@ const scrapeURLAction: ResearchAction<typeof schema> = {
             metadata: {
               url,
               title: scraped.title,
+              extractor: scraped.extractor,
+              scraperEngine: engineLabel,
+              mcpFallback,
+              mcpError: scraped.mcpError,
             },
           });
         } catch (error) {

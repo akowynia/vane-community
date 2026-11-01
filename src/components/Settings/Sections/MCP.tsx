@@ -20,6 +20,7 @@ import {
   Search,
   ChevronDown,
   ChevronUp,
+  Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslation } from '@/lib/i18n';
@@ -39,11 +40,14 @@ const MCPSection = () => {
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
 
   // Form state
+  const [selectedPreset, setSelectedPreset] = useState<'custom' | 'firecrawl' | 'crawl4ai_sse' | 'crawl4ai_stdio'>('custom');
   const [formName, setFormName] = useState('');
   const [formTransport, setFormTransport] = useState<'stdio' | 'sse'>('stdio');
   const [formCommand, setFormCommand] = useState('');
   const [formArgs, setFormArgs] = useState('');
   const [formUrl, setFormUrl] = useState('');
+  const [formApiKey, setFormApiKey] = useState('');
+  const [formEnv, setFormEnv] = useState('');
   const [formAutoApprove, setFormAutoApprove] = useState(true);
 
   // Logs and Stats state
@@ -126,6 +130,52 @@ const MCPSection = () => {
     }
   };
 
+  const isScraperServer = (name: string) => {
+    const lower = (name || '').toLowerCase();
+    return (
+      lower.includes('firecrawl') ||
+      lower.includes('crawl4ai') ||
+      lower.includes('scraper') ||
+      lower.includes('crawler')
+    );
+  };
+
+  const applyPreset = (preset: 'custom' | 'firecrawl' | 'crawl4ai_sse' | 'crawl4ai_stdio') => {
+    setSelectedPreset(preset);
+    if (preset === 'firecrawl') {
+      setFormName('Firecrawl');
+      setFormTransport('stdio');
+      setFormCommand('npx');
+      setFormArgs('-y firecrawl-mcp');
+      setFormUrl('');
+    } else if (preset === 'crawl4ai_sse') {
+      setFormName('Crawl4AI');
+      setFormTransport('sse');
+      setFormCommand('');
+      setFormArgs('');
+      setFormUrl('http://localhost:11235');
+    } else if (preset === 'crawl4ai_stdio') {
+      setFormName('Crawl4AI');
+      setFormTransport('stdio');
+      setFormCommand('python3');
+      setFormArgs('-m crawl4ai.mcp');
+      setFormUrl('');
+    } else {
+      setFormName('');
+      setFormTransport('stdio');
+      setFormCommand('');
+      setFormArgs('');
+      setFormUrl('');
+    }
+  };
+
+  const openPreset = (preset: 'firecrawl' | 'crawl4ai_sse') => {
+    applyPreset(preset);
+    setFormApiKey('');
+    setFormEnv('');
+    setIsAddOpen(true);
+  };
+
   const handleAddServer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) {
@@ -133,12 +183,31 @@ const MCPSection = () => {
       return;
     }
 
+    const parsedEnv: Record<string, string> = {};
+    if (formApiKey.trim()) {
+      parsedEnv['FIRECRAWL_API_KEY'] = formApiKey.trim();
+    }
+    if (formEnv.trim()) {
+      const lines = formEnv.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx > 0) {
+          const k = trimmed.substring(0, eqIdx).trim();
+          const v = trimmed.substring(eqIdx + 1).trim();
+          if (k) parsedEnv[k] = v;
+        }
+      }
+    }
+
     const payload: Partial<MCPServerConfig> = {
       name: formName.trim(),
       transport: formTransport,
       command: formTransport === 'stdio' ? formCommand.trim() : undefined,
-      args: formTransport === 'stdio' && formArgs.trim() ? formArgs.split(' ') : undefined,
+      args: formTransport === 'stdio' && formArgs.trim() ? formArgs.split(' ').filter(Boolean) : undefined,
       url: formTransport === 'sse' ? formUrl.trim() : undefined,
+      env: Object.keys(parsedEnv).length > 0 ? parsedEnv : undefined,
       autoApprove: formAutoApprove,
       enabled: true,
     };
@@ -157,6 +226,9 @@ const MCPSection = () => {
         setFormCommand('');
         setFormArgs('');
         setFormUrl('');
+        setFormApiKey('');
+        setFormEnv('');
+        setSelectedPreset('custom');
         loadServers();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -291,6 +363,159 @@ const MCPSection = () => {
             </button>
           </div>
 
+          {/* AI Web Scraper Engines (Firecrawl & Crawl4AI) */}
+          {(() => {
+            const firecrawlConfigured = servers.find((s) => s.name.toLowerCase().includes('firecrawl'));
+            const crawl4aiConfigured = servers.find((s) => s.name.toLowerCase().includes('crawl4ai'));
+
+            return (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-black dark:text-stone-200 flex items-center gap-2">
+                      <Zap size={14} className="text-[#b8864d]" />
+                      <span>{t('mcp.scraperPresetsTitle') || 'AI Web Scraper Engines'}</span>
+                    </h4>
+                    <p className="text-[11px] text-black/50 dark:text-stone-400 mt-0.5">
+                      {t('mcp.scraperPresetsDesc') ||
+                        'Enable advanced scraping engines (Firecrawl or Crawl4AI) as MCP tools to automatically parse modern web pages and bypass anti-bot protections.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Firecrawl Preset Card */}
+                  <div className="rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/30 dark:bg-[#181411] p-4 flex flex-col justify-between gap-3 hover:border-[#b8864d]/40 transition">
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-xs">
+                            🔥
+                          </div>
+                          <span className="text-xs font-semibold text-black dark:text-stone-100">
+                            {t('mcp.firecrawlPresetTitle') || 'Firecrawl (Cloud & Anti-Bot)'}
+                          </span>
+                        </div>
+                        {firecrawlConfigured ? (
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                              firecrawlConfigured.enabled
+                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-black/5 dark:bg-white/5 text-black/40 dark:text-stone-500'
+                            }`}
+                          >
+                            {firecrawlConfigured.enabled
+                              ? t('mcp.activeScraper') || 'Active Scraper'
+                              : t('common.disabled') || 'Disabled'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 font-mono">
+                            stdio / npx
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-black/60 dark:text-stone-400 mt-2 leading-relaxed">
+                        {t('mcp.firecrawlPresetDesc') ||
+                          'Managed cloud scraper by Mendable. Clean Markdown, Cloudflare bypass, and recursive crawling.'}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-light-200 dark:border-[#2d251d] flex items-center justify-between gap-2">
+                      {firecrawlConfigured ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleServer(firecrawlConfigured)}
+                          className={`w-full py-1.5 px-3 rounded-lg text-xs font-medium transition ${
+                            firecrawlConfigured.enabled
+                              ? 'border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
+                              : 'border border-black/10 dark:border-white/10 text-black/60 dark:text-stone-400 bg-black/5 dark:bg-white/5 hover:bg-black/10'
+                          }`}
+                        >
+                          {firecrawlConfigured.enabled
+                            ? t('mcp.clickToDisable') || 'Active (Click to Disable)'
+                            : t('mcp.clickToEnable') || 'Click to Enable'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openPreset('firecrawl')}
+                          className="w-full py-1.5 px-3 rounded-lg text-xs font-medium bg-[#b8864d] hover:bg-[#a6743b] text-white transition shadow-sm inline-flex items-center justify-center gap-1.5"
+                        >
+                          <Plus size={13} />
+                          <span>{t('mcp.quickConnect') || 'Quick Connect'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Crawl4AI Preset Card */}
+                  <div className="rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/30 dark:bg-[#181411] p-4 flex flex-col justify-between gap-3 hover:border-[#b8864d]/40 transition">
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold text-xs">
+                            ⚡
+                          </div>
+                          <span className="text-xs font-semibold text-black dark:text-stone-100">
+                            {t('mcp.crawl4aiPresetTitle') || 'Crawl4AI (Local / Self-Hosted)'}
+                          </span>
+                        </div>
+                        {crawl4aiConfigured ? (
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                              crawl4aiConfigured.enabled
+                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-black/5 dark:bg-white/5 text-black/40 dark:text-stone-500'
+                            }`}
+                          >
+                            {crawl4aiConfigured.enabled
+                              ? t('mcp.activeScraper') || 'Active Scraper'
+                              : t('common.disabled') || 'Disabled'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 font-mono">
+                            SSE / Docker
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-black/60 dark:text-stone-400 mt-2 leading-relaxed">
+                        {t('mcp.crawl4aiPresetDesc') ||
+                          'High-speed open-source crawler with BM25 noise reduction and zero API cost.'}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-light-200 dark:border-[#2d251d] flex items-center justify-between gap-2">
+                      {crawl4aiConfigured ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleServer(crawl4aiConfigured)}
+                          className={`w-full py-1.5 px-3 rounded-lg text-xs font-medium transition ${
+                            crawl4aiConfigured.enabled
+                              ? 'border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
+                              : 'border border-black/10 dark:border-white/10 text-black/60 dark:text-stone-400 bg-black/5 dark:bg-white/5 hover:bg-black/10'
+                          }`}
+                        >
+                          {crawl4aiConfigured.enabled
+                            ? t('mcp.clickToDisable') || 'Active (Click to Disable)'
+                            : t('mcp.clickToEnable') || 'Click to Enable'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openPreset('crawl4ai_sse')}
+                          className="w-full py-1.5 px-3 rounded-lg text-xs font-medium bg-[#b8864d] hover:bg-[#a6743b] text-white transition shadow-sm inline-flex items-center justify-center gap-1.5"
+                        >
+                          <Plus size={13} />
+                          <span>{t('mcp.quickConnect') || 'Quick Connect'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Header & Add Button */}
           <div className="flex items-center justify-between pt-2">
             <div>
@@ -303,7 +528,12 @@ const MCPSection = () => {
             </div>
             <button
               type="button"
-              onClick={() => setIsAddOpen(true)}
+              onClick={() => {
+                applyPreset('custom');
+                setFormApiKey('');
+                setFormEnv('');
+                setIsAddOpen(true);
+              }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#b8864d] hover:bg-[#a6743b] rounded-xl transition shadow-sm"
             >
               <Plus size={14} />
@@ -340,13 +570,29 @@ const MCPSection = () => {
                         {server.transport === 'stdio' ? <Terminal size={16} /> : <Globe size={16} />}
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="text-xs font-semibold text-black dark:text-stone-100 truncate">
                             {server.name}
                           </h4>
                           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/5 dark:bg-white/5 text-black/60 dark:text-stone-400 uppercase">
                             {server.transport}
                           </span>
+                          {isScraperServer(server.name) && (
+                            <span
+                              className={`text-[10px] px-1.5 py-0.2 rounded font-medium flex items-center gap-1 ${
+                                server.enabled
+                                  ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                  : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                              }`}
+                            >
+                              <Zap size={10} />
+                              <span>
+                                {server.enabled
+                                  ? t('mcp.activeScraper') || 'Active Scraper'
+                                  : t('mcp.scraperEngineBadge') || 'Scraper Engine'}
+                              </span>
+                            </span>
+                          )}
                         </div>
                         <p className="text-[11px] text-black/50 dark:text-stone-400 font-mono mt-0.5 truncate max-w-md">
                           {server.transport === 'stdio'
@@ -684,6 +930,59 @@ const MCPSection = () => {
             </h3>
 
             <form onSubmit={handleAddServer} className="space-y-4">
+              {/* Preset Selector */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                  {t('mcp.selectPreset') || 'Preset / Template'}
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => applyPreset('custom')}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left ${
+                      selectedPreset === 'custom'
+                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                    }`}
+                  >
+                    ⚙️ {t('mcp.presetCustom') || 'Custom Server'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyPreset('firecrawl')}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
+                      selectedPreset === 'firecrawl'
+                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                    }`}
+                  >
+                    🔥 Firecrawl (stdio)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyPreset('crawl4ai_sse')}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
+                      selectedPreset === 'crawl4ai_sse'
+                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                    }`}
+                  >
+                    ⚡ Crawl4AI (SSE)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyPreset('crawl4ai_stdio')}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
+                      selectedPreset === 'crawl4ai_stdio'
+                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                    }`}
+                  >
+                    🐍 Crawl4AI (Python)
+                  </button>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
                   {t('mcp.serverName') || 'Server Name'} *
@@ -772,10 +1071,45 @@ const MCPSection = () => {
                 </div>
               )}
 
+              {/* Firecrawl API Key Helper */}
+              {(selectedPreset === 'firecrawl' || formName.toLowerCase().includes('firecrawl')) && (
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                    {t('mcp.apiKeyLabel') || 'Firecrawl API Key (optional for cloud)'}
+                  </label>
+                  <input
+                    type="password"
+                    placeholder={t('mcp.apiKeyPlaceholder') || 'fc-xxxxxxxxxxxxxxxx'}
+                    value={formApiKey}
+                    onChange={(e) => setFormApiKey(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                  />
+                </div>
+              )}
+
+              {/* General Environment Variables */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                  {t('mcp.envVarsLabel') || 'Environment Variables (KEY=VALUE per line)'}
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder={t('mcp.envVarsPlaceholder') || 'FIRECRAWL_API_KEY=your_key\nCUSTOM_VAR=value'}
+                  value={formEnv}
+                  onChange={(e) => setFormEnv(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                />
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-light-200 dark:border-[#2d251d]">
                 <button
                   type="button"
-                  onClick={() => setIsAddOpen(false)}
+                  onClick={() => {
+                    setIsAddOpen(false);
+                    applyPreset('custom');
+                    setFormApiKey('');
+                    setFormEnv('');
+                  }}
                   className="px-3.5 py-1.5 rounded-xl border border-light-200 dark:border-[#2d251d] text-xs font-medium text-black/70 dark:text-stone-300 hover:bg-black/5 dark:hover:bg-white/5 transition"
                 >
                   {t('common.cancel') || 'Cancel'}

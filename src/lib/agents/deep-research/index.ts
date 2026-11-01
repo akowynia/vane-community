@@ -1,5 +1,5 @@
 import { searchSearxng } from '@/lib/searxng';
-import Scraper from '@/lib/scraper';
+import Scraper, { getScraperEngineLabel } from '@/lib/scraper';
 import BaseLLM from '@/lib/models/base/llm';
 import SessionManager from '@/lib/session';
 import crypto from 'crypto';
@@ -112,12 +112,24 @@ Return STRICT JSON in the following format:
     } = {},
   ): Promise<{
     allFindings: DeepResearchFinding[];
-    allSources: Array<{ title: string; url: string; publishedDate?: string }>;
+    allSources: Array<{
+      title: string;
+      url: string;
+      publishedDate?: string;
+      scraperEngine?: string;
+      searchEngine?: string;
+    }>;
   }> {
     const maxDepth = Math.min(Math.max(options.maxDepth || 2, 1), 3);
     const allFindings: DeepResearchFinding[] = [];
     const visitedUrls = new Set<string>();
-    const allSources: Array<{ title: string; url: string; publishedDate?: string }> = [];
+    const allSources: Array<{
+      title: string;
+      url: string;
+      publishedDate?: string;
+      scraperEngine?: string;
+      searchEngine?: string;
+    }> = [];
 
     const totalBranches = plan.hypotheses.length;
 
@@ -152,22 +164,31 @@ Return STRICT JSON in the following format:
             if (!item.url || visitedUrls.has(item.url)) continue;
             visitedUrls.add(item.url);
 
-            allSources.push({
-              title: item.title,
-              url: item.url,
-              publishedDate: item.publishedDate,
-            });
-
             // Scrape full content or use search snippet
             let content = item.content || '';
+            let scraperEngine = 'Search Snippet';
             try {
-              const scraped = await Scraper.scrape(item.url, { minLength: 150 });
+              const scraped = await Scraper.scrape(item.url, {
+                minLength: 150,
+                optimizationMode: 'deep',
+              });
               if (scraped.content && scraped.content.length > 200) {
                 content = scraped.content.substring(0, 3000);
+              }
+              if (scraped && scraped.extractor) {
+                scraperEngine = getScraperEngineLabel(scraped.extractor);
               }
             } catch {
               // Fall back to search snippet
             }
+
+            allSources.push({
+              title: item.title,
+              url: item.url,
+              publishedDate: item.publishedDate,
+              scraperEngine,
+              searchEngine: (item as any).engine || ((item as any).engines && (item as any).engines[0]) || undefined,
+            });
 
             const finding: DeepResearchFinding = {
               title: item.title,
@@ -227,6 +248,8 @@ Return ONLY the refined query string, nothing else.`;
                 title: item.title,
                 url: item.url,
                 publishedDate: item.publishedDate,
+                scraperEngine: 'Search Snippet',
+                searchEngine: (item as any).engine || ((item as any).engines && (item as any).engines[0]) || undefined,
               });
 
               allFindings.push({

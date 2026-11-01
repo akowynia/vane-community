@@ -67,6 +67,8 @@ export interface Translations {
     previous?: string;
     next?: string;
     of?: string;
+    enabled?: string;
+    disabled?: string;
   };
   navigation: {
     home: string;
@@ -129,6 +131,7 @@ export interface Translations {
     manageLimits?: string;
     whyIsThisHappening?: string;
     antiBotExplanation?: string;
+    mcpScraperFallback?: string;
     manageSearchEngines?: string;
     stopGenerating?: string;
     retry?: string;
@@ -1359,5 +1362,26 @@ export interface Translations {
     outputResult?: string;
     inputArgs?: string;
     durationLabel?: string;
+    scraperPresetsTitle?: string;
+    scraperPresetsDesc?: string;
+    firecrawlPresetTitle?: string;
+    firecrawlPresetDesc?: string;
+    crawl4aiPresetTitle?: string;
+    crawl4aiPresetDesc?: string;
+    quickConnect?: string;
+    activeScraper?: string;
+    builtinScraper?: string;
+    presetCustom?: string;
+    presetFirecrawl?: string;
+    presetCrawl4aiSse?: string;
+    presetCrawl4aiStdio?: string;
+    apiKeyLabel?: string;
+    apiKeyPlaceholder?: string;
+    envVarsLabel?: string;
+    envVarsPlaceholder?: string;
+    scraperEngineBadge?: string;
+    selectPreset?: string;
+    clickToDisable?: string;
+    clickToEnable?: string;
   };
 }

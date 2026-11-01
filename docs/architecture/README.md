@@ -56,6 +56,7 @@ For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation d
 - [Quality Mode Optimizations](QUALITY_MODE_OPTIMIZATIONS.md)
 - [Model Selection & Response Metadata](MODEL_SELECTION_AND_RESPONSE_METADATA.md)
 - [Scraper Extraction & Telemetry](SCRAPER_EXTRACTION_AND_TELEMETRY.md)
+- [Advanced Scraper Integration (Firecrawl & Crawl4AI)](ADVANCED_SCRAPER_INTEGRATION.md)
 - [Search & Response Pipeline Optimizations](SEARCH_AND_RESPONSE_OPTIMIZATIONS.md)
 - [Beta Options & Feature Flags](BETA_OPTIONS.md)
 - [Batch Search & CSV Processing](BATCH_SEARCH.md)
