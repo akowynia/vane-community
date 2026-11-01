@@ -141,7 +141,7 @@ export default function ApiAccessPage() {
   // Playground state
   const [playgroundKeyId, setPlaygroundKeyId] = useState<string>('');
   const [playgroundQuery, setPlaygroundQuery] = useState('');
-  const [playgroundOptimization, setPlaygroundOptimization] = useState<'speed' | 'balanced' | 'quality'>('balanced');
+  const [playgroundOptimization, setPlaygroundOptimization] = useState<'speed' | 'balanced' | 'quality' | 'deep'>('balanced');
   const [playgroundFocusMode, setPlaygroundFocusMode] = useState<string>('web');
   const [playgroundWaypointId, setPlaygroundWaypointId] = useState<string>('');
   const [playgroundStream, setPlaygroundStream] = useState<boolean>(true);
@@ -1188,6 +1188,7 @@ searchVane().catch(console.error);`;
                     <option value="speed">{t('apiAccess.optSpeed') || 'Speed (Fast)'}</option>
                     <option value="balanced">{t('apiAccess.optBalanced') || 'Balanced'}</option>
                     <option value="quality">{t('apiAccess.optQuality') || 'Deep Quality'}</option>
+                    <option value="deep">{t('optimization.deepTitle') || 'Deep Research'}</option>
                   </select>
                 </div>
               </div>

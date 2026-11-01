@@ -9,9 +9,11 @@ import {
   ToggleRight,
   Lock,
   FlaskConical,
+  Plug,
 } from 'lucide-react';
 import Preferences from './Sections/Preferences';
 import Beta from './Sections/Beta';
+import MCPSection from './Sections/MCP';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -79,6 +81,14 @@ const SettingsDialogue = ({
       icon: FlaskConical,
       component: Beta,
       dataAdd: 'beta',
+    },
+    {
+      key: 'mcp',
+      name: t('settings.mcpTitle') || 'MCP Servers',
+      description: t('settings.mcpDesc') || 'Model Context Protocol tool connections and integrations.',
+      icon: Plug,
+      component: MCPSection,
+      dataAdd: 'mcp',
     },
   ];
 

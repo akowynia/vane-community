@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import configManager from '@/lib/config';
 import { resolveRequestUser } from '@/lib/security/rbac';
+import { createSessionToken, isSecureCookie } from '@/lib/security/token';
 
 export const GET = async (req: NextRequest) => {
   const isSetup = !configManager.isSetupComplete();
@@ -60,7 +61,7 @@ export const POST = async (req: NextRequest) => {
       adminPassword,
     });
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         message: 'Network configuration updated.',
         exposeToNetwork: configManager.getConfig('network.exposeToNetwork', false),
@@ -70,6 +71,23 @@ export const POST = async (req: NextRequest) => {
       },
       { status: 200 },
     );
+
+    if (adminPassword) {
+      const token = await createSessionToken({
+        userId: 'admin',
+        username: 'admin',
+        role: 'admin',
+      });
+      response.cookies.set('vane_session', token, {
+        httpOnly: true,
+        secure: isSecureCookie(req),
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60,
+      });
+    }
+
+    return response;
   } catch (err: any) {
     console.error('Error in /api/config/network-exposure:', err);
     return NextResponse.json(

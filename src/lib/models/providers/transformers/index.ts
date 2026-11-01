@@ -39,12 +39,12 @@ class TransformersProvider extends BaseModelProvider<TransformersConfig> {
 
   async getModelList(): Promise<ModelList> {
     const defaultModels = await this.getDefaultModels();
-    const configProvider = getConfiguredModelProviderById(this.id)!;
+    const configProvider = getConfiguredModelProviderById(this.id);
 
     return {
       embedding: [
         ...defaultModels.embedding,
-        ...configProvider.embeddingModels,
+        ...(configProvider?.embeddingModels || []),
       ],
       chat: [],
     };

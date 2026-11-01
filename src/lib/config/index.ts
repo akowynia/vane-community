@@ -22,6 +22,8 @@ const ALLOWED_CONFIG_KEYS = new Set([
   'preferences.autoMediaSearch',
   'preferences.showWeatherWidget',
   'preferences.showNewsWidget',
+  'preferences.pdfExportStyle',
+  'preferences.pdfShowBranding',
   'personalization.systemInstructions',
   'search.searxngURL',
   'search.braveApiKey',
@@ -49,6 +51,7 @@ const ALLOWED_CONFIG_KEYS = new Set([
   'beta.enablePresentations',
   'beta.presentations',
   'auth.adminPassword',
+  'mcpServers',
 ]);
 
 const ALLOWED_LANGUAGES = new Set([
@@ -132,8 +135,8 @@ function parseLegacyToml(
 
 class ConfigManager {
   configPath: string = path.join(
-    process.env.DATA_DIR || process.cwd(),
-    '/data/config.json',
+    path.resolve(process.env.DATA_DIR || path.join(process.cwd(), 'data')),
+    'config.json',
   );
   configVersion = 1;
   currentConfig: Config = {
@@ -157,16 +160,40 @@ class ConfigManager {
         type: 'select',
         options: [
           {
-            name: 'Light',
+            name: 'Dark (Modern)',
+            value: 'dark',
+          },
+          {
+            name: 'Light (Minimal)',
             value: 'light',
           },
           {
-            name: 'Dark',
-            value: 'dark',
+            name: 'Cyberpunk (Neon)',
+            value: 'cyberpunk',
+          },
+          {
+            name: 'Nordic (Frost)',
+            value: 'nord',
+          },
+          {
+            name: 'Retro CRT Terminal',
+            value: 'retro-terminal',
+          },
+          {
+            name: '80s Synthwave',
+            value: 'synthwave',
+          },
+          {
+            name: 'Vintage Paper',
+            value: 'vintage-paper',
+          },
+          {
+            name: 'Matrix Digital Rain',
+            value: 'matrix',
           },
         ],
         required: false,
-        description: 'Choose between light and dark layouts for the app.',
+        description: 'Choose between modern and retro layouts for the app.',
         default: 'dark',
         scope: 'client',
       },
@@ -237,6 +264,44 @@ class ConfigManager {
         type: 'switch',
         required: false,
         description: 'Display the recent news card on the home screen.',
+        default: true,
+        scope: 'client',
+      },
+      {
+        name: 'PDF Export Style',
+        key: 'pdfExportStyle',
+        type: 'select',
+        options: [
+          {
+            name: 'Vane Classic (Branded)',
+            value: 'vane',
+          },
+          {
+            name: 'Minimal Neutral (Clean)',
+            value: 'minimal',
+          },
+          {
+            name: 'Corporate Executive',
+            value: 'corporate',
+          },
+          {
+            name: 'Academic Paper',
+            value: 'academic',
+          },
+        ],
+        required: false,
+        description:
+          'Choose the visual styling and layout for exported PDF documents and reports.',
+        default: 'vane',
+        scope: 'client',
+      },
+      {
+        name: 'Vane Branding in PDF',
+        key: 'pdfShowBranding',
+        type: 'switch',
+        required: false,
+        description:
+          'Include Vane logo, header badge, and community attribution in exported PDF documents.',
         default: true,
         scope: 'client',
       },
@@ -317,7 +382,20 @@ class ConfigManager {
       });
     }
 
-    fs.writeFileSync(this.configPath, JSON.stringify(diskConfig, null, 2));
+    const configDir = path.dirname(this.configPath);
+    if (!fs.existsSync(configDir)) {
+      try {
+        fs.mkdirSync(configDir, { recursive: true });
+      } catch (err) {
+        console.error(`Failed to create config directory at ${configDir}:`, err);
+      }
+    }
+
+    try {
+      fs.writeFileSync(this.configPath, JSON.stringify(diskConfig, null, 2));
+    } catch (writeErr) {
+      console.error(`Failed to save config to ${this.configPath}:`, writeErr);
+    }
   }
 
   private tryImportLegacyToml() {
@@ -460,13 +538,26 @@ class ConfigManager {
   }
 
   private initializeConfig() {
+    const configDir = path.dirname(this.configPath);
+    if (!fs.existsSync(configDir)) {
+      try {
+        fs.mkdirSync(configDir, { recursive: true });
+      } catch (err) {
+        console.error(`Failed to create config directory at ${configDir}:`, err);
+      }
+    }
+
     const exists = fs.existsSync(this.configPath);
     if (!exists) {
       this.tryImportLegacyToml();
-      fs.writeFileSync(
-        this.configPath,
-        JSON.stringify(this.currentConfig, null, 2),
-      );
+      try {
+        fs.writeFileSync(
+          this.configPath,
+          JSON.stringify(this.currentConfig, null, 2),
+        );
+      } catch (writeErr) {
+        console.error(`Failed to write initial config file at ${this.configPath}:`, writeErr);
+      }
     } else {
       try {
         this.currentConfig = JSON.parse(
@@ -729,8 +820,20 @@ class ConfigManager {
 
     // Strict type and value validation per config key
     if (key === 'preferences.theme') {
-      if (val !== 'light' && val !== 'dark') {
-        throw new Error('Theme must be either "light" or "dark".');
+      const allowedThemes = new Set([
+        'dark',
+        'light',
+        'cyberpunk',
+        'nord',
+        'retro-terminal',
+        'synthwave',
+        'vintage-paper',
+        'matrix',
+      ]);
+      if (!allowedThemes.has(val)) {
+        throw new Error(
+          `Theme must be one of: ${Array.from(allowedThemes).join(', ')}.`,
+        );
       }
     } else if (key === 'preferences.language') {
       if (typeof val !== 'string' || !ALLOWED_LANGUAGES.has(val)) {

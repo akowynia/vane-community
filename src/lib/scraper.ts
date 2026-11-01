@@ -18,7 +18,12 @@ export interface ScrapeSuccessResult {
     | 'fast_fetch_readability'
     | 'fast_fetch_pdf'
     | 'fast_fetch_selectors'
-    | 'fast_fetch_paragraphs';
+    | 'fast_fetch_paragraphs'
+    | 'mcp_firecrawl'
+    | 'mcp_crawl4ai'
+    | string;
+  attemptedMcp?: string;
+  mcpError?: string;
 }
 
 export interface ScrapeErrorResult {
@@ -32,9 +37,31 @@ export interface ScrapeErrorResult {
     | 'extraction_failed'
     | string;
   length: number;
+  extractor?: undefined;
+  attemptedMcp?: string;
+  mcpError?: string;
 }
 
 export type ScrapeResult = ScrapeSuccessResult | ScrapeErrorResult;
+
+export const getScraperEngineLabel = (extractor?: string): string => {
+  if (!extractor) return 'Built-in';
+  if (extractor === 'mcp_firecrawl' || extractor.includes('firecrawl')) return 'Firecrawl (MCP)';
+  if (extractor === 'mcp_crawl4ai' || extractor.includes('crawl4ai')) return 'Crawl4AI (MCP)';
+  if (extractor.startsWith('mcp_')) {
+    const raw = extractor.replace(/^mcp_/, '').replace(/_/g, ' ');
+    return `${raw.charAt(0).toUpperCase() + raw.slice(1)} (MCP)`;
+  }
+  if (extractor.includes('pdf')) return 'PDF Parser';
+  if (extractor.includes('readability')) return 'Readability';
+  if (extractor.includes('selectors') || extractor.includes('paragraphs')) return 'Semantic Fallback';
+  if (extractor.includes('fast_fetch')) return 'Fast Fetch';
+  return 'Built-in';
+};
+
+export const isMcpExtractor = (extractor?: string): boolean => {
+  return Boolean(extractor && (extractor.startsWith('mcp_') || extractor.includes('(MCP)')));
+};
 
 export interface ScrapeOptions {
   minLength?: number;
@@ -227,6 +254,168 @@ class Scraper {
     }
   }
 
+  /**
+   * Find any enabled MCP server configured as a web scraper (e.g. Firecrawl or Crawl4AI)
+   */
+  public static async getActiveMcpScraperServer(): Promise<any | null> {
+    try {
+      const { default: mcpClientManager } = await import('./mcp/client');
+      const servers = mcpClientManager.getServers().filter((s) => s.enabled);
+      if (servers.length === 0) return null;
+
+      return (
+        servers.find((s) => {
+          const lower = (s.name || '').toLowerCase();
+          return (
+            lower.includes('firecrawl') ||
+            lower.includes('crawl4ai') ||
+            lower.includes('scraper') ||
+            lower.includes('crawler')
+          );
+        }) || null
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Tier 0: Check if an enabled MCP server provides web scraping tools (e.g. Firecrawl or Crawl4AI).
+   * If available, execute the tool and return the parsed markdown.
+   */
+  private static async tryMcpScrape(
+    url: string,
+    minLength: number,
+    presetServer?: any,
+  ): Promise<ScrapeSuccessResult | null> {
+    try {
+      const { default: mcpClientManager } = await import('./mcp/client');
+      const servers = mcpClientManager.getServers().filter((s) => s.enabled);
+      if (servers.length === 0) return null;
+
+      const scraperServer =
+        presetServer ||
+        servers.find((s) => {
+          const lower = (s.name || '').toLowerCase();
+          return (
+            lower.includes('firecrawl') ||
+            lower.includes('crawl4ai') ||
+            lower.includes('scraper') ||
+            lower.includes('crawler')
+          );
+        });
+
+      if (!scraperServer) return null;
+
+      let targetServerId: string | undefined = scraperServer.id;
+      let targetToolName: string | undefined;
+      let serverName: string = scraperServer.name;
+
+      const serverTools = await mcpClientManager.listServerTools(scraperServer);
+      const scrapeTool =
+        serverTools.find((t) => {
+          const tName = (t.name || '').toLowerCase();
+          return (
+            tName.includes('scrape') ||
+            tName.includes('crawl') ||
+            tName.includes('extract')
+          );
+        }) || serverTools[0];
+
+      if (scrapeTool) {
+        targetToolName = scrapeTool.name;
+      } else {
+        const lower = (scraperServer.name || '').toLowerCase();
+        if (lower.includes('firecrawl')) {
+          targetToolName = 'firecrawl_scrape';
+        } else if (lower.includes('crawl4ai')) {
+          targetToolName = 'crawl4ai_scrape';
+        }
+      }
+
+      if (!targetServerId || !targetToolName) return null;
+
+      const lowerInfo = `${serverName} ${targetToolName}`.toLowerCase();
+      const isFirecrawl = lowerInfo.includes('firecrawl');
+      const isCrawl4Ai = lowerInfo.includes('crawl4ai');
+
+      // Arguments compatible with Firecrawl and Crawl4AI
+      const args: Record<string, any> = isFirecrawl
+        ? { url, formats: ['markdown'] }
+        : { url };
+
+      const result = await mcpClientManager.callTool(
+        targetServerId,
+        targetToolName,
+        args,
+      );
+
+      if (result.isError || !result.content || result.content.length === 0) {
+        throw new Error(result.content?.[0]?.text || 'MCP scraping tool returned an error');
+      }
+
+      let rawText = result.content
+        .map((c) => c.text || '')
+        .filter(Boolean)
+        .join('\n\n')
+        .trim();
+
+      if (!rawText) return null;
+
+      // Handle cases where the tool returns a JSON string with markdown or content
+      if (rawText.startsWith('{') && rawText.endsWith('}')) {
+        try {
+          const parsedJson = JSON.parse(rawText);
+          if (typeof parsedJson.markdown === 'string') {
+            rawText = parsedJson.markdown;
+          } else if (typeof parsedJson.content === 'string') {
+            rawText = parsedJson.content;
+          } else if (typeof parsedJson.text === 'string') {
+            rawText = parsedJson.text;
+          } else if (parsedJson.data && typeof parsedJson.data.markdown === 'string') {
+            rawText = parsedJson.data.markdown;
+          }
+        } catch {
+          // Keep rawText as is
+        }
+      }
+
+      if (rawText.length < minLength) {
+        return null;
+      }
+
+      let title = 'Webpage';
+      const headingMatch = rawText.match(/^#\s+(.+)$/m);
+      if (headingMatch) {
+        title = headingMatch[1].trim();
+      } else {
+        try {
+          title = new URL(url).hostname;
+        } catch {}
+      }
+
+      const extractor = isFirecrawl
+        ? 'mcp_firecrawl'
+        : isCrawl4Ai
+          ? 'mcp_crawl4ai'
+          : `mcp_${serverName.toLowerCase().replace(/[^a-z0-9_]/g, '_')}`;
+
+      const formattedContent = rawText.startsWith('#')
+        ? rawText
+        : `# ${title} - ${url}\n\n${rawText}`;
+
+      return {
+        content: formattedContent,
+        title,
+        length: rawText.length,
+        extractor: extractor as any,
+      };
+    } catch (err: any) {
+      console.warn(`[Scraper] MCP scraping delegation failed on ${url}:`, err?.message || err);
+      throw err;
+    }
+  }
+
   static async scrape(
     url: string,
     options?: ScrapeOptions,
@@ -261,6 +450,43 @@ class Scraper {
       };
     }
 
+    let attemptedMcp: string | undefined;
+    let mcpError: string | undefined;
+
+    // Step 0: Check if an active MCP Scraper (Firecrawl / Crawl4AI) is configured and enabled
+    try {
+      const activeMcpServer = await this.getActiveMcpScraperServer();
+      if (activeMcpServer) {
+        attemptedMcp = activeMcpServer.name.includes('(MCP)') ? activeMcpServer.name : `${activeMcpServer.name} (MCP)`;
+        const mcpResult = await this.tryMcpScrape(url, minLength, activeMcpServer);
+        if (mcpResult) {
+          const durationMs = Date.now() - startTime;
+          await recordScrapeMetric({
+            url,
+            status: 'success',
+            durationMs,
+            contentLength: mcpResult.length,
+            extractor: mcpResult.extractor,
+            chatId: options?.chatId,
+            messageId: options?.messageId,
+            userId: options?.userId,
+            optimizationMode: options?.optimizationMode,
+          });
+
+          return {
+            ...mcpResult,
+            attemptedMcp,
+          };
+        }
+      }
+    } catch (mcpErr: any) {
+      mcpError = mcpErr?.message || String(mcpErr);
+      console.warn(
+        `[Scraper] MCP scrape error on ${url}, falling back to fast fetch:`,
+        mcpErr,
+      );
+    }
+
     // Step 1: Attempt Tier 1 Fast Fetch (HTTP + Readability/PDF)
     try {
       const fastResult = await this.fastFetch(url, minLength);
@@ -278,7 +504,11 @@ class Scraper {
           optimizationMode: options?.optimizationMode,
         });
 
-        return fastResult;
+        return {
+          ...fastResult,
+          attemptedMcp,
+          mcpError,
+        };
       }
     } catch (fastErr) {
       console.warn(`[Scraper] Fast fetch unexpected error for ${url}, falling back to browser:`, fastErr);
@@ -408,6 +638,8 @@ class Scraper {
           title,
           error: errorType,
           length: extractedText.length,
+          attemptedMcp,
+          mcpError,
         };
       }
 
@@ -431,6 +663,8 @@ class Scraper {
         title,
         length: extractedText.length,
         extractor: extractorMethod,
+        attemptedMcp,
+        mcpError,
       };
     } catch (err: any) {
       const durationMs = Date.now() - startTime;
@@ -454,6 +688,8 @@ class Scraper {
         title: 'Failed to scrape',
         error: 'navigation_failed',
         length: 0,
+        attemptedMcp,
+        mcpError,
       };
     } finally {
       this.userCount--;

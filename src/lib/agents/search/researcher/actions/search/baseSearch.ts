@@ -10,7 +10,7 @@ import { Chunk, ResearchBlock, SearchResultsResearchBlock } from '@/lib/types';
 import { SearchAgentConfig } from '../../../types';
 import computeSimilarity from '@/lib/utils/computeSimilarity';
 import z from 'zod';
-import Scraper from '@/lib/scraper';
+import Scraper, { getScraperEngineLabel } from '@/lib/scraper';
 import { splitText, getTokenCount } from '@/lib/utils/splitText';
 
 export const normalizeUrl = (url?: string): string => {
@@ -332,6 +332,10 @@ export const executeSearch = async (input: {
                 url: r.url,
                 publishedDate:
                   r.publishedDate || r.pubdate || r.published_date,
+                searchEngine:
+                  (r as any).engine ||
+                  (Array.isArray((r as any).engines) ? (r as any).engines[0] : undefined),
+                scraperEngine: 'Search Snippet',
                 similarity: hybridScore,
                 vectorSimilarity: vectorSim,
                 embedding: chunkEmbedding,
@@ -362,6 +366,10 @@ export const executeSearch = async (input: {
                 url: r.url,
                 publishedDate:
                   r.publishedDate || r.pubdate || r.published_date,
+                searchEngine:
+                  (r as any).engine ||
+                  (Array.isArray((r as any).engines) ? (r as any).engines[0] : undefined),
+                scraperEngine: 'Search Snippet',
                 similarity: 1 * authorityMultiplier,
                 embedding: [],
               },
@@ -503,11 +511,34 @@ export const executeSearch = async (input: {
     // In Balanced mode: lightweight Fast Fetch for top 2 articles to enrich snippets with full readable text
     if (input.mode === 'balanced' && uniqueSearchResults.length > 0) {
       const topItems = uniqueSearchResults.slice(0, 2);
+
+      const readingBlockId = crypto.randomUUID();
+      researchBlock.data.subSteps.push({
+        id: readingBlockId,
+        type: 'reading',
+        reading: topItems.map((item) => ({
+          ...item,
+          metadata: {
+            ...item.metadata,
+            scraperEngine: 'Extracting...',
+          },
+        })),
+      });
+
+      input.session.updateBlock(researchBlock.id, [
+        {
+          path: '/data/subSteps',
+          op: 'replace',
+          value: researchBlock.data.subSteps,
+        },
+      ]);
+
       await Promise.all(
         topItems.map(async (item) => {
           try {
             const scraped = await Scraper.scrape(item.metadata.url, {
               minLength: 200,
+              optimizationMode: 'balanced',
             });
             if (
               scraped &&
@@ -516,11 +547,33 @@ export const executeSearch = async (input: {
             ) {
               item.content = scraped.content.slice(0, 2500);
             }
+            if (scraped) {
+              item.metadata.extractor = scraped.extractor;
+              item.metadata.scraperEngine = getScraperEngineLabel(scraped.extractor);
+              if (scraped.attemptedMcp && !scraped.extractor?.startsWith('mcp_')) {
+                item.metadata.mcpFallback = scraped.attemptedMcp;
+                item.metadata.mcpError = scraped.mcpError;
+              }
+            }
           } catch {
             // Keep original snippet on failure
           }
         }),
       );
+
+      const readingStep = researchBlock.data.subSteps.find(
+        (s: any) => s.id === readingBlockId,
+      );
+      if (readingStep && readingStep.type === 'reading') {
+        readingStep.reading = topItems;
+        input.session.updateBlock(researchBlock.id, [
+          {
+            path: '/data/subSteps',
+            op: 'replace',
+            value: researchBlock.data.subSteps,
+          },
+        ]);
+      }
     }
 
     return uniqueSearchResults;
@@ -618,6 +671,9 @@ export const executeSearch = async (input: {
                 url: r.url,
                 publishedDate:
                   r.publishedDate || r.pubdate || r.published_date,
+                searchEngine:
+                  (r as any).engine ||
+                  (Array.isArray((r as any).engines) ? (r as any).engines[0] : undefined),
                 similarity: hybridScore,
                 vectorSimilarity: vectorSim,
                 embedding: chunkEmbedding,
@@ -649,6 +705,9 @@ export const executeSearch = async (input: {
                   url: r.url,
                   publishedDate:
                     r.publishedDate || r.pubdate || r.published_date,
+                  searchEngine:
+                    (r as any).engine ||
+                    (Array.isArray((r as any).engines) ? (r as any).engines[0] : undefined),
                   similarity: 1 * authorityMultiplier,
                   embedding: [],
                 },
@@ -787,7 +846,7 @@ export const executeSearch = async (input: {
     let pickedIndices: number[] = [];
     try {
       const pickerUserContent = `<queries>${input.queries.join(', ')}</queries>\n<search_results>${deduplicatedSearchResults.map((result, index) => `<result indice=${index}>${JSON.stringify(result)}</result>`).join('\n')}</search_results>`;
-      
+
       if (input.tokenTracker) {
         input.tokenTracker.addTokens(
           getTokenCount(pickerPrompt) + getTokenCount(pickerUserContent),
@@ -930,6 +989,22 @@ export const executeSearch = async (input: {
           continue;
         }
 
+        result.metadata.extractor = scrapedData.extractor;
+        result.metadata.scraperEngine = getScraperEngineLabel(scrapedData.extractor);
+        if (scrapedData.attemptedMcp && !scrapedData.extractor?.startsWith('mcp_')) {
+          result.metadata.mcpFallback = scrapedData.attemptedMcp;
+          result.metadata.mcpError = scrapedData.mcpError;
+        }
+
+        // Live update the reading sub-step with the detected engine
+        input.session.updateBlock(researchBlock.id, [
+          {
+            path: '/data/subSteps',
+            op: 'replace',
+            value: researchBlock.data.subSteps,
+          },
+        ]);
+
         let accumulatedContent = '';
         // Limit to max 2 most important chunks per page to conserve the token budget
         const chunks = splitText(scrapedData.content, 4000, 500).slice(0, 2);
@@ -982,6 +1057,16 @@ export const executeSearch = async (input: {
           extractedFacts.push({
             ...result,
             content: accumulatedContent.trim(),
+            metadata: {
+              ...result.metadata,
+              extractor: scrapedData.extractor,
+              scraperEngine: getScraperEngineLabel(scrapedData.extractor),
+              mcpFallback:
+                scrapedData.attemptedMcp && !scrapedData.extractor?.startsWith('mcp_')
+                  ? scrapedData.attemptedMcp
+                  : undefined,
+              mcpError: scrapedData.mcpError,
+            },
           });
         }
       } catch (err) {
@@ -995,7 +1080,13 @@ export const executeSearch = async (input: {
 
     // If nothing was extracted, or due to the limit, include the top snippets instead
     if (extractedFacts.length === 0 && deduplicatedSearchResults.length > 0) {
-      return deduplicatedSearchResults.slice(0, 5);
+      return deduplicatedSearchResults.slice(0, 5).map((r) => ({
+        ...r,
+        metadata: {
+          ...r.metadata,
+          scraperEngine: 'Search Snippet',
+        },
+      }));
     }
 
     return extractedFacts;

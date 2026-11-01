@@ -10,6 +10,207 @@
   font-display: swap;
 }
 
+:root {
+  --color-light-50: 255 255 255;
+  --color-light-100: 246 248 250;
+  --color-light-200: 232 237 241;
+  --color-light-300: 208 215 222;
+
+  --color-dark-50: 12 10 9;
+  --color-dark-100: 22 20 18;
+  --color-dark-200: 40 34 27;
+  --color-dark-300: 61 52 42;
+
+  --color-bronze-50: 251 248 244;
+  --color-bronze-100: 245 239 230;
+  --color-bronze-200: 233 220 206;
+  --color-bronze-300: 215 192 169;
+  --color-bronze-400: 197 159 125;
+  --color-bronze-500: 184 134 77;
+  --color-bronze-600: 157 110 58;
+  --color-bronze-700: 122 84 42;
+  --color-bronze-800: 83 55 26;
+  --color-bronze-900: 46 29 13;
+
+  --color-accent-primary: 184 134 77;
+  --color-scrollbar-thumb: 232 237 241;
+  --color-scrollbar-hover: 208 215 222;
+}
+
+:root.dark,
+html.dark,
+html[data-theme='dark'] {
+  --color-dark-50: 12 10 9;
+  --color-dark-100: 22 20 18;
+  --color-dark-200: 40 34 27;
+  --color-dark-300: 61 52 42;
+
+  --color-bronze-500: 184 134 77;
+  --color-accent-primary: 184 134 77;
+  --color-scrollbar-thumb: 40 34 27;
+  --color-scrollbar-hover: 61 52 42;
+}
+
+/* Cyberpunk Neon Theme */
+html.dark.cyberpunk,
+html.cyberpunk,
+html[data-theme='cyberpunk'],
+:root[data-theme='cyberpunk'] {
+  --color-dark-50: 8 8 19;
+  --color-dark-100: 16 16 38;
+  --color-dark-200: 28 26 62;
+  --color-dark-300: 48 42 96;
+
+  --color-bronze-50: 230 253 255;
+  --color-bronze-100: 195 250 255;
+  --color-bronze-200: 140 245 255;
+  --color-bronze-300: 80 240 255;
+  --color-bronze-400: 0 240 255;
+  --color-bronze-500: 0 220 240;
+  --color-bronze-600: 255 0 127;
+  --color-bronze-700: 200 0 100;
+  --color-bronze-800: 140 0 70;
+  --color-bronze-900: 80 0 40;
+
+  --color-accent-primary: 0 240 255;
+  --color-scrollbar-thumb: 28 26 62;
+  --color-scrollbar-hover: 48 42 96;
+}
+
+/* Nordic Arctic Frost Theme */
+html.dark.nord,
+html.nord,
+html[data-theme='nord'],
+:root[data-theme='nord'] {
+  --color-dark-50: 36 41 51;
+  --color-dark-100: 46 52 64;
+  --color-dark-200: 59 66 82;
+  --color-dark-300: 67 76 94;
+
+  --color-bronze-50: 236 244 246;
+  --color-bronze-100: 216 234 238;
+  --color-bronze-200: 180 216 225;
+  --color-bronze-300: 150 202 214;
+  --color-bronze-400: 136 192 208;
+  --color-bronze-500: 129 161 193;
+  --color-bronze-600: 94 129 172;
+  --color-bronze-700: 76 103 138;
+  --color-bronze-800: 59 80 107;
+  --color-bronze-900: 43 59 79;
+
+  --color-accent-primary: 136 192 208;
+  --color-scrollbar-thumb: 59 66 82;
+  --color-scrollbar-hover: 67 76 94;
+}
+
+/* Retro CRT Terminal Green Phosphor Theme */
+html.dark.retro-terminal,
+html.retro-terminal,
+html[data-theme='retro-terminal'],
+:root[data-theme='retro-terminal'] {
+  --color-dark-50: 8 14 10;
+  --color-dark-100: 13 24 16;
+  --color-dark-200: 20 38 25;
+  --color-dark-300: 28 56 37;
+
+  --color-bronze-50: 235 255 240;
+  --color-bronze-100: 200 255 215;
+  --color-bronze-200: 140 255 170;
+  --color-bronze-300: 80 255 130;
+  --color-bronze-400: 0 255 102;
+  --color-bronze-500: 0 230 90;
+  --color-bronze-600: 0 190 75;
+  --color-bronze-700: 0 145 55;
+  --color-bronze-800: 0 100 40;
+  --color-bronze-900: 0 60 25;
+
+  --color-accent-primary: 0 255 102;
+  --color-scrollbar-thumb: 20 38 25;
+  --color-scrollbar-hover: 28 56 37;
+}
+
+/* 80s Neon Synthwave Theme */
+html.dark.synthwave,
+html.synthwave,
+html[data-theme='synthwave'],
+:root[data-theme='synthwave'] {
+  --color-dark-50: 18 8 36;
+  --color-dark-100: 29 14 58;
+  --color-dark-200: 44 20 84;
+  --color-dark-300: 72 32 130;
+
+  --color-bronze-50: 255 235 245;
+  --color-bronze-100: 255 200 230;
+  --color-bronze-200: 255 140 195;
+  --color-bronze-300: 255 80 160;
+  --color-bronze-400: 255 42 133;
+  --color-bronze-500: 255 42 133;
+  --color-bronze-600: 255 184 0;
+  --color-bronze-700: 210 30 105;
+  --color-bronze-800: 150 20 75;
+  --color-bronze-900: 90 10 45;
+
+  --color-accent-primary: 255 42 133;
+  --color-scrollbar-thumb: 44 20 84;
+  --color-scrollbar-hover: 72 32 130;
+}
+
+/* Vintage Paper & Typewriter Theme */
+html.vintage-paper,
+html[data-theme='vintage-paper'],
+:root[data-theme='vintage-paper'] {
+  --color-light-50: 247 242 231;
+  --color-light-100: 238 229 211;
+  --color-light-200: 226 213 189;
+  --color-light-300: 208 192 163;
+
+  --color-dark-50: 45 36 30;
+  --color-dark-100: 58 46 38;
+  --color-dark-200: 76 60 49;
+  --color-dark-300: 102 81 67;
+
+  --color-bronze-50: 249 245 240;
+  --color-bronze-100: 240 230 220;
+  --color-bronze-200: 220 200 180;
+  --color-bronze-300: 190 160 130;
+  --color-bronze-400: 160 120 80;
+  --color-bronze-500: 139 90 43;
+  --color-bronze-600: 114 69 28;
+  --color-bronze-700: 90 52 20;
+  --color-bronze-800: 68 38 14;
+  --color-bronze-900: 45 24 8;
+
+  --color-accent-primary: 139 90 43;
+  --color-scrollbar-thumb: 226 213 189;
+  --color-scrollbar-hover: 208 192 163;
+}
+
+/* Matrix Digital Rain Theme */
+html.dark.matrix,
+html.matrix,
+html[data-theme='matrix'],
+:root[data-theme='matrix'] {
+  --color-dark-50: 5 11 6;
+  --color-dark-100: 9 21 10;
+  --color-dark-200: 15 36 17;
+  --color-dark-300: 24 56 27;
+
+  --color-bronze-50: 230 255 235;
+  --color-bronze-100: 195 255 205;
+  --color-bronze-200: 130 255 150;
+  --color-bronze-300: 70 255 100;
+  --color-bronze-400: 0 255 65;
+  --color-bronze-500: 0 235 60;
+  --color-bronze-600: 0 190 48;
+  --color-bronze-700: 0 145 36;
+  --color-bronze-800: 0 100 25;
+  --color-bronze-900: 0 60 15;
+
+  --color-accent-primary: 0 255 65;
+  --color-scrollbar-thumb: 15 36 17;
+  --color-scrollbar-hover: 24 56 27;
+}
+
 @layer base {
   .overflow-hidden-scrollable {
     -ms-overflow-style: none;
@@ -21,7 +222,7 @@
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: #e8edf1 transparent; /* light-200 */
+    scrollbar-color: rgb(var(--color-scrollbar-thumb, 232 237 241)) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -34,45 +235,13 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background: #e8edf1; /* light-200 */
+    background: rgb(var(--color-scrollbar-thumb, 232 237 241));
     border-radius: 3px;
     transition: background 0.2s ease;
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: #d0d7de; /* light-300 */
-  }
-
-  @media (prefers-color-scheme: dark) {
-    * {
-      scrollbar-color: #28221b transparent; /* dark-200 */
-    }
-
-    *::-webkit-scrollbar-thumb {
-      background: #28221b; /* dark-200 */
-    }
-
-    *::-webkit-scrollbar-thumb:hover {
-      background: #3d342a; /* dark-300 */
-    }
-  }
-
-  :root.dark *,
-  html.dark *,
-  body.dark * {
-    scrollbar-color: #28221b transparent; /* dark-200 */
-  }
-
-  :root.dark *::-webkit-scrollbar-thumb,
-  html.dark *::-webkit-scrollbar-thumb,
-  body.dark *::-webkit-scrollbar-thumb {
-    background: #28221b; /* dark-200 */
-  }
-
-  :root.dark *::-webkit-scrollbar-thumb:hover,
-  html.dark *::-webkit-scrollbar-thumb:hover,
-  body.dark *::-webkit-scrollbar-thumb:hover {
-    background: #3d342a; /* dark-300 */
+    background: rgb(var(--color-scrollbar-hover, 208 215 222));
   }
 
   html {
@@ -108,3 +277,219 @@
   }
 }
 
+/* Subtle retro CRT scanline effect for retro-terminal theme */
+html.retro-terminal::after,
+html[data-theme='retro-terminal']::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  opacity: 0.35;
+}
+
+/* Glowing accents for futuristic & retro themes */
+html.cyberpunk .border-bronze-500,
+html[data-theme='cyberpunk'] .border-bronze-500 {
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+}
+
+html.synthwave .border-bronze-500,
+html[data-theme='synthwave'] .border-bronze-500 {
+  box-shadow: 0 0 12px rgba(255, 42, 133, 0.35);
+}
+
+html.retro-terminal .border-bronze-500,
+html[data-theme='retro-terminal'] .border-bronze-500 {
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.35);
+}
+
+html.matrix .border-bronze-500,
+html[data-theme='matrix'] .border-bronze-500 {
+  box-shadow: 0 0 10px rgba(0, 255, 65, 0.35);
+}
+
+/* Compatibility theme overrides for hardcoded container backgrounds */
+html.cyberpunk [class*="bg-[#090807]"],
+html.cyberpunk [class*="bg-[#181513]"],
+html.cyberpunk [class*="bg-[#1b1713]"],
+html.cyberpunk [class*="bg-[#181411]"],
+html.nord [class*="bg-[#090807]"],
+html.nord [class*="bg-[#181513]"],
+html.nord [class*="bg-[#1b1713]"],
+html.nord [class*="bg-[#181411]"],
+html.retro-terminal [class*="bg-[#090807]"],
+html.retro-terminal [class*="bg-[#181513]"],
+html.retro-terminal [class*="bg-[#1b1713]"],
+html.retro-terminal [class*="bg-[#181411]"],
+html.synthwave [class*="bg-[#090807]"],
+html.synthwave [class*="bg-[#181513]"],
+html.synthwave [class*="bg-[#1b1713]"],
+html.synthwave [class*="bg-[#181411]"],
+html.matrix [class*="bg-[#090807]"],
+html.matrix [class*="bg-[#181513]"],
+html.matrix [class*="bg-[#1b1713]"],
+html.matrix [class*="bg-[#181411]"] {
+  background-color: rgb(var(--color-dark-100)) !important;
+}
+
+html.vintage-paper [class*="bg-[#090807]"],
+html.vintage-paper [class*="bg-[#181513]"],
+html.vintage-paper [class*="bg-[#1b1713]"],
+html.vintage-paper [class*="bg-[#181411]"] {
+  background-color: rgb(var(--color-light-100)) !important;
+}
+
+/* Theme overrides for hardcoded borders */
+html.cyberpunk [class*="border-[#221c16]"],
+html.cyberpunk [class*="border-[#2e2720]"],
+html.cyberpunk [class*="border-[#2d251d]"],
+html.nord [class*="border-[#221c16]"],
+html.nord [class*="border-[#2e2720]"],
+html.nord [class*="border-[#2d251d]"],
+html.retro-terminal [class*="border-[#221c16]"],
+html.retro-terminal [class*="border-[#2e2720]"],
+html.retro-terminal [class*="border-[#2d251d]"],
+html.synthwave [class*="border-[#221c16]"],
+html.synthwave [class*="border-[#2e2720]"],
+html.synthwave [class*="border-[#2d251d]"],
+html.matrix [class*="border-[#221c16]"],
+html.matrix [class*="border-[#2e2720]"],
+html.matrix [class*="border-[#2d251d]"] {
+  border-color: rgb(var(--color-dark-200)) !important;
+}
+
+html.vintage-paper [class*="border-[#221c16]"],
+html.vintage-paper [class*="border-[#2e2720]"],
+html.vintage-paper [class*="border-[#2d251d]"] {
+  border-color: rgb(var(--color-light-200)) !important;
+}
+
+/* Theme accent text color overrides */
+html.cyberpunk [class*="text-[#b8864d]"],
+html.nord [class*="text-[#b8864d]"],
+html.retro-terminal [class*="text-[#b8864d]"],
+html.synthwave [class*="text-[#b8864d]"],
+html.vintage-paper [class*="text-[#b8864d]"],
+html.matrix [class*="text-[#b8864d]"] {
+  color: rgb(var(--color-accent-primary)) !important;
+}
+
+/* Theme accent border color overrides */
+html.cyberpunk [class*="border-[#b8864d]"],
+html.nord [class*="border-[#b8864d]"],
+html.retro-terminal [class*="border-[#b8864d]"],
+html.synthwave [class*="border-[#b8864d]"],
+html.vintage-paper [class*="border-[#b8864d]"],
+html.matrix [class*="border-[#b8864d]"] {
+  border-color: rgb(var(--color-accent-primary)) !important;
+}
+
+/* Ensure main layout background matches dark theme palette */
+html.cyberpunk main,
+html.nord main,
+html.retro-terminal main,
+html.synthwave main,
+html.matrix main,
+html[data-theme='cyberpunk'] main,
+html[data-theme='nord'] main,
+html[data-theme='retro-terminal'] main,
+html[data-theme='synthwave'] main,
+html[data-theme='matrix'] main {
+  background-color: rgb(var(--color-dark-50)) !important;
+}
+
+/* Ensure light utility fallbacks map to dark theme palette */
+html.cyberpunk .bg-light-primary,
+html.nord .bg-light-primary,
+html.retro-terminal .bg-light-primary,
+html.synthwave .bg-light-primary,
+html.matrix .bg-light-primary,
+html[data-theme='cyberpunk'] .bg-light-primary,
+html[data-theme='nord'] .bg-light-primary,
+html[data-theme='retro-terminal'] .bg-light-primary,
+html[data-theme='synthwave'] .bg-light-primary,
+html[data-theme='matrix'] .bg-light-primary {
+  background-color: rgb(var(--color-dark-50)) !important;
+}
+
+html.cyberpunk .bg-light-secondary,
+html.nord .bg-light-secondary,
+html.retro-terminal .bg-light-secondary,
+html.synthwave .bg-light-secondary,
+html.matrix .bg-light-secondary,
+html[data-theme='cyberpunk'] .bg-light-secondary,
+html[data-theme='nord'] .bg-light-secondary,
+html[data-theme='retro-terminal'] .bg-light-secondary,
+html[data-theme='synthwave'] .bg-light-secondary,
+html[data-theme='matrix'] .bg-light-secondary {
+  background-color: rgb(var(--color-dark-100)) !important;
+}
+
+/* Ensure high-contrast headings in dark themes */
+html.cyberpunk h1, html.cyberpunk h2,
+html.nord h1, html.nord h2,
+html.retro-terminal h1, html.retro-terminal h2,
+html.synthwave h1, html.synthwave h2,
+html.matrix h1, html.matrix h2,
+html[data-theme='cyberpunk'] h1, html[data-theme='cyberpunk'] h2,
+html[data-theme='nord'] h1, html[data-theme='nord'] h2,
+html[data-theme='retro-terminal'] h1, html[data-theme='retro-terminal'] h2,
+html[data-theme='synthwave'] h1, html[data-theme='synthwave'] h2,
+html[data-theme='matrix'] h1, html[data-theme='matrix'] h2 {
+  color: #ffffff !important;
+}
+
+/* SVG stroke and fill overrides for compass and brand assets */
+html.cyberpunk [stroke="#b8864d"],
+html.nord [stroke="#b8864d"],
+html.retro-terminal [stroke="#b8864d"],
+html.synthwave [stroke="#b8864d"],
+html.vintage-paper [stroke="#b8864d"],
+html.matrix [stroke="#b8864d"],
+html[data-theme='cyberpunk'] [stroke="#b8864d"],
+html[data-theme='nord'] [stroke="#b8864d"],
+html[data-theme='retro-terminal'] [stroke="#b8864d"],
+html[data-theme='synthwave'] [stroke="#b8864d"],
+html[data-theme='vintage-paper'] [stroke="#b8864d"],
+html[data-theme='matrix'] [stroke="#b8864d"] {
+  stroke: rgb(var(--color-accent-primary)) !important;
+}
+
+html.cyberpunk [fill="#b8864d"],
+html.nord [fill="#b8864d"],
+html.retro-terminal [fill="#b8864d"],
+html.synthwave [fill="#b8864d"],
+html.vintage-paper [fill="#b8864d"],
+html.matrix [fill="#b8864d"],
+html[data-theme='cyberpunk'] [fill="#b8864d"],
+html[data-theme='nord'] [fill="#b8864d"],
+html[data-theme='retro-terminal'] [fill="#b8864d"],
+html[data-theme='synthwave'] [fill="#b8864d"],
+html[data-theme='vintage-paper'] [fill="#b8864d"],
+html[data-theme='matrix'] [fill="#b8864d"] {
+  fill: rgb(var(--color-accent-primary)) !important;
+}
+
+html.cyberpunk [class*="text-[#f3d5ab]"],
+html.nord [class*="text-[#f3d5ab]"],
+html.retro-terminal [class*="text-[#f3d5ab]"],
+html.synthwave [class*="text-[#f3d5ab]"],
+html.matrix [class*="text-[#f3d5ab]"],
+html[data-theme='cyberpunk'] [class*="text-[#f3d5ab]"],
+html[data-theme='nord'] [class*="text-[#f3d5ab]"],
+html[data-theme='retro-terminal'] [class*="text-[#f3d5ab]"],
+html[data-theme='synthwave'] [class*="text-[#f3d5ab]"],
+html[data-theme='matrix'] [class*="text-[#f3d5ab]"] {
+  color: rgb(var(--color-accent-primary)) !important;
+}

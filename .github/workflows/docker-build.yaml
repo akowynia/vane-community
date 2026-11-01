@@ -130,6 +130,8 @@ jobs:
             dockerfile: Dockerfile
           - name: slim
             dockerfile: Dockerfile.slim
+          - name: mcp
+            dockerfile: Dockerfile.mcp
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -177,6 +179,8 @@ jobs:
             dockerfile: Dockerfile
           - name: slim
             dockerfile: Dockerfile.slim
+          - name: mcp
+            dockerfile: Dockerfile.mcp
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -219,7 +223,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        variant: [full, slim]
+        variant: [full, slim, mcp]
     steps:
       - name: Log in to DockerHub
         uses: docker/login-action@v3
@@ -251,6 +255,9 @@ jobs:
             push_manifest "akowynia/vane-community:${VARIANT}-canary"
             if [ "$VARIANT" = "full" ]; then
               push_manifest "akowynia/vane-community:canary"
+            fi
+            if [ "$VARIANT" = "mcp" ]; then
+              push_manifest "akowynia/vane-community:mcp-canary"
             fi
 
           elif [ "$BUILD_TYPE" = "release" ]; then
@@ -288,6 +295,9 @@ jobs:
                 push_manifest "akowynia/vane-community:latest"
                 push_manifest "akowynia/vane-community:main"
               fi
+              if [ "$VARIANT" = "mcp" ]; then
+                push_manifest "akowynia/vane-community:mcp"
+              fi
             fi
 
           else
@@ -295,5 +305,8 @@ jobs:
             if [ "$VARIANT" = "full" ]; then
               push_manifest "akowynia/vane-community:latest"
               push_manifest "akowynia/vane-community:main"
+            fi
+            if [ "$VARIANT" = "mcp" ]; then
+              push_manifest "akowynia/vane-community:mcp"
             fi
           fi

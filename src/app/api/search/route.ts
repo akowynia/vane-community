@@ -37,7 +37,7 @@ const searchRequestSchema = z.object({
   embeddingModelKey: z.string().optional(),
   embeddingModelProviderId: z.string().optional(),
   optimizationMode: z
-    .enum(['speed', 'balanced', 'quality'])
+    .enum(['speed', 'balanced', 'quality', 'deep'])
     .optional()
     .default('speed'),
   history: z

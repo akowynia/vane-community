@@ -6,7 +6,7 @@ import db from '@/lib/db';
 import { users } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { hashPassword } from '@/lib/security/password';
-import { createSessionToken } from '@/lib/security/token';
+import { createSessionToken, isSecureCookie } from '@/lib/security/token';
 import configManager from '@/lib/config';
 import crypto from 'node:crypto';
 
@@ -127,7 +127,7 @@ export const POST = async (req: NextRequest) => {
       name: 'vane_session',
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isSecureCookie(req),
       sameSite: 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60, // 7 days

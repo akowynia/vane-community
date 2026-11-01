@@ -1,4 +1,4 @@
-import { ChevronDown, Sliders, Star, Zap } from 'lucide-react';
+import { ChevronDown, Sliders, Star, Zap, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Popover,
@@ -44,6 +44,19 @@ const Optimization = ({
         <Star
           size={16}
           className="text-[#2196F3] dark:text-[#BBDEFB] fill-[#BBDEFB] dark:fill-[#2196F3]"
+        />
+      ),
+    },
+    {
+      key: 'deep',
+      title: t('optimization.deepTitle') || 'Deep Research',
+      description:
+        t('optimization.deepDesc') ||
+        'Multi-hop autonomous recursive exploration with full whitepaper synthesis.',
+      icon: (
+        <Sparkles
+          size={16}
+          className="text-purple-500 fill-purple-500/20"
         />
       ),
     },

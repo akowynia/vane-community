@@ -8,7 +8,7 @@ import {
   resetLoginRateLimit,
 } from '@/lib/security/rateLimiter';
 import { verifyPassword } from '@/lib/security/password';
-import { createSessionToken } from '@/lib/security/token';
+import { createSessionToken, isSecureCookie } from '@/lib/security/token';
 import configManager from '@/lib/config';
 import db from '@/lib/db';
 import { users } from '@/lib/db/schema';
@@ -150,7 +150,7 @@ export const POST = async (req: NextRequest) => {
     // Set secure HTTP-only cookie
     response.cookies.set('vane_session', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isSecureCookie(req),
       sameSite: 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60, // 7 days

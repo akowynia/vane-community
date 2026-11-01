@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import { text, integer, sqliteTable } from 'drizzle-orm/sqlite-core';
 import { Block } from '../types';
 import { SearchSources } from '../agents/search/types';
+import { CronWebhookConfig } from '../cron/types';
 
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
@@ -91,6 +92,9 @@ export const waypointCrons = sqliteTable('waypoint_crons', {
   lastError: text('last_error'),
   lastChatId: text('last_chat_id'),
   userId: text('user_id'),
+  webhooks: text('webhooks', { mode: 'json' })
+    .$type<CronWebhookConfig[]>()
+    .default(sql`'[]'`),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
 });
@@ -155,6 +159,28 @@ export const modelStats = sqliteTable('model_stats', {
   errorMessage: text('errorMessage'),
   createdAt: text('createdAt').notNull(),
 });
+
+export const mcpLogs = sqliteTable('mcp_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  direction: text('direction').notNull(), // 'inbound' | 'outbound'
+  serverName: text('server_name').notNull(),
+  method: text('method').notNull(),
+  toolName: text('tool_name'),
+  callerUser: text('caller_user'),
+  apiKeyId: text('api_key_id'),
+  apiKeyName: text('api_key_name'),
+  clientIp: text('client_ip'),
+  userAgent: text('user_agent'),
+  inputPayload: text('input_payload', { mode: 'json' }).$type<any>(),
+  outputSummary: text('output_summary'),
+  status: text('status').notNull().default('success'), // 'success' | 'error'
+  errorMessage: text('error_message'),
+  durationMs: integer('duration_ms').notNull().default(0),
+  createdAt: text('created_at').notNull(),
+});
+
+export type MCPLogRecord = typeof mcpLogs.$inferSelect;
+export type NewMCPLogRecord = typeof mcpLogs.$inferInsert;
 
 export const scratchpadTemplates = sqliteTable('scratchpad_templates', {
   id: text('id').primaryKey(),

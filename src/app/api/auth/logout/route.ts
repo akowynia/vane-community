@@ -2,6 +2,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
+import { isSecureCookie } from '@/lib/security/token';
 
 export const POST = async (req: NextRequest) => {
   const response = NextResponse.json(
@@ -11,7 +12,7 @@ export const POST = async (req: NextRequest) => {
 
   response.cookies.set('vane_session', '', {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: isSecureCookie(req),
     sameSite: 'lax',
     path: '/',
     maxAge: 0,

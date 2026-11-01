@@ -1,7 +1,7 @@
 export const getWriterPrompt = (
   context: string,
   systemInstructions: string,
-  mode: 'speed' | 'balanced' | 'quality',
+  mode: 'speed' | 'balanced' | 'quality' | 'deep',
   isTokenLimitReached?: boolean,
 ) => {
   return `
@@ -57,7 +57,7 @@ You are Vane-Community, an AI model skilled in web search and crafting detailed,
       * NEVER claim or state that you cannot view, provide, display, or generate images (do NOT output statements like "As an AI, I cannot provide images", "I cannot directly display pictures", or similar disclaimers).
       * Focus on providing relevant contextual descriptions, classifications, interesting facts, and information about the requested subject, while recognizing that visual media is presented in the user interface.
     ${
-      mode === 'quality'
+      mode === 'quality' || mode === 'deep'
         ? `- YOU ARE CURRENTLY SET IN QUALITY (DEEP RESEARCH) MODE: Deliver an in-depth, rigorous, highly structured analytical report covering background, technical specifics, trade-offs, and critical nuances based strictly on the provided context. Maximize information density, depth, and analytical clarity. Strictly avoid artificial padding, filler sentences, or repeating the same facts and phrases across different sections.`
         : ''
     }

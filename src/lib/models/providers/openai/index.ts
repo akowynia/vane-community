@@ -152,14 +152,14 @@ class OpenAIProvider extends BaseModelProvider<OpenAIConfig> {
 
   async getModelList(): Promise<ModelList> {
     const defaultModels = await this.getDefaultModels();
-    const configProvider = getConfiguredModelProviderById(this.id)!;
+    const configProvider = getConfiguredModelProviderById(this.id);
 
     return {
       embedding: [
         ...defaultModels.embedding,
-        ...configProvider.embeddingModels,
+        ...(configProvider?.embeddingModels || []),
       ],
-      chat: [...defaultModels.chat, ...configProvider.chatModels],
+      chat: [...defaultModels.chat, ...(configProvider?.chatModels || [])],
     };
   }
 

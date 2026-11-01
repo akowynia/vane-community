@@ -38,18 +38,29 @@ const providerConfigFields: UIConfigField[] = [
 ];
 
 class OllamaProvider extends BaseModelProvider<OllamaConfig> {
+  private static cachedModels: {
+    [url: string]: { timestamp: number; models: ModelList };
+  } = {};
+
   constructor(id: string, name: string, config: OllamaConfig) {
     super(id, name, config);
   }
 
   async getDefaultModels(): Promise<ModelList> {
+    const cacheKey = this.config.baseURL;
+    const cached = OllamaProvider.cachedModels[cacheKey];
+    const now = Date.now();
+    if (cached && now - cached.timestamp < 15000) {
+      return cached.models;
+    }
+
     try {
       const res = await fetch(`${this.config.baseURL}/api/tags`, {
         method: 'GET',
         headers: {
           'Content-type': 'application/json',
         },
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(30000),
       });
 
       if (!res.ok) {
@@ -76,11 +87,22 @@ class OllamaProvider extends BaseModelProvider<OllamaConfig> {
         };
       });
 
-      return {
+      const result: ModelList = {
         embedding: models,
         chat: models,
       };
+
+      OllamaProvider.cachedModels[cacheKey] = {
+        timestamp: now,
+        models: result,
+      };
+
+      return result;
     } catch (err: any) {
+      if (cached) {
+        return cached.models;
+      }
+
       if (
         err instanceof TypeError ||
         err.name === 'TimeoutError' ||
@@ -99,28 +121,36 @@ class OllamaProvider extends BaseModelProvider<OllamaConfig> {
   }
 
   async getModelList(): Promise<ModelList> {
-    const defaultModels = await this.getDefaultModels();
-    const configProvider = getConfiguredModelProviderById(this.id)!;
+    let defaultModels: ModelList = { chat: [], embedding: [] };
+    try {
+      defaultModels = await this.getDefaultModels();
+    } catch (err) {
+      // If fetching default tags fails, return empty defaults with any user-configured models
+    }
+
+    const configProvider = getConfiguredModelProviderById(this.id);
 
     return {
       embedding: [
         ...defaultModels.embedding,
-        ...configProvider.embeddingModels,
+        ...(configProvider?.embeddingModels || []),
       ],
-      chat: [...defaultModels.chat, ...configProvider.chatModels],
+      chat: [
+        ...defaultModels.chat,
+        ...(configProvider?.chatModels || []),
+      ],
     };
   }
 
   async loadChatModel(key: string): Promise<BaseLLM<any>> {
-    const modelList = await this.getModelList();
+    try {
+      const modelList = await this.getModelList();
+      const exists = modelList.chat.find((m) => m.key === key);
 
-    const exists = modelList.chat.find((m) => m.key === key);
-
-    if (!exists) {
-      throw new Error(
-        'Error Loading Ollama Chat Model. Invalid Model Selected',
-      );
-    }
+      if (!exists && modelList.chat.length > 0 && !modelList.chat.some((m) => m.key === 'error')) {
+        console.warn(`Model "${key}" not in Ollama tags list, but attempting to load.`);
+      }
+    } catch {}
 
     return new OllamaLLM({
       baseURL: this.config.baseURL,
@@ -129,14 +159,14 @@ class OllamaProvider extends BaseModelProvider<OllamaConfig> {
   }
 
   async loadEmbeddingModel(key: string): Promise<BaseEmbedding<any>> {
-    const modelList = await this.getModelList();
-    const exists = modelList.embedding.find((m) => m.key === key);
+    try {
+      const modelList = await this.getModelList();
+      const exists = modelList.embedding.find((m) => m.key === key);
 
-    if (!exists) {
-      throw new Error(
-        'Error Loading Ollama Embedding Model. Invalid Model Selected.',
-      );
-    }
+      if (!exists && modelList.embedding.length > 0 && !modelList.embedding.some((m) => m.key === 'error')) {
+        console.warn(`Embedding model "${key}" not in Ollama tags list, but attempting to load.`);
+      }
+    } catch {}
 
     return new OllamaEmbedding({
       model: key,

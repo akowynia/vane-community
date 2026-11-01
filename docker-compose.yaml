@@ -6,10 +6,26 @@ services:
     ports:
       - '3000:3000'
     env_file:
-      - .env
+      - path: .env
+        required: false
     volumes:
       - data:/home/vane-community/data
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     restart: unless-stopped
+
+  # Optional local Crawl4AI scraper service (activate with: docker compose --profile crawl4ai up -d)
+  crawl4ai:
+    image: unclecode/crawl4ai:basic
+    container_name: vane-crawl4ai
+    ports:
+      - '11235:11235'
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
+    restart: unless-stopped
+    profiles:
+      - scrapers
+      - crawl4ai
 
 volumes:
   data:

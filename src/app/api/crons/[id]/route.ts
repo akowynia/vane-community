@@ -15,7 +15,7 @@ const updateCronSchema = z.object({
   schedule: z.string().min(1, 'Schedule is required'),
   prompt: z.string().min(1, 'Prompt content is required'),
   sources: z.array(z.string()).optional().default(['web']),
-  optimizationMode: z.enum(['speed', 'balanced', 'quality']).optional().default('balanced'),
+  optimizationMode: z.enum(['speed', 'balanced', 'quality', 'deep']).optional().default('balanced'),
   chatModelProvider: z.string().min(1, 'Chat model provider is required'),
   chatModelKey: z.string().min(1, 'Chat model key is required'),
   embeddingModelProvider: z.string().optional().nullable(),
@@ -23,6 +23,7 @@ const updateCronSchema = z.object({
   systemInstructions: z.string().optional().nullable(),
   timezone: z.string().optional(),
   enabled: z.boolean().optional(),
+  webhooks: z.array(z.any()).optional(),
 });
 
 export const GET = async (
@@ -79,11 +80,21 @@ export const GET = async (
       }
     }
 
+    let parsedWebhooks = (cron as any).webhooks;
+    if (typeof parsedWebhooks === 'string') {
+      try {
+        parsedWebhooks = JSON.parse(parsedWebhooks);
+      } catch {
+        parsedWebhooks = [];
+      }
+    }
+
     return Response.json(
       {
         cron: {
           ...cron,
           sources: Array.isArray(parsedSources) ? parsedSources : [],
+          webhooks: Array.isArray(parsedWebhooks) ? parsedWebhooks : [],
           waypointName: waypoint?.name || 'Unknown space',
           waypointIcon: waypoint?.icon || 'Waypoints',
           waypointIsPublic: isPublic,
@@ -197,6 +208,7 @@ export const PUT = async (
         systemInstructions: data.systemInstructions?.trim() || null,
         timezone: targetTimezone,
         enabled: data.enabled !== undefined ? Boolean(data.enabled) : cron.enabled,
+        webhooks: data.webhooks !== undefined ? data.webhooks : cron.webhooks,
         nextRunAt: nextRun ? nextRun.toISOString() : null,
         updatedAt: now.toISOString(),
       })
@@ -206,10 +218,20 @@ export const PUT = async (
       where: eq(waypointCrons.id, id),
     });
 
+    let updatedWebhooks = (updated as any)?.webhooks;
+    if (typeof updatedWebhooks === 'string') {
+      try {
+        updatedWebhooks = JSON.parse(updatedWebhooks);
+      } catch {
+        updatedWebhooks = [];
+      }
+    }
+
     return Response.json(
       {
         cron: {
           ...updated,
+          webhooks: Array.isArray(updatedWebhooks) ? updatedWebhooks : [],
           waypointName: waypoint?.name || 'Unknown space',
           waypointIcon: waypoint?.icon || 'Waypoints',
           waypointIsPublic: isPublic,

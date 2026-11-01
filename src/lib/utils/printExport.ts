@@ -30,6 +30,8 @@ export interface PrintDocumentTurn {
   };
 }
 
+export type PdfExportStyle = 'vane' | 'minimal' | 'corporate' | 'academic';
+
 export interface PrintDocumentConfig {
   title: string;
   locale?: string;
@@ -48,6 +50,8 @@ export interface PrintDocumentConfig {
     tokens?: string;
     vaneAnswer?: string;
   };
+  pdfStyle?: PdfExportStyle;
+  pdfShowBranding?: boolean;
 }
 
 export interface SingleNotePrintConfig {
@@ -59,6 +63,8 @@ export interface SingleNotePrintConfig {
   sourcesHeading?: string;
   untitledText?: string;
   metaSubtitle?: string;
+  pdfStyle?: PdfExportStyle;
+  pdfShowBranding?: boolean;
 }
 
 const escapeHtml = (text: string): string => {
@@ -602,9 +608,164 @@ export const convertMarkdownToPrintHtml = async (
 };
 
 /**
- * Global CSS styles specifically optimized for crisp, high-contrast printing and PDF export
+ * Generates global CSS styles optimized for printing and PDF export,
+ * dynamically styled based on the selected PDF visual variant.
  */
-export const PRINT_STYLESHEET = `
+export const getPrintStylesheet = (style: PdfExportStyle = 'vane'): string => {
+  const isMinimal = style === 'minimal';
+  const isCorporate = style === 'corporate';
+  const isAcademic = style === 'academic';
+
+  // Base font family
+  const fontFamily = isAcademic
+    ? '"Georgia", "Times New Roman", "Cambria", Times, serif'
+    : isCorporate
+      ? '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif'
+      : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+
+  // Background and borders
+  const bodyBg = isAcademic
+    ? '#fcfbfa'
+    : isCorporate
+      ? '#f1f5f9'
+      : isMinimal
+        ? '#ffffff'
+        : '#faf8f5';
+
+  const containerBorder = isAcademic
+    ? '1px solid #d6d3d1'
+    : isCorporate
+      ? '1px solid #cbd5e1'
+      : isMinimal
+        ? '1px solid #e2e8f0'
+        : '1px solid #ede5dc';
+
+  const headerBorder = isAcademic
+    ? '3px double #1c1917'
+    : isCorporate
+      ? '3px solid #1e3a8a'
+      : isMinimal
+        ? '1.5px solid #cbd5e1'
+        : '2px solid #b8864d';
+
+  const brandSubColor = isAcademic
+    ? '#78716c'
+    : isCorporate
+      ? '#1e3a8a'
+      : isMinimal
+        ? '#64748b'
+        : '#b8864d';
+
+  // User query bubble
+  const userBg = isAcademic
+    ? '#fafaf9'
+    : isCorporate
+      ? '#f0f7ff'
+      : isMinimal
+        ? '#f8fafc'
+        : '#fbf8f4';
+
+  const userBorder = isAcademic
+    ? '1px solid #e7e5e4'
+    : isCorporate
+      ? '1px solid #dbeafe'
+      : isMinimal
+        ? '1px solid #e2e8f0'
+        : '1px solid #ede3d7';
+
+  const userBorderLeft = isAcademic
+    ? '3px solid #1c1917'
+    : isCorporate
+      ? '4px solid #1e3a8a'
+      : isMinimal
+        ? '3px solid #64748b'
+        : '4px solid #b8864d';
+
+  const userHeaderColor = isAcademic
+    ? '#44403c'
+    : isCorporate
+      ? '#1e3a8a'
+      : isMinimal
+        ? '#475569'
+        : '#8c5b28';
+
+  // Assistant & badge
+  const assistantHeaderBorder = isAcademic
+    ? '1px solid #d6d3d1'
+    : isCorporate
+      ? '1.5px solid #dbeafe'
+      : isMinimal
+        ? '1px solid #e2e8f0'
+        : '1px solid #f2ece4';
+
+  const assistantBadgeBg = isAcademic
+    ? '#f5f5f4'
+    : isCorporate
+      ? '#dbeafe'
+      : isMinimal
+        ? '#f1f5f9'
+        : '#f5ede4';
+
+  const assistantBadgeColor = isAcademic
+    ? '#292524'
+    : isCorporate
+      ? '#1e3a8a'
+      : isMinimal
+        ? '#334155'
+        : '#9c6d3a';
+
+  // Accents & citations
+  const linkColor = isAcademic
+    ? '#1c1917'
+    : isCorporate
+      ? '#1d4ed8'
+      : isMinimal
+        ? '#2563eb'
+        : '#b8864d';
+
+  const citationColor = isAcademic
+    ? '#1c1917'
+    : isCorporate
+      ? '#1d4ed8'
+      : isMinimal
+        ? '#2563eb'
+        : '#b8864d';
+
+  const citationBg = isAcademic
+    ? '#f5f5f4'
+    : isCorporate
+      ? '#eff6ff'
+      : isMinimal
+        ? '#f8fafc'
+        : '#fdfaf6';
+
+  const citationBorder = isAcademic
+    ? '#d6d3d1'
+    : isCorporate
+      ? '#bfdbfe'
+      : isMinimal
+        ? '#cbd5e1'
+        : '#eedecf';
+
+  const sourcesBorderTop = isAcademic
+    ? '2px solid #1c1917'
+    : isCorporate
+      ? '2.5px solid #1e3a8a'
+      : isMinimal
+        ? '1.5px solid #cbd5e1'
+        : '2px solid #b8864d';
+
+  const footerBorderTop = isAcademic
+    ? '1px solid #d6d3d1'
+    : isCorporate
+      ? '1.5px solid #cbd5e1'
+      : isMinimal
+        ? '1px solid #e2e8f0'
+        : '1px solid #f0e6dc';
+
+  const lineHeight = isAcademic ? '1.7' : '1.6';
+
+  return `
   @page {
     size: A4 portrait;
     margin: 14mm 16mm;
@@ -663,10 +824,10 @@ export const PRINT_STYLESHEET = `
   }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    line-height: 1.6;
+    font-family: ${fontFamily};
+    line-height: ${lineHeight};
     color: #1c1917;
-    background: #faf8f5;
+    background: ${bodyBg};
     margin: 0;
     padding: clamp(16px, 3vw, 36px);
     display: flex;
@@ -678,10 +839,10 @@ export const PRINT_STYLESHEET = `
     width: 100%;
     max-width: 840px;
     background: #ffffff;
-    border: 1px solid #ede5dc;
-    border-radius: 12px;
+    border: ${containerBorder};
+    border-radius: ${isAcademic ? '4px' : '12px'};
     padding: clamp(20px, 4vw, 36px);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    box-shadow: ${isCorporate ? '0 4px 24px rgba(30, 58, 138, 0.06)' : isMinimal ? '0 1px 4px rgba(0,0,0,0.04)' : '0 4px 20px rgba(0, 0, 0, 0.04)'};
   }
 
   /* Brand Header */
@@ -689,7 +850,7 @@ export const PRINT_STYLESHEET = `
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 2px solid #b8864d;
+    border-bottom: ${headerBorder};
     padding-bottom: 14px;
     margin-bottom: 24px;
     gap: 16px;
@@ -708,7 +869,7 @@ export const PRINT_STYLESHEET = `
   }
 
   .brand-name {
-    font-size: 18px;
+    font-size: ${isAcademic ? '19px' : '18px'};
     font-weight: 700;
     letter-spacing: -0.02em;
     color: #1c1917;
@@ -720,7 +881,7 @@ export const PRINT_STYLESHEET = `
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: #b8864d;
+    color: ${brandSubColor};
   }
 
   .doc-meta {
@@ -743,6 +904,7 @@ export const PRINT_STYLESHEET = `
     line-height: 1.3;
     margin: 0 0 8px 0;
     word-break: break-word;
+    ${isAcademic ? 'font-family: "Georgia", serif;' : ''}
   }
 
   .doc-badge {
@@ -751,9 +913,9 @@ export const PRINT_STYLESHEET = `
     gap: 6px;
     padding: 3px 10px;
     border-radius: 9999px;
-    background: #fdfaf6;
-    border: 1px solid #e8ded3;
-    color: #8c5b28;
+    background: ${citationBg};
+    border: 1px solid ${citationBorder};
+    color: ${linkColor};
     font-size: 11px;
     font-weight: 600;
   }
@@ -765,10 +927,10 @@ export const PRINT_STYLESHEET = `
 
   /* User Message Box */
   .user-message {
-    background: #fbf8f4;
-    border: 1px solid #ede3d7;
-    border-left: 4px solid #b8864d;
-    border-radius: 8px;
+    background: ${userBg};
+    border: ${userBorder};
+    border-left: ${userBorderLeft};
+    border-radius: ${isAcademic ? '4px' : '8px'};
     padding: 12px 16px;
     margin-bottom: 18px;
   }
@@ -782,11 +944,12 @@ export const PRINT_STYLESHEET = `
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #8c5b28;
+    color: ${userHeaderColor};
+    ${isAcademic ? 'font-family: -apple-system, sans-serif; font-size: 10px;' : ''}
   }
 
   .user-message-content {
-    font-size: 14.5px;
+    font-size: 14px;
     font-weight: 500;
     color: #292524;
     line-height: 1.5;
@@ -804,7 +967,7 @@ export const PRINT_STYLESHEET = `
     align-items: center;
     margin-bottom: 12px;
     padding-bottom: 6px;
-    border-bottom: 1px solid #f2ece4;
+    border-bottom: ${assistantHeaderBorder};
   }
 
   .assistant-sender {
@@ -818,19 +981,20 @@ export const PRINT_STYLESHEET = `
 
   .assistant-badge {
     font-size: 9.5px;
-    background: #f5ede4;
-    color: #9c6d3a;
+    background: ${assistantBadgeBg};
+    color: ${assistantBadgeColor};
     padding: 1px 7px;
     border-radius: 4px;
     font-weight: 600;
     text-transform: uppercase;
+    ${isAcademic ? 'font-family: -apple-system, sans-serif; border: 1px solid #d6d3d1;' : ''}
   }
 
   /* Typography */
   .content {
     font-size: 13.5px;
     color: #1f1a16;
-    line-height: 1.65;
+    line-height: ${lineHeight};
     word-break: break-word;
   }
 
@@ -838,9 +1002,9 @@ export const PRINT_STYLESHEET = `
     margin: 0 0 12px 0;
   }
 
-  h1 { font-size: 18px; font-weight: 700; color: #111827; margin: 22px 0 10px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; }
-  h2 { font-size: 15.5px; font-weight: 700; color: #1f2937; margin: 18px 0 8px 0; border-bottom: 1px solid #f3f4f6; padding-bottom: 3px; }
-  h3 { font-size: 14px; font-weight: 600; color: #374151; margin: 15px 0 6px 0; }
+  h1 { font-size: 18px; font-weight: 700; color: #111827; margin: 22px 0 10px 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; ${isAcademic ? 'font-family: "Georgia", serif;' : ''} }
+  h2 { font-size: 15.5px; font-weight: 700; color: #1f2937; margin: 18px 0 8px 0; border-bottom: 1px solid #f3f4f6; padding-bottom: 3px; ${isAcademic ? 'font-family: "Georgia", serif;' : ''} }
+  h3 { font-size: 14px; font-weight: 600; color: #374151; margin: 15px 0 6px 0; ${isAcademic ? 'font-family: "Georgia", serif;' : ''} }
   h4 { font-size: 13px; font-weight: 600; color: #4b5563; margin: 13px 0 5px 0; }
   h5, h6 { font-size: 12px; font-weight: 600; color: #6b7280; margin: 11px 0 4px 0; }
 
@@ -868,8 +1032,8 @@ export const PRINT_STYLESHEET = `
   blockquote {
     margin: 12px 0;
     padding: 8px 14px;
-    border-left: 3px solid #d4a373;
-    background: #fdfaf7;
+    border-left: ${isCorporate ? '3px solid #2563eb' : isMinimal ? '3px solid #94a3b8' : isAcademic ? '2px solid #1c1917' : '3px solid #d4a373'};
+    background: ${isCorporate ? '#f0f7ff' : isMinimal ? '#f8fafc' : isAcademic ? '#fafaf9' : '#fdfaf7'};
     color: #57534e;
     font-style: italic;
     border-radius: 0 6px 6px 0;
@@ -878,15 +1042,15 @@ export const PRINT_STYLESHEET = `
   .inline-code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 12px;
-    background: #f5ede4;
-    color: #8c5b28;
+    background: ${isCorporate ? '#eff6ff' : isMinimal ? '#f1f5f9' : isAcademic ? '#f5f5f4' : '#f5ede4'};
+    color: ${isCorporate ? '#1e3a8a' : isMinimal ? '#0f172a' : isAcademic ? '#1c1917' : '#8c5b28'};
     padding: 2px 5px;
     border-radius: 4px;
   }
 
   /* Links & Citations */
   a.doc-link {
-    color: #b8864d;
+    color: ${linkColor};
     text-decoration: underline;
   }
 
@@ -894,15 +1058,16 @@ export const PRINT_STYLESHEET = `
     display: inline-block;
     font-size: 9px;
     font-weight: 600;
-    color: #b8864d;
-    background: #fdfaf6;
-    border: 1px solid #eedecf;
+    color: ${citationColor};
+    background: ${citationBg};
+    border: 1px solid ${citationBorder};
     border-radius: 4px;
     padding: 0 4px;
     margin: 0 1.5px;
     vertical-align: super;
     line-height: 1.1;
     text-decoration: none;
+    ${isAcademic ? 'font-family: -apple-system, sans-serif;' : ''}
   }
 
   /* Callout Alert Blocks */
@@ -973,20 +1138,20 @@ export const PRINT_STYLESHEET = `
   }
 
   table.doc-table th, table.doc-table td {
-    border: 1px solid #e2d9cf;
+    border: 1px solid ${isCorporate ? '#cbd5e1' : isMinimal ? '#e2e8f0' : isAcademic ? '#d6d3d1' : '#e2d9cf'};
     padding: 8px 10px;
     text-align: left;
     vertical-align: top;
   }
 
   table.doc-table th {
-    background-color: #f7f3ed;
+    background-color: ${isCorporate ? '#f1f5f9' : isMinimal ? '#f1f5f9' : isAcademic ? '#f5f5f4' : '#f7f3ed'};
     color: #1c1917;
     font-weight: 600;
   }
 
   table.doc-table tbody tr:nth-child(even) {
-    background-color: #faf7f3;
+    background-color: ${isCorporate ? '#f8fafc' : isMinimal ? '#f8fafc' : isAcademic ? '#fafaf9' : '#faf7f3'};
   }
 
   /* Code Blocks */
@@ -1025,7 +1190,7 @@ export const PRINT_STYLESHEET = `
   .mermaid-diagram-box {
     margin: 16px 0;
     background: #ffffff;
-    border: 1px solid #ede5dc;
+    border: 1px solid ${isCorporate ? '#cbd5e1' : isMinimal ? '#e2e8f0' : isAcademic ? '#d6d3d1' : '#ede5dc'};
     border-radius: 8px;
     overflow: hidden;
     padding: 12px;
@@ -1037,7 +1202,7 @@ export const PRINT_STYLESHEET = `
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #8c5b28;
+    color: ${userHeaderColor};
     margin-bottom: 8px;
     text-align: left;
   }
@@ -1052,7 +1217,7 @@ export const PRINT_STYLESHEET = `
   .document-sources {
     margin-top: 28px;
     padding-top: 18px;
-    border-top: 2px solid #b8864d;
+    border-top: ${sourcesBorderTop};
   }
 
   .sources-heading {
@@ -1062,6 +1227,7 @@ export const PRINT_STYLESHEET = `
     margin: 0 0 12px 0;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    ${isAcademic ? 'font-family: "Georgia", serif;' : ''}
   }
 
   .sources-grid {
@@ -1072,9 +1238,9 @@ export const PRINT_STYLESHEET = `
 
   .source-card {
     padding: 8px 12px;
-    border: 1px solid #e8dfd5;
+    border: 1px solid ${isCorporate ? '#dbeafe' : isMinimal ? '#e2e8f0' : isAcademic ? '#d6d3d1' : '#e8dfd5'};
     border-radius: 6px;
-    background: #fdfbf8;
+    background: ${isCorporate ? '#f8fafc' : isMinimal ? '#f8fafc' : isAcademic ? '#fafaf9' : '#fdfbf8'};
     font-size: 11px;
   }
 
@@ -1086,13 +1252,13 @@ export const PRINT_STYLESHEET = `
   }
 
   .source-num {
-    color: #b8864d;
+    color: ${linkColor};
     font-weight: 700;
     font-size: 11.5px;
   }
 
   .source-main-link {
-    color: #8c5b28;
+    color: ${linkColor};
     font-weight: 600;
     text-decoration: underline;
   }
@@ -1112,7 +1278,7 @@ export const PRINT_STYLESHEET = `
 
   .source-domain-chip {
     color: #78716c;
-    background: #f5ece1;
+    background: ${isCorporate ? '#eff6ff' : isMinimal ? '#f1f5f9' : isAcademic ? '#f5f5f4' : '#f5ece1'};
     padding: 1px 6px;
     border-radius: 3px;
     font-weight: 500;
@@ -1137,7 +1303,7 @@ export const PRINT_STYLESHEET = `
     gap: 6px;
     margin-top: 14px;
     padding-top: 8px;
-    border-top: 1px dashed #e8dfd5;
+    border-top: 1px dashed ${isCorporate ? '#cbd5e1' : isMinimal ? '#e2e8f0' : isAcademic ? '#d6d3d1' : '#e8dfd5'};
     font-size: 10px;
     color: #78716c;
     font-family: ui-monospace, monospace;
@@ -1147,38 +1313,42 @@ export const PRINT_STYLESHEET = `
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    background: #fcf9f5;
-    border: 1px solid #e8ded3;
+    background: ${isCorporate ? '#f0f7ff' : isMinimal ? '#f8fafc' : isAcademic ? '#fafaf9' : '#fcf9f5'};
+    border: 1px solid ${isCorporate ? '#bfdbfe' : isMinimal ? '#e2e8f0' : isAcademic ? '#d6d3d1' : '#e8ded3'};
     padding: 2px 6px;
     border-radius: 4px;
   }
 
   .telemetry-tag.model {
-    color: #8c5b28;
+    color: ${userHeaderColor};
     font-weight: 600;
   }
 
   .doc-divider {
     border: 0;
     height: 1px;
-    background-color: #ede5dc;
+    background-color: ${isCorporate ? '#cbd5e1' : isMinimal ? '#e2e8f0' : isAcademic ? '#d6d3d1' : '#ede5dc'};
     margin: 20px 0;
   }
 
   /* Document Footer */
   .doc-footer {
-    border-top: 1px solid #f0e6dc;
+    border-top: ${footerBorderTop};
     margin-top: 32px;
     padding-top: 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 10.5px;
-    color: #a8a29e;
+    color: ${isMinimal ? '#64748b' : '#a8a29e'};
     flex-wrap: wrap;
     gap: 8px;
+    ${isAcademic ? 'font-family: "Georgia", serif; font-style: italic;' : ''}
   }
 `;
+};
+
+export const PRINT_STYLESHEET = getPrintStylesheet('vane');
 
 /**
  * Builds a complete standalone HTML document for printing a multi-turn chat export
@@ -1186,8 +1356,44 @@ export const PRINT_STYLESHEET = `
 export const buildChatPrintDocumentHtml = async (
   config: PrintDocumentConfig,
 ): Promise<string> => {
-  const { title, locale = 'en', subtitle, turns, labels = {} } = config;
+  const {
+    title,
+    locale = 'en',
+    subtitle,
+    turns,
+    labels = {},
+    pdfStyle,
+    pdfShowBranding,
+  } = config;
   const dateStr = new Date().toLocaleString(locale || undefined);
+
+  let activeStyle: PdfExportStyle = pdfStyle || 'vane';
+  let activeShowBranding: boolean =
+    pdfShowBranding !== undefined ? pdfShowBranding : true;
+
+  if (typeof window !== 'undefined') {
+    if (!pdfStyle) {
+      try {
+        const storedStyle = localStorage.getItem('pdfExportStyle');
+        if (
+          storedStyle &&
+          ['vane', 'minimal', 'corporate', 'academic'].includes(storedStyle)
+        ) {
+          activeStyle = storedStyle as PdfExportStyle;
+        }
+      } catch {}
+    }
+    if (pdfShowBranding === undefined) {
+      try {
+        const storedBranding = localStorage.getItem('pdfShowBranding');
+        if (storedBranding !== null) {
+          activeShowBranding = storedBranding === 'true';
+        } else if (activeStyle === 'minimal') {
+          activeShowBranding = false;
+        }
+      } catch {}
+    }
+  }
 
   let turnsHtml = '';
   for (let idx = 0; idx < turns.length; idx++) {
@@ -1203,6 +1409,39 @@ export const buildChatPrintDocumentHtml = async (
       },
     );
 
+    let assistantSenderHtml = '';
+    if (activeStyle === 'vane') {
+      assistantSenderHtml = `
+        <div class="assistant-sender">
+          ${activeShowBranding ? VANE_LOGO_SVG : ''}
+          <span>${escapeHtml(activeShowBranding ? labels.vaneAnswer || 'Vane Assistant' : labels.assistant || 'AI Assistant')}</span>
+          <span class="assistant-badge">AI</span>
+        </div>
+      `;
+    } else if (activeStyle === 'corporate') {
+      assistantSenderHtml = `
+        <div class="assistant-sender">
+          ${activeShowBranding ? VANE_LOGO_SVG : ''}
+          <span>${escapeHtml(activeShowBranding ? 'Vane Intelligence' : labels.assistant || 'Executive Analysis')}</span>
+          <span class="assistant-badge">REPORT</span>
+        </div>
+      `;
+    } else if (activeStyle === 'academic') {
+      assistantSenderHtml = `
+        <div class="assistant-sender">
+          <span>${escapeHtml(labels.assistant || 'Analysis & Findings')}</span>
+          <span class="assistant-badge">SYNTHESIS</span>
+        </div>
+      `;
+    } else {
+      assistantSenderHtml = `
+        <div class="assistant-sender">
+          <span>${escapeHtml(labels.assistant || 'Assistant')}</span>
+          <span class="assistant-badge">AI</span>
+        </div>
+      `;
+    }
+
     turnsHtml += `
       <div class="turn-block">
         <!-- User Query -->
@@ -1217,11 +1456,7 @@ export const buildChatPrintDocumentHtml = async (
         <!-- Assistant Response -->
         <div class="assistant-message">
           <div class="assistant-header">
-            <div class="assistant-sender">
-              ${VANE_LOGO_SVG}
-              <span>${escapeHtml(labels.vaneAnswer || 'Vane Assistant')}</span>
-              <span class="assistant-badge">AI</span>
-            </div>
+            ${assistantSenderHtml}
             <span style="font-size: 11px; color: #78716c;">${escapeHtml(turn.assistantDate || turn.userDate || dateStr)}</span>
           </div>
           
@@ -1243,31 +1478,120 @@ export const buildChatPrintDocumentHtml = async (
     `;
   }
 
+  let headerHtml = '';
+  if (activeStyle === 'vane') {
+    if (activeShowBranding) {
+      headerHtml = `
+        <div class="brand-header">
+          <div class="brand-logo-title">
+            ${VANE_LOGO_SVG}
+            <div class="brand-text">
+              <span class="brand-name">Vane</span>
+              <span class="brand-sub">Community</span>
+            </div>
+          </div>
+          <div class="doc-meta">
+            <div><strong>${escapeHtml(labels.exportReport || 'Report Export')}</strong></div>
+            <div>${escapeHtml(dateStr)}</div>
+          </div>
+        </div>
+      `;
+    } else {
+      headerHtml = `
+        <div class="brand-header">
+          <div class="brand-text">
+            <span class="brand-name">${escapeHtml(labels.exportReport || 'Research Report')}</span>
+          </div>
+          <div class="doc-meta">
+            <div>${escapeHtml(dateStr)}</div>
+          </div>
+        </div>
+      `;
+    }
+  } else if (activeStyle === 'corporate') {
+    headerHtml = `
+      <div class="brand-header">
+        <div class="brand-logo-title">
+          ${activeShowBranding ? VANE_LOGO_SVG : ''}
+          <div class="brand-text">
+            <span class="brand-name">${activeShowBranding ? 'VANE INTELLIGENCE' : 'EXECUTIVE RESEARCH REPORT'}</span>
+            <span class="brand-sub">CONFIDENTIAL BRIEF & SYNTHESIS</span>
+          </div>
+        </div>
+        <div class="doc-meta">
+          <div><strong>${escapeHtml(labels.exportReport || 'Executive Report')}</strong></div>
+          <div>${escapeHtml(dateStr)}</div>
+        </div>
+      </div>
+    `;
+  } else if (activeStyle === 'academic') {
+    headerHtml = `
+      <div class="brand-header" style="justify-content: center; text-align: center;">
+        <div class="brand-text" style="align-items: center; text-align: center;">
+          <span class="brand-name">RESEARCH MONOGRAPH & SYNTHESIS</span>
+          <span class="brand-sub">${activeShowBranding ? 'Vane Research Platform • ' : ''}${escapeHtml(dateStr)}</span>
+        </div>
+      </div>
+    `;
+  } else {
+    headerHtml = `
+      <div class="brand-header">
+        <div class="brand-text">
+          <span class="brand-name">${escapeHtml(labels.exportReport || 'Research Report')}</span>
+        </div>
+        <div class="doc-meta">
+          <div>${escapeHtml(dateStr)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  let footerHtml = '';
+  if (activeShowBranding && activeStyle === 'vane') {
+    footerHtml = `
+      <div class="doc-footer">
+        <span>${escapeHtml(labels.generatedBy || 'Generated by Vane Community')}</span>
+        <span>${escapeHtml(dateStr)}</span>
+      </div>
+    `;
+  } else if (activeShowBranding && activeStyle === 'corporate') {
+    footerHtml = `
+      <div class="doc-footer">
+        <span>Generated with Vane Intelligence • Executive Briefing</span>
+        <span>${escapeHtml(dateStr)}</span>
+      </div>
+    `;
+  } else if (activeShowBranding && activeStyle === 'academic') {
+    footerHtml = `
+      <div class="doc-footer">
+        <span>Prepared with Vane Research Platform</span>
+        <span>${escapeHtml(dateStr)}</span>
+      </div>
+    `;
+  } else {
+    footerHtml = `
+      <div class="doc-footer">
+        <span>${escapeHtml(labels.exportReport || 'Research Document & Report')}</span>
+        <span>${escapeHtml(dateStr)}</span>
+      </div>
+    `;
+  }
+
+  const stylesheet = getPrintStylesheet(activeStyle);
+
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(locale)}">
 <head>
   <meta charset="utf-8">
   <title>${escapeHtml(title || 'Vane Chat Export')}</title>
   <style>
-    ${PRINT_STYLESHEET}
+    ${stylesheet}
   </style>
 </head>
 <body>
   <div class="doc-container">
     <!-- Brand Header -->
-    <div class="brand-header">
-      <div class="brand-logo-title">
-        ${VANE_LOGO_SVG}
-        <div class="brand-text">
-          <span class="brand-name">Vane</span>
-          <span class="brand-sub">Community</span>
-        </div>
-      </div>
-      <div class="doc-meta">
-        <div><strong>${escapeHtml(labels.exportReport || 'Report Export')}</strong></div>
-        <div>${escapeHtml(dateStr)}</div>
-      </div>
-    </div>
+    ${headerHtml}
 
     <!-- Title Section -->
     <div class="doc-title-section">
@@ -1282,10 +1606,7 @@ export const buildChatPrintDocumentHtml = async (
     </div>
 
     <!-- Document Footer -->
-    <div class="doc-footer">
-      <span>${escapeHtml(labels.generatedBy || 'Generated by Vane Community')}</span>
-      <span>${escapeHtml(dateStr)}</span>
-    </div>
+    ${footerHtml}
   </div>
 </body>
 </html>`;
@@ -1305,8 +1626,38 @@ export const buildNotePrintDocumentHtml = async (
     locale = 'en',
     sourcesHeading,
     untitledText = 'Untitled Note',
-    metaSubtitle = 'Vane Scratchpad',
+    metaSubtitle,
+    pdfStyle,
+    pdfShowBranding,
   } = config;
+
+  let activeStyle: PdfExportStyle = pdfStyle || 'vane';
+  let activeShowBranding: boolean =
+    pdfShowBranding !== undefined ? pdfShowBranding : true;
+
+  if (typeof window !== 'undefined') {
+    if (!pdfStyle) {
+      try {
+        const storedStyle = localStorage.getItem('pdfExportStyle');
+        if (
+          storedStyle &&
+          ['vane', 'minimal', 'corporate', 'academic'].includes(storedStyle)
+        ) {
+          activeStyle = storedStyle as PdfExportStyle;
+        }
+      } catch {}
+    }
+    if (pdfShowBranding === undefined) {
+      try {
+        const storedBranding = localStorage.getItem('pdfShowBranding');
+        if (storedBranding !== null) {
+          activeShowBranding = storedBranding === 'true';
+        } else if (activeStyle === 'minimal') {
+          activeShowBranding = false;
+        }
+      } catch {}
+    }
+  }
 
   const docTitle = title || untitledText;
   const dateStr = new Date().toLocaleDateString(locale || 'en-US');
@@ -1317,31 +1668,120 @@ export const buildNotePrintDocumentHtml = async (
     sourcesHeadingText: sourcesHeading,
   });
 
+  let headerHtml = '';
+  if (activeStyle === 'vane') {
+    if (activeShowBranding) {
+      headerHtml = `
+        <div class="brand-header">
+          <div class="brand-logo-title">
+            ${VANE_LOGO_SVG}
+            <div class="brand-text">
+              <span class="brand-name">Vane</span>
+              <span class="brand-sub">Community</span>
+            </div>
+          </div>
+          <div class="doc-meta">
+            <div><strong>${escapeHtml(metaSubtitle || 'Vane Scratchpad')}</strong></div>
+            <div>${escapeHtml(dateStr)}</div>
+          </div>
+        </div>
+      `;
+    } else {
+      headerHtml = `
+        <div class="brand-header">
+          <div class="brand-text">
+            <span class="brand-name">${escapeHtml(metaSubtitle || 'Document & Notes')}</span>
+          </div>
+          <div class="doc-meta">
+            <div>${escapeHtml(dateStr)}</div>
+          </div>
+        </div>
+      `;
+    }
+  } else if (activeStyle === 'corporate') {
+    headerHtml = `
+      <div class="brand-header">
+        <div class="brand-logo-title">
+          ${activeShowBranding ? VANE_LOGO_SVG : ''}
+          <div class="brand-text">
+            <span class="brand-name">${activeShowBranding ? 'VANE INTELLIGENCE' : 'EXECUTIVE BRIEFING'}</span>
+            <span class="brand-sub">${escapeHtml(metaSubtitle || 'MEMORANDUM & NOTES')}</span>
+          </div>
+        </div>
+        <div class="doc-meta">
+          <div><strong>${escapeHtml(docTitle)}</strong></div>
+          <div>${escapeHtml(dateStr)}</div>
+        </div>
+      </div>
+    `;
+  } else if (activeStyle === 'academic') {
+    headerHtml = `
+      <div class="brand-header" style="justify-content: center; text-align: center;">
+        <div class="brand-text" style="align-items: center; text-align: center;">
+          <span class="brand-name">RESEARCH NOTE & WORKING DRAFT</span>
+          <span class="brand-sub">${activeShowBranding ? 'Vane Research Platform • ' : ''}${escapeHtml(dateStr)}</span>
+        </div>
+      </div>
+    `;
+  } else {
+    headerHtml = `
+      <div class="brand-header">
+        <div class="brand-text">
+          <span class="brand-name">${escapeHtml(metaSubtitle || 'Document & Notes')}</span>
+        </div>
+        <div class="doc-meta">
+          <div>${escapeHtml(dateStr)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  let footerHtml = '';
+  if (activeShowBranding && activeStyle === 'vane') {
+    footerHtml = `
+      <div class="doc-footer">
+        <span>Generated by Vane Community</span>
+        <span>${escapeHtml(dateStr)}</span>
+      </div>
+    `;
+  } else if (activeShowBranding && activeStyle === 'corporate') {
+    footerHtml = `
+      <div class="doc-footer">
+        <span>Generated with Vane Intelligence</span>
+        <span>${escapeHtml(dateStr)}</span>
+      </div>
+    `;
+  } else if (activeShowBranding && activeStyle === 'academic') {
+    footerHtml = `
+      <div class="doc-footer">
+        <span>Prepared with Vane Research Platform</span>
+        <span>${escapeHtml(dateStr)}</span>
+      </div>
+    `;
+  } else {
+    footerHtml = `
+      <div class="doc-footer">
+        <span>${escapeHtml(docTitle)}</span>
+        <span>${escapeHtml(dateStr)}</span>
+      </div>
+    `;
+  }
+
+  const stylesheet = getPrintStylesheet(activeStyle);
+
   return `<!DOCTYPE html>
 <html lang="${escapeHtml(locale)}">
 <head>
   <meta charset="utf-8">
   <title>${escapeHtml(docTitle)}</title>
   <style>
-    ${PRINT_STYLESHEET}
+    ${stylesheet}
   </style>
 </head>
 <body>
   <div class="doc-container">
     <!-- Brand Header -->
-    <div class="brand-header">
-      <div class="brand-logo-title">
-        ${VANE_LOGO_SVG}
-        <div class="brand-text">
-          <span class="brand-name">Vane</span>
-          <span class="brand-sub">Community</span>
-        </div>
-      </div>
-      <div class="doc-meta">
-        <div><strong>${escapeHtml(metaSubtitle)}</strong></div>
-        <div>${escapeHtml(dateStr)}</div>
-      </div>
-    </div>
+    ${headerHtml}
 
     <!-- Title Section -->
     <div class="doc-title-section">
@@ -1354,10 +1794,7 @@ export const buildNotePrintDocumentHtml = async (
     </div>
 
     <!-- Document Footer -->
-    <div class="doc-footer">
-      <span>Generated by Vane Community</span>
-      <span>${escapeHtml(dateStr)}</span>
-    </div>
+    ${footerHtml}
   </div>
 </body>
 </html>`;

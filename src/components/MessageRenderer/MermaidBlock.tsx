@@ -3,6 +3,7 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { Check, Copy, AlertCircle, RefreshCw } from 'lucide-react';
+import { isThemeDark } from '@/lib/theme';
 
 interface MermaidBlockProps {
   chart: string;
@@ -48,7 +49,7 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
 
         mermaid.initialize({
           startOnLoad: false,
-          theme: resolvedTheme === 'dark' ? 'dark' : 'default',
+          theme: isThemeDark(resolvedTheme) ? 'dark' : 'default',
           securityLevel: 'loose',
           fontFamily: 'inherit',
           suppressErrorRendering: true,

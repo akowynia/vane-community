@@ -19,6 +19,10 @@ import {
   buildChatPrintDocumentHtml,
   executeIframePrint,
 } from '@/lib/utils/printExport';
+import {
+  getPdfExportStyle,
+  getPdfShowBranding,
+} from '@/lib/config/clientRegistry';
 
 const downloadFile = (filename: string, content: string, type: string) => {
   const blob = new Blob([content], { type });
@@ -318,6 +322,8 @@ const exportAsPDF = async (
     title: title || tr.defaultTitle,
     locale,
     turns,
+    pdfStyle: getPdfExportStyle(),
+    pdfShowBranding: getPdfShowBranding(),
     labels: {
       exportReport: tr.exportReport,
       user: tr.user,

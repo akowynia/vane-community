@@ -65,7 +65,8 @@ function getRuntimeConfig(): {
   trustedProxies: string[];
 } {
   try {
-    const configPath = path.join(process.env.DATA_DIR || process.cwd(), '/data/config.json');
+    const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+    const configPath = path.join(path.resolve(dataDir), 'config.json');
     if (fs.existsSync(configPath)) {
       const content = fs.readFileSync(configPath, 'utf-8');
       const parsed = JSON.parse(content);
