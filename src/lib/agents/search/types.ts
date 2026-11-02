@@ -11,7 +11,7 @@ export type SearchAgentConfig = {
   fileIds: string[];
   llm: BaseLLM<any>;
   embedding: BaseEmbedding<any>;
-  mode: 'speed' | 'balanced' | 'quality' | 'deep';
+  mode: 'speed' | 'balanced' | 'quality' | 'deep' | 'presentation';
   systemInstructions: string;
   providerId?: string;
   modelKey?: string;

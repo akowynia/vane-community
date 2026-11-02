@@ -49,6 +49,7 @@ const ALLOWED_CONFIG_KEYS = new Set([
   'globalLimits.maxTokensPerRequest',
   'globalLimits.qualityModeMaxTokens',
   'beta.enablePresentations',
+  'beta.enablePresentonBeta',
   'beta.presentations',
   'auth.adminPassword',
   'mcpServers',
@@ -149,7 +150,8 @@ class ConfigManager {
       searxngURL: '',
     },
     beta: {
-      enablePresentations: false,
+      enablePresentations: true,
+      enablePresentonBeta: true,
     },
   };
   uiConfigSections: UIConfigSections = {
@@ -340,7 +342,17 @@ class ConfigManager {
         required: false,
         description:
           'Enable experimental AI Presentation Generator with Deep Research in Scratchpad.',
-        default: false,
+        default: true,
+        scope: 'client',
+      },
+      {
+        name: 'Presenton Presentations (MCP)',
+        key: 'enablePresentonBeta',
+        type: 'switch',
+        required: false,
+        description:
+          'Generate editable PowerPoint (.pptx) and PDF decks via Presenton MCP using deep web research.',
+        default: true,
         scope: 'client',
       },
     ],
@@ -623,7 +635,12 @@ class ConfigManager {
     if (!config.beta) {
       config.beta = {
         enablePresentations: false,
+        enablePresentonBeta: false,
       };
+    } else {
+      if (config.beta.enablePresentonBeta === undefined) {
+        config.beta.enablePresentonBeta = false;
+      }
     }
     return config;
   }
@@ -850,6 +867,7 @@ class ConfigManager {
       key === 'preferences.showWeatherWidget' ||
       key === 'preferences.showNewsWidget' ||
       key === 'beta.enablePresentations' ||
+      key === 'beta.enablePresentonBeta' ||
       key === 'beta.presentations'
     ) {
       if (typeof val !== 'boolean') {

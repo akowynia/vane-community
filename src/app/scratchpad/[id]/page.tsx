@@ -35,6 +35,7 @@ import ScratchpadTemplateDialog from '@/components/Scratchpad/ScratchpadTemplate
 import ScratchpadExportDialog from '@/components/Scratchpad/ScratchpadExportDialog';
 import LoginDialog from '@/components/Auth/LoginDialog';
 import { applyPatch } from 'rfc6902';
+import { useBatchSearch } from '@/lib/batch-search/context';
 
 const ScratchpadWorkspacePage = () => {
   const params = useParams();
@@ -42,11 +43,12 @@ const ScratchpadWorkspacePage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useTranslation();
+  const batchSearch = useBatchSearch();
 
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [sketchType, setSketchType] = useState<'note' | 'presentation'>('note');
+  const [sketchType, setSketchType] = useState<'note' | 'presentation' | 'batch'>('note');
   const [metadata, setMetadata] = useState<any>({});
   const [sources, setSources] = useState<any[]>([]);
   const [messages, setMessages] = useState<ScratchpadChatMessage[]>([]);
@@ -603,6 +605,11 @@ const ScratchpadWorkspacePage = () => {
                 <PresentationIcon className="w-3 h-3" />
                 <span>{t('presentation.badgePresentation') || 'PRESENTATION'}</span>
               </span>
+            ) : sketchType === 'batch' || metadata?.isBatchExport ? (
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 font-bold shrink-0 flex items-center space-x-1 uppercase tracking-wider">
+                <Layers className="w-3 h-3" />
+                <span>{t('scratchpad.badgeBatch') || 'BATCH RESEARCH'}</span>
+              </span>
             ) : waypointInfo ? (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#b8864d]/15 text-[#b8864d] font-medium shrink-0 flex items-center space-x-1">
                 <WaypointsIcon className="w-3 h-3" />
@@ -614,6 +621,28 @@ const ScratchpadWorkspacePage = () => {
 
         {/* Action Buttons */}
         <div className="flex items-center space-x-1.5">
+          {/* Load into Batch Studio Button */}
+          {(sketchType === 'batch' || metadata?.isBatchExport) && (
+            <button
+              type="button"
+              onClick={() => {
+                batchSearch.loadSavedBatchSession({
+                  title,
+                  content,
+                  metadata,
+                  sources,
+                });
+              }}
+              title={t('library.loadIntoStudio') || 'Załaduj do studia i regeneruj'}
+              className="p-2 rounded-xl text-xs font-semibold border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 transition flex items-center space-x-1.5 cursor-pointer shadow-sm"
+            >
+              <RotateCcw className="w-4 h-4 text-cyan-400" />
+              <span className="hidden md:inline">
+                {t('library.loadIntoStudio') || 'Studio & Regeneracja'}
+              </span>
+            </button>
+          )}
+
           {/* TOC Toggle */}
           <button
             type="button"

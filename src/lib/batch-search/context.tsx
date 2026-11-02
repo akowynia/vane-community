@@ -89,6 +89,7 @@ interface BatchSearchContextType {
     modelKey: string,
   ) => void;
   handleDeleteItem: (index: number) => void;
+  handleDeleteSelected: () => void;
   handleAddNewItem: () => void;
   handleApplySourcesToAll: (sourcesToApply: string[]) => void;
   handleApplyOptimizationToAll: (mode: 'speed' | 'balanced' | 'quality') => void;
@@ -101,6 +102,15 @@ interface BatchSearchContextType {
   selectedCount: number;
   progressPercent: number;
   compiledMarkdown: string;
+
+  // Persistence & Export actions
+  saveToScratchpad: (customTitle?: string) => Promise<{ id: string } | null>;
+  isSavingToScratchpad: boolean;
+  exportAsMarkdown: () => void;
+  exportAsCsv: () => void;
+  exportAsTxt: () => void;
+  copyToClipboard: () => void;
+  loadSavedBatchSession: (savedNote: any) => Promise<boolean>;
 }
 
 const BatchSearchContext = createContext<BatchSearchContextType | undefined>(
@@ -392,6 +402,20 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
     setItems((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
+  const handleDeleteSelected = useCallback(() => {
+    setItems((prev) => {
+      const remaining = prev.filter((item) => !item.selected);
+      const removedCount = prev.length - remaining.length;
+      if (removedCount > 0) {
+        toast.info(
+          t('batchSearch.deletedSelected', { count: removedCount }) ||
+            `Deleted ${removedCount} selected queries.`,
+        );
+      }
+      return remaining;
+    });
+  }, [t]);
+
   const handleAddNewItem = useCallback(() => {
     setItems((prev) => {
       const nextNum = String(prev.length + 1);
@@ -471,6 +495,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
     setItems([]);
     setRawCsvText('');
     localStorage.removeItem(STORAGE_KEY);
+    setActiveTab('upload');
     toast.info(t('batchSearch.clearAll') || 'Cleared batch search.');
   }, [t]);
 
@@ -706,6 +731,299 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
       ? items[currentRunningIndex].query
       : null;
 
+  // Scratchpad saving state & handlers
+  const [isSavingToScratchpad, setIsSavingToScratchpad] = useState(false);
+
+  const saveToScratchpad = useCallback(
+    async (customTitle?: string): Promise<{ id: string } | null> => {
+      if (completedCount === 0 && items.length === 0) {
+        toast.error(t('batchSearch.noResultsYet') || 'No results to save.');
+        return null;
+      }
+
+      setIsSavingToScratchpad(true);
+      try {
+        const aggregatedSources: any[] = [];
+        const seenUrls = new Set<string>();
+
+        items.forEach((item, itemIdx) => {
+          const itemSources = Array.isArray(item.sourcesList) ? item.sourcesList : [];
+          itemSources.forEach((src: any) => {
+            const url = src?.metadata?.url || src?.url || '';
+            const title = src?.metadata?.title || src?.title || `Query ${item.number}`;
+            const dedupKey = url
+              ? url.toLowerCase().trim()
+              : `${title.toLowerCase().trim()}-${itemIdx}`;
+            if (!seenUrls.has(dedupKey)) {
+              seenUrls.add(dedupKey);
+              aggregatedSources.push({
+                pageContent:
+                  src?.pageContent ||
+                  src?.snippet ||
+                  src?.metadata?.snippet ||
+                  src?.content ||
+                  '',
+                metadata: {
+                  title,
+                  url,
+                  queryNumber: item.number,
+                  queryText: item.query,
+                  ...(src?.metadata || {}),
+                },
+              });
+            }
+          });
+        });
+
+        const firstCompleted = items.find((i) => i.status === 'completed') || items[0];
+        const defaultTitle = firstCompleted?.query
+          ? `Batch Research: ${firstCompleted.query}${items.length > 1 ? ` (+${items.length - 1})` : ''}`
+          : `Batch Research (${items.length} items)`;
+
+        const titleToSave = (customTitle && customTitle.trim()) || defaultTitle;
+
+        const res = await fetch('/api/scratchpad', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: titleToSave,
+            content: compiledMarkdown,
+            type: 'batch',
+            sources: aggregatedSources,
+            metadata: {
+              isBatchExport: true,
+              batchCount: items.length,
+              completedCount,
+              sourcesCount: aggregatedSources.length,
+              generatedAt: new Date().toISOString(),
+              items: items.map((it) => ({
+                id: it.id,
+                number: it.number,
+                query: it.query,
+                status: it.status,
+                response: it.response,
+                sources: it.sources,
+                optimizationMode: it.optimizationMode,
+                modelKey: it.modelKey,
+                providerId: it.providerId,
+                sourcesList: it.sourcesList,
+              })),
+            },
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          toast.success(
+            t('batchSearch.savedToScratchpadSuccess') || 'Saved note to Scratchpad!',
+          );
+          return data?.scratchpad || { id: data?.id };
+        } else {
+          const data = await res.json().catch(() => ({}));
+          toast.error(data.message || 'Failed to save note to Scratchpad.');
+          return null;
+        }
+      } catch (err: any) {
+        toast.error(err?.message || 'Error saving to Scratchpad.');
+        return null;
+      } finally {
+        setIsSavingToScratchpad(false);
+      }
+    },
+    [items, completedCount, compiledMarkdown, t],
+  );
+
+  const exportAsMarkdown = useCallback(() => {
+    if (!compiledMarkdown) {
+      toast.error(t('batchSearch.noResultsYet') || 'No results to export.');
+      return;
+    }
+    const blob = new Blob([compiledMarkdown], {
+      type: 'text/markdown;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `batch-research-${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [compiledMarkdown, t]);
+
+  const exportAsTxt = useCallback(() => {
+    if (!compiledMarkdown) {
+      toast.error(t('batchSearch.noResultsYet') || 'No results to export.');
+      return;
+    }
+    const blob = new Blob([compiledMarkdown], {
+      type: 'text/plain;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `batch-research-${new Date().toISOString().slice(0, 10)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [compiledMarkdown, t]);
+
+  const exportAsCsv = useCallback(() => {
+    const csvContent = exportToCsv(items);
+    const blob = new Blob([csvContent], {
+      type: 'text/csv;charset=utf-8;',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `batch-research-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [items]);
+
+  const copyToClipboard = useCallback(() => {
+    if (!compiledMarkdown) {
+      toast.error(t('batchSearch.noResultsYet') || 'No results to copy.');
+      return;
+    }
+    navigator.clipboard.writeText(compiledMarkdown);
+    toast.success(t('common.copied') || 'Copied to clipboard!');
+  }, [compiledMarkdown, t]);
+
+  const loadSavedBatchSession = useCallback(
+    async (savedNote: any): Promise<boolean> => {
+      let fullNote = savedNote;
+
+      // If content is missing or metadata items are absent, fetch full note if ID exists
+      const meta =
+        typeof fullNote.metadata === 'string'
+          ? (() => {
+              try {
+                return JSON.parse(fullNote.metadata || '{}');
+              } catch {
+                return {};
+              }
+            })()
+          : fullNote.metadata || {};
+
+      const hasMetaItems = Array.isArray(meta.items) && meta.items.length > 0;
+      const hasContent =
+        typeof fullNote.content === 'string' && fullNote.content.trim().length > 0;
+
+      if (!hasMetaItems && !hasContent && fullNote.id) {
+        try {
+          const res = await fetch(`/api/scratchpad/${fullNote.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data?.scratchpad) {
+              fullNote = data.scratchpad;
+            }
+          }
+        } catch (fetchErr) {
+          console.error('Failed to fetch full scratchpad details:', fetchErr);
+        }
+      }
+
+      let noteItems: BatchQueryItem[] = [];
+      try {
+        const fullMeta =
+          typeof fullNote.metadata === 'string'
+            ? JSON.parse(fullNote.metadata || '{}')
+            : fullNote.metadata || {};
+        if (Array.isArray(fullMeta.items) && fullMeta.items.length > 0) {
+          noteItems = fullMeta.items;
+        }
+      } catch {}
+
+      // Fallback: parse sections from markdown content if raw items not present
+      if (noteItems.length === 0 && fullNote.content) {
+        const contentStr = fullNote.content as string;
+        // Split by top-level item headers like '# Title [1]' or '# [1] Title' or '# 1. Title'
+        const sectionRegex = /(?:^|\n)(?:---\s*\n+)?(?=#\s+(?:\[\d+\]|.*?\[\d+\]|\d+\.))/;
+        const rawSections = contentStr
+          .split(sectionRegex)
+          .map((s) => s.trim())
+          .filter(Boolean);
+
+        noteItems = [];
+        let autoIdx = 1;
+
+        for (let i = 0; i < rawSections.length; i++) {
+          const sec = rawSections[i];
+          const headerMatch = sec.match(/^#\s+([^\n]+)(?:\n+([\s\S]*))?$/);
+          if (!headerMatch) continue;
+
+          const rawHeader = headerMatch[1].trim();
+          let rawBody = (headerMatch[2] || '').trim();
+
+          let itemNumber = String(autoIdx++);
+          let query = rawHeader;
+
+          const bracketStartMatch = rawHeader.match(/^\[(\d+)\]\s+(.*)$/);
+          const bracketEndMatch = rawHeader.match(/^(.*?)\s+\[(\d+)\]$/);
+          const dotMatch = rawHeader.match(/^(\d+)\.\s+(.*)$/);
+
+          if (bracketStartMatch) {
+            itemNumber = bracketStartMatch[1];
+            query = bracketStartMatch[2];
+          } else if (bracketEndMatch) {
+            query = bracketEndMatch[1];
+            itemNumber = bracketEndMatch[2];
+          } else if (dotMatch) {
+            itemNumber = dotMatch[1];
+            query = dotMatch[2];
+          }
+
+          // Strip references section if present, and parse sourcesList
+          const referencesMatch = rawBody.match(
+            /\n\n### References & Sources:\n([\s\S]*)$/i,
+          );
+          const sourcesList: Array<{ title: string; url: string }> = [];
+
+          if (referencesMatch) {
+            const refsText = referencesMatch[1];
+            rawBody = rawBody.substring(0, referencesMatch.index).trim();
+            const linkRegex = /-\s+\[(.*?)\]\((.*?)\)/g;
+            let linkMatch;
+            while ((linkMatch = linkRegex.exec(refsText)) !== null) {
+              sourcesList.push({
+                title: linkMatch[1],
+                url: linkMatch[2],
+              });
+            }
+          }
+
+          noteItems.push({
+            id: `loaded-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 6)}`,
+            number: itemNumber,
+            query: query.trim(),
+            status: 'completed' as const,
+            response: rawBody,
+            sources: ['web'],
+            sourcesList: sourcesList.length > 0 ? sourcesList : undefined,
+            optimizationMode: 'balanced' as const,
+            selected: true,
+          });
+        }
+      }
+
+      if (noteItems.length > 0) {
+        setItems(noteItems);
+        setActiveTab('results');
+        openModal();
+        toast.success(
+          t('library.loadedIntoStudio') ||
+            'Załadowano badanie wsadowe do Studia!',
+        );
+        return true;
+      } else {
+        toast.error(
+          t('batchSearch.noResultsYet') ||
+            'Nie znaleziono pytań w wybranym dokumencie.',
+        );
+        return false;
+      }
+    },
+    [openModal, t],
+  );
+
   return (
     <BatchSearchContext.Provider
       value={{
@@ -751,6 +1069,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
         handleUpdateItemOptimization,
         handleUpdateItemModel,
         handleDeleteItem,
+        handleDeleteSelected,
         handleAddNewItem,
         handleApplySourcesToAll,
         handleApplyOptimizationToAll,
@@ -761,6 +1080,13 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
         selectedCount,
         progressPercent,
         compiledMarkdown,
+        saveToScratchpad,
+        isSavingToScratchpad,
+        exportAsMarkdown,
+        exportAsCsv,
+        exportAsTxt,
+        copyToClipboard,
+        loadSavedBatchSession,
       }}
     >
       {children}

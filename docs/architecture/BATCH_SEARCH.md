@@ -20,9 +20,14 @@ The **Batch Search** module introduces an asynchronous, high-throughput research
      - **Optimization Mode**: Choice between Speed (fast synthesis), Balanced, and Quality (thorough analysis).
      - **Model Assignment**: Override specific LLM providers and models per query item.
      - **Query Item Editing**: Rename, edit, renumber, add, or remove items dynamically.
-   - **Bulk Actions & Mass Model Assignment**:
+   - **Bulk Actions, Selection & Deletion**:
      - Global **Model for All** selector: One-click assignment of any configured provider/model across all imported queries without having to adjust rows manually.
      - Batch apply sources (Web, Academic, Discussions) or optimization modes (Speed, Quality) to all queries simultaneously.
+     - Interactive table header checkbox to toggle selection of all queries at once with indeterminate tri-state support.
+     - Selective deletion action ("Delete Selected") to remove checked queries in one click.
+     - Studio-wide Reset & Clear ("Clear Studio") available from the workspace header, queue ribbon, and review screens with confirmation prompt.
+   - **Robust Section Parsing & Integrity**:
+     - Structural regex header parsing that identifies query boundaries by `# Title [No.]` and `# [No.] Title` headers, preventing internal markdown horizontal rules (`---`) from breaking note bodies into fragmented queries.
 
 3. **Sequential Pipeline & Background Resilience**:
    - Executes queries sequentially one after another, keeping real-time progress indicators.
@@ -105,15 +110,28 @@ flowchart TD
 3. **Dedicated Batch Search Tab in Library**:
    - The Library features a dedicated "Batch Search" tab alongside All Chats and Schedules.
    - Displays real-time active session banner with progress indicators, status, and quick link to return to the active studio session.
+   - **One-Click Save to Scratchpad**: Banner includes a direct action button to immediately commit completed batch research into Scratchpad notes, automatically refreshing the saved research grid below.
+   - **Preview & Regenerate Button**: Direct action to open the Batch Studio modal directly on Tab 3 (Notes & Review), allowing inspection of all generated notes and re-running any specific query.
+   - **Inline Expandable Questions Accordion**: Banner includes an expandable preview listing all batch questions and responses directly on the Library page, featuring per-question "Regenerate" actions and live synthesis indicators without leaving the view.
+   - **Quick Export Menu**: Direct dropdown access to download compiled research as Markdown (`.md`), CSV (`.csv`), or Plain Text (`.txt`) directly from the session card without entering the studio.
+   - **Session Reset / Clear**: Allows clearing finished sessions with confirmation.
+   - **Reload into Studio from Saved Notes**: Every saved batch research card in the library includes an action to restore query items into the Batch Studio for review and single-query regeneration.
    - Lists all saved Batch Research documents from Scratchpad with direct navigation, question counts, and discovered sources count.
    - Quick action to launch new batch research workflows.
 
-4. **Scratchpad Batch Category**:
+4. **Scratchpad Batch Category & Studio Restoration**:
    - Scratchpad workspace contains dedicated category tabs (`All`, `Notes`, `Batch Research`, `Presentations`).
    - Batch notes are highlighted with specialized cyan badges, query counts, and filtered views.
+   - Workspace header includes a "Studio & Regenerate" action to restore saved questions and notes back into the Batch Search pipeline.
 
 5. **Floating Quick-Access Bar**:
    - Persists unobtrusively at the bottom corner for immediate preview, continuation, and stopping from anywhere in the app.
+   - **Inline Save**: Provides an instant Save button when queries are completed or finished, allowing users to save research to Scratchpad with one tap.
+
+6. **Studio Queue and Review Save Integration**:
+   - Tab 2 (Queue & Run) prominently features "Save to Scratchpad" as the primary action when all queries complete, preventing accidental query re-runs.
+   - Tab 3 (Notes & Review) includes an instant "Save to Scratchpad" action in the header alongside final export.
+   - **Non-Destructive In-Place Regeneration**: Regenerating a single query in Tab 3 keeps the card visible with an active pulsing synthesizer indicator, immediately rendering the updated output once complete.
 
 6. **Global Event System**:
    - Dispatches and listens to standard window events for seamless modal invocation from any view.

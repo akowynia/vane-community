@@ -11,6 +11,7 @@ import { TextBlock, MetricsBlock } from '@/lib/types';
 import { getTokenCount } from '@/lib/utils/splitText';
 import { recordLlmMetric } from '@/lib/stats/tracker';
 import deepResearchEngine from '@/lib/agents/deep-research';
+import presentonEngine from '@/lib/agents/presenton';
 
 class SearchAgent {
   async searchAsync(session: SessionManager, input: SearchAgentInput) {
@@ -83,6 +84,60 @@ class SearchAgent {
             id: crypto.randomUUID(),
             type: 'source',
             data: deepRes.sources.map((s) => ({
+              content: s.title,
+              metadata: {
+                title: s.title,
+                url: s.url,
+                publishedDate: s.publishedDate,
+              },
+            })),
+          });
+        }
+
+        await db
+          .update(messages)
+          .set({
+            status: 'completed',
+            responseBlocks: session.getAllBlocks(),
+          })
+          .where(
+            and(
+              eq(messages.chatId, input.chatId),
+              eq(messages.messageId, input.messageId),
+            ),
+          )
+          .execute();
+
+        return;
+      }
+
+      if (input.config.mode === 'presentation') {
+        const presRes = await presentonEngine.runPresentationPipeline(
+          input.followUp,
+          input.config.llm,
+          session,
+          {
+            systemInstructions: input.config.systemInstructions,
+            signal: input.signal,
+          },
+        );
+
+        session.emit('data', {
+          type: 'researchComplete',
+        });
+
+        const block: TextBlock = {
+          id: crypto.randomUUID(),
+          type: 'text',
+          data: presRes.content,
+        };
+        session.emitBlock(block);
+
+        if (presRes.sources && presRes.sources.length > 0) {
+          session.emitBlock({
+            id: crypto.randomUUID(),
+            type: 'source',
+            data: presRes.sources.map((s) => ({
               content: s.title,
               metadata: {
                 title: s.title,

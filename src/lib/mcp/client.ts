@@ -24,9 +24,15 @@ interface StdioSession {
   isInitialized?: boolean;
 }
 
+interface SSESession {
+  targetUrl: string;
+  sessionId?: string;
+}
+
 class MCPClientManager {
   private static instance: MCPClientManager;
   private stdioSessions: Map<string, StdioSession> = new Map();
+  private sseSessions: Map<string, SSESession> = new Map();
 
   private constructor() {}
 
@@ -237,9 +243,137 @@ class MCPClientManager {
   }
 
   /**
-   * Send a JSON-RPC request over SSE / HTTP
+   * Parse either direct JSON response or Streamable HTTP / Server-Sent Events (SSE) data stream
    */
-  private async sendSSERequest(
+  private parseSSEOrJson(rawText: string): any {
+    const trimmed = rawText.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      return JSON.parse(trimmed);
+    }
+    const lines = trimmed.split('\n');
+    const dataLines: string[] = [];
+    for (const line of lines) {
+      if (line.startsWith('data:')) {
+        dataLines.push(line.replace(/^data:\s*/, ''));
+      }
+    }
+    if (dataLines.length > 0) {
+      const combined = dataLines.join('\n');
+      return JSON.parse(combined);
+    }
+    throw new Error(`Unable to parse MCP response payload: ${trimmed.substring(0, 120)}`);
+  }
+
+  /**
+   * Build candidate endpoint URLs for remote SSE servers, handling Docker container networking
+   */
+  private getSSECandidateUrls(server: MCPServerConfig): string[] {
+    if (!server.url) return [];
+    const urls: string[] = [];
+
+    const existing = this.sseSessions.get(server.id);
+    if (existing?.targetUrl) {
+      urls.push(existing.targetUrl);
+    }
+
+    urls.push(server.url);
+
+    if (server.url.includes('localhost:11235') || server.url.includes('127.0.0.1:11235')) {
+      urls.push(
+        server.url.replace(/localhost:11235|127\.0\.0\.1:11235/, 'crawl4ai:11235'),
+        server.url.replace(/localhost:11235|127\.0\.0\.1:11235/, 'host.docker.internal:11235'),
+      );
+    }
+
+    if (
+      server.url.includes(':5000') ||
+      server.url.includes(':5001') ||
+      server.url.toLowerCase().includes('presenton')
+    ) {
+      urls.push(
+        'http://presenton/mcp',
+        'http://presenton:80/mcp',
+        server.url.replace(/localhost:(5000|5001)|127\.0\.0\.1:(5000|5001)/, 'presenton'),
+        server.url.replace(/localhost:(5000|5001)|127\.0\.0\.1:(5000|5001)/, 'host.docker.internal:5001'),
+        'http://localhost:5001/mcp',
+      );
+    }
+
+    return Array.from(new Set(urls));
+  }
+
+  /**
+   * Ensure Streamable HTTP / FastMCP SSE server has initialized session ID
+   */
+  private async ensureSSEInitialized(
+    server: MCPServerConfig,
+    timeoutMs: number = 10000,
+  ): Promise<SSESession> {
+    const existing = this.sseSessions.get(server.id);
+    if (existing) return existing;
+
+    const candidateUrls = this.getSSECandidateUrls(server);
+    let lastError: any;
+
+    for (const targetUrl of candidateUrls) {
+      const ssrfCheck = await validateUrlForSSRF(targetUrl, { allowLocal: true });
+      if (!ssrfCheck.valid) continue;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const res = await fetch(targetUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream',
+            ...server.env,
+          },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'initialize',
+            params: {
+              protocolVersion: '2024-11-05',
+              capabilities: {},
+              clientInfo: { name: 'vane-community', version: '1.0.1' },
+            },
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: Failed to initialize MCP SSE session`);
+        }
+
+        const rawText = await res.text();
+        const data = this.parseSSEOrJson(rawText);
+        if (data.error) {
+          throw new Error(data.error.message || 'MCP Initialization error');
+        }
+
+        const sessionId = res.headers.get('mcp-session-id') || undefined;
+        const session: SSESession = { targetUrl, sessionId };
+        this.sseSessions.set(server.id, session);
+        return session;
+      } catch (err: any) {
+        clearTimeout(timeout);
+        lastError = err;
+      }
+    }
+
+    const fallbackSession: SSESession = { targetUrl: candidateUrls[0] || server.url! };
+    this.sseSessions.set(server.id, fallbackSession);
+    return fallbackSession;
+  }
+
+  /**
+   * Execute single SSE/HTTP JSON-RPC request attempt
+   */
+  private async executeSSERequest(
     server: MCPServerConfig,
     method: string,
     params: any = {},
@@ -249,18 +383,15 @@ class MCPClientManager {
       throw new Error(`Endpoint URL missing for SSE server ${server.name}`);
     }
 
-    // Build list of candidate URLs (e.g. Docker container hostnames if localhost is specified)
-    const urlsToTry = [server.url];
-    if (server.url.includes('localhost:11235') || server.url.includes('127.0.0.1:11235')) {
-      urlsToTry.push(
-        server.url.replace(/localhost:11235|127\.0\.0\.1:11235/, 'crawl4ai:11235'),
-        server.url.replace(/localhost:11235|127\.0\.0\.1:11235/, 'host.docker.internal:11235'),
-      );
+    if (method !== 'initialize') {
+      await this.ensureSSEInitialized(server, timeoutMs).catch(() => {});
     }
 
+    const session = this.sseSessions.get(server.id);
+    const candidateUrls = this.getSSECandidateUrls(server);
     let lastError: any;
 
-    for (const targetUrl of urlsToTry) {
+    for (const targetUrl of candidateUrls) {
       const ssrfCheck = await validateUrlForSSRF(targetUrl, { allowLocal: true });
       if (!ssrfCheck.valid) continue;
 
@@ -269,8 +400,13 @@ class MCPClientManager {
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
         ...server.env,
       };
+
+      if (session?.sessionId) {
+        headers['mcp-session-id'] = session.sessionId;
+      }
 
       try {
         const res = await fetch(targetUrl, {
@@ -287,11 +423,22 @@ class MCPClientManager {
 
         clearTimeout(timeout);
 
+        if (res.status === 400 && session?.sessionId) {
+          this.sseSessions.delete(server.id);
+        }
+
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: Failed to communicate with MCP server`);
         }
 
-        const data = await res.json();
+        const rawText = await res.text();
+        const data = this.parseSSEOrJson(rawText);
+
+        const newSessionId = res.headers.get('mcp-session-id');
+        if (newSessionId) {
+          this.sseSessions.set(server.id, { targetUrl, sessionId: newSessionId });
+        }
+
         if (data.error) {
           throw new Error(data.error.message || 'MCP Error');
         }
@@ -304,6 +451,30 @@ class MCPClientManager {
     }
 
     throw lastError || new Error(`Failed to communicate with ${server.name} on ${server.url}`);
+  }
+
+  /**
+   * Send a JSON-RPC request over SSE / HTTP with automatic session reconnection
+   */
+  private async sendSSERequest(
+    server: MCPServerConfig,
+    method: string,
+    params: any = {},
+    timeoutMs: number = 10000,
+  ): Promise<any> {
+    try {
+      return await this.executeSSERequest(server, method, params, timeoutMs);
+    } catch (err: any) {
+      if (
+        err?.message?.includes('Missing session ID') ||
+        err?.message?.includes('session') ||
+        err?.message?.includes('HTTP 400')
+      ) {
+        this.sseSessions.delete(server.id);
+        return await this.executeSSERequest(server, method, params, timeoutMs);
+      }
+      throw err;
+    }
   }
 
   /**

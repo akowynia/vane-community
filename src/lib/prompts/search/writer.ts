@@ -1,7 +1,7 @@
 export const getWriterPrompt = (
   context: string,
   systemInstructions: string,
-  mode: 'speed' | 'balanced' | 'quality' | 'deep',
+  mode: 'speed' | 'balanced' | 'quality' | 'deep' | 'presentation',
   isTokenLimitReached?: boolean,
 ) => {
   return `

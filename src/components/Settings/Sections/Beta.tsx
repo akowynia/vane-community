@@ -26,7 +26,17 @@ const Beta = ({
             required: false,
             description:
               'Enable experimental AI Presentation Generator with Deep Research in Scratchpad.',
-            default: false,
+            default: true,
+            scope: 'client',
+          },
+          {
+            name: 'Presenton Presentations (MCP)',
+            key: 'enablePresentonBeta',
+            type: 'switch',
+            required: false,
+            description:
+              'Generate editable PowerPoint (.pptx) and PDF decks via Presenton MCP using deep web research.',
+            default: true,
             scope: 'client',
           },
         ];

@@ -40,7 +40,7 @@ const MCPSection = () => {
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
 
   // Form state
-  const [selectedPreset, setSelectedPreset] = useState<'custom' | 'firecrawl' | 'crawl4ai_sse' | 'crawl4ai_stdio'>('custom');
+  const [selectedPreset, setSelectedPreset] = useState<'custom' | 'firecrawl' | 'crawl4ai_sse' | 'crawl4ai_stdio' | 'presenton'>('custom');
   const [formName, setFormName] = useState('');
   const [formTransport, setFormTransport] = useState<'stdio' | 'sse'>('stdio');
   const [formCommand, setFormCommand] = useState('');
@@ -140,7 +140,7 @@ const MCPSection = () => {
     );
   };
 
-  const applyPreset = (preset: 'custom' | 'firecrawl' | 'crawl4ai_sse' | 'crawl4ai_stdio') => {
+  const applyPreset = (preset: 'custom' | 'firecrawl' | 'crawl4ai_sse' | 'crawl4ai_stdio' | 'presenton') => {
     setSelectedPreset(preset);
     if (preset === 'firecrawl') {
       setFormName('Firecrawl');
@@ -160,6 +160,12 @@ const MCPSection = () => {
       setFormCommand('python3');
       setFormArgs('-m crawl4ai.mcp');
       setFormUrl('');
+    } else if (preset === 'presenton') {
+      setFormName('Presenton');
+      setFormTransport('sse');
+      setFormCommand('');
+      setFormArgs('');
+      setFormUrl('http://presenton/mcp');
     } else {
       setFormName('');
       setFormTransport('stdio');
@@ -169,7 +175,7 @@ const MCPSection = () => {
     }
   };
 
-  const openPreset = (preset: 'firecrawl' | 'crawl4ai_sse') => {
+  const openPreset = (preset: 'firecrawl' | 'crawl4ai_sse' | 'presenton') => {
     applyPreset(preset);
     setFormApiKey('');
     setFormEnv('');
@@ -363,10 +369,16 @@ const MCPSection = () => {
             </button>
           </div>
 
-          {/* AI Web Scraper Engines (Firecrawl & Crawl4AI) */}
+          {/* MCP Preset Tool Integrations */}
           {(() => {
             const firecrawlConfigured = servers.find((s) => s.name.toLowerCase().includes('firecrawl'));
             const crawl4aiConfigured = servers.find((s) => s.name.toLowerCase().includes('crawl4ai'));
+            const presentonConfigured = servers.find(
+              (s) =>
+                s.name.toLowerCase().includes('presenton') ||
+                (s.url && s.url.includes('5001')) ||
+                (s.url && s.url.includes('presenton')),
+            );
 
             return (
               <div className="space-y-3 pt-1">
@@ -374,16 +386,16 @@ const MCPSection = () => {
                   <div>
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-black dark:text-stone-200 flex items-center gap-2">
                       <Zap size={14} className="text-[#b8864d]" />
-                      <span>{t('mcp.scraperPresetsTitle') || 'AI Web Scraper Engines'}</span>
+                      <span>{t('mcp.scraperPresetsTitle') || 'Tool Presets & Integrations'}</span>
                     </h4>
                     <p className="text-[11px] text-black/50 dark:text-stone-400 mt-0.5">
                       {t('mcp.scraperPresetsDesc') ||
-                        'Enable advanced scraping engines (Firecrawl or Crawl4AI) as MCP tools to automatically parse modern web pages and bypass anti-bot protections.'}
+                        'Enable advanced web scraping and presentation generation tools as MCP connections.'}
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {/* Firecrawl Preset Card */}
                   <div className="rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/30 dark:bg-[#181411] p-4 flex flex-col justify-between gap-3 hover:border-[#b8864d]/40 transition">
                     <div>
@@ -405,7 +417,7 @@ const MCPSection = () => {
                             }`}
                           >
                             {firecrawlConfigured.enabled
-                              ? t('mcp.activeScraper') || 'Active Scraper'
+                              ? t('mcp.activeScraper') || 'Active'
                               : t('common.disabled') || 'Disabled'}
                           </span>
                         ) : (
@@ -469,7 +481,7 @@ const MCPSection = () => {
                             }`}
                           >
                             {crawl4aiConfigured.enabled
-                              ? t('mcp.activeScraper') || 'Active Scraper'
+                              ? t('mcp.activeScraper') || 'Active'
                               : t('common.disabled') || 'Disabled'}
                           </span>
                         ) : (
@@ -503,6 +515,75 @@ const MCPSection = () => {
                         <button
                           type="button"
                           onClick={() => openPreset('crawl4ai_sse')}
+                          className="w-full py-1.5 px-3 rounded-lg text-xs font-medium bg-[#b8864d] hover:bg-[#a6743b] text-white transition shadow-sm inline-flex items-center justify-center gap-1.5"
+                        >
+                          <Plus size={13} />
+                          <span>{t('mcp.quickConnect') || 'Quick Connect'}</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Presenton Preset Card (BETA) */}
+                  <div className="rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/30 dark:bg-[#181411] p-4 flex flex-col justify-between gap-3 hover:border-amber-500/40 transition">
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold text-xs">
+                            📊
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-black dark:text-stone-100">
+                              {t('mcp.presentonPresetTitle') || 'Presenton'}
+                            </span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                              BETA
+                            </span>
+                          </div>
+                        </div>
+                        {presentonConfigured ? (
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                              presentonConfigured.enabled
+                                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-black/5 dark:bg-white/5 text-black/40 dark:text-stone-500'
+                            }`}
+                          >
+                            {presentonConfigured.enabled
+                              ? t('mcp.activeScraper') || 'Active'
+                              : t('common.disabled') || 'Disabled'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 font-mono">
+                            FastMCP / SSE
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-black/60 dark:text-stone-400 mt-2 leading-relaxed">
+                        {t('mcp.presentonPresetDesc') ||
+                          'Autonomous presentation generator. Researches web sources, creates 8-slide decks, and exports editable PowerPoint (.pptx).'}
+                      </p>
+                    </div>
+
+                    <div className="pt-2 border-t border-light-200 dark:border-[#2d251d] flex items-center justify-between gap-2">
+                      {presentonConfigured ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleServer(presentonConfigured)}
+                          className={`w-full py-1.5 px-3 rounded-lg text-xs font-medium transition ${
+                            presentonConfigured.enabled
+                              ? 'border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
+                              : 'border border-black/10 dark:border-white/10 text-black/60 dark:text-stone-400 bg-black/5 dark:bg-white/5 hover:bg-black/10'
+                          }`}
+                        >
+                          {presentonConfigured.enabled
+                            ? t('mcp.clickToDisable') || 'Active (Click to Disable)'
+                            : t('mcp.clickToEnable') || 'Click to Enable'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openPreset('presenton')}
                           className="w-full py-1.5 px-3 rounded-lg text-xs font-medium bg-[#b8864d] hover:bg-[#a6743b] text-white transition shadow-sm inline-flex items-center justify-center gap-1.5"
                         >
                           <Plus size={13} />
@@ -935,7 +1016,7 @@ const MCPSection = () => {
                 <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
                   {t('mcp.selectPreset') || 'Preset / Template'}
                 </label>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   <button
                     type="button"
                     onClick={() => applyPreset('custom')}
@@ -979,6 +1060,17 @@ const MCPSection = () => {
                     }`}
                   >
                     🐍 Crawl4AI (Python)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => applyPreset('presenton')}
+                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
+                      selectedPreset === 'presenton'
+                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                    }`}
+                  >
+                    📊 Presenton (SSE)
                   </button>
                 </div>
               </div>
@@ -1068,6 +1160,19 @@ const MCPSection = () => {
                     onChange={(e) => setFormUrl(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
                   />
+                </div>
+              )}
+
+              {/* Presenton Helper */}
+              {(selectedPreset === 'presenton' || formName.toLowerCase().includes('presenton')) && (
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
+                  <p className="font-semibold mb-1">
+                    {t('mcp.presetPresenton') || 'Presenton Presentation Generator (SSE)'}
+                  </p>
+                  <p className="text-[11px] leading-relaxed">
+                    {t('mcp.presentonTip') ||
+                      'Connects to your local or self-hosted Presenton instance. Run with: docker compose --profile presenton up -d'}
+                  </p>
                 </div>
               )}
 

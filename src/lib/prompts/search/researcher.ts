@@ -319,7 +319,7 @@ const getQualityPrompt = (
 
 export const getResearcherPrompt = (
   actionDesc: string,
-  mode: 'speed' | 'balanced' | 'quality' | 'deep',
+  mode: 'speed' | 'balanced' | 'quality' | 'deep' | 'presentation',
   i: number,
   maxIteration: number,
   fileIds: string[],

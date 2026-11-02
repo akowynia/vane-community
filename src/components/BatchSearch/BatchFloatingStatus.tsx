@@ -11,6 +11,8 @@ import {
   AlertCircle,
   Maximize2,
   X,
+  NotebookPen,
+  Loader2,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -35,6 +37,8 @@ export const BatchFloatingStatus: React.FC = () => {
     pauseBatchSearch,
     resumeBatchSearch,
     stopBatchSearch,
+    saveToScratchpad,
+    isSavingToScratchpad,
   } = useBatchSearch();
 
   // Hide if no items, or if modal is open, or on the dedicated batch search page
@@ -98,6 +102,29 @@ export const BatchFloatingStatus: React.FC = () => {
 
         {/* Action Buttons: Preview / Continue / Abort */}
         <div className="flex items-center space-x-1.5 shrink-0 pl-1 border-l border-light-200 dark:border-[#28211a]">
+          {/* Quick Save to Scratchpad button */}
+          {completedCount > 0 && (
+            <button
+              type="button"
+              disabled={isSavingToScratchpad}
+              onClick={async (e) => {
+                e.stopPropagation();
+                await saveToScratchpad();
+              }}
+              title={t('batchSearch.saveToScratchpad') || 'Zapisz w Szkicowniku'}
+              className="p-1.5 sm:px-2 sm:py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30 transition text-xs flex items-center space-x-1 font-semibold disabled:opacity-50 cursor-pointer"
+            >
+              {isSavingToScratchpad ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <NotebookPen className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden sm:inline text-[11px]">
+                {t('common.save') || 'Zapisz'}
+              </span>
+            </button>
+          )}
+
           {/* Preview / View button */}
           <button
             type="button"

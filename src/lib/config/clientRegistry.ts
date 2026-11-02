@@ -21,7 +21,10 @@ export const getShowNewsWidget = () =>
   getClientConfig('showNewsWidget', 'true') === 'true';
 
 export const getEnablePresentations = () =>
-  getClientConfig('enablePresentations', 'false') === 'true';
+  getClientConfig('enablePresentations', 'true') === 'true';
+
+export const getEnablePresentonBeta = () =>
+  getClientConfig('enablePresentonBeta', 'true') === 'true';
 
 export const getMeasurementUnit = () => {
   const value =

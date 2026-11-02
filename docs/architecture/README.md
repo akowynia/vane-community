@@ -65,5 +65,6 @@ For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation d
 - [Waypoint Cron Webhooks & Proactive Notifications](WAYPOINT_CRON_WEBHOOKS.md)
 - [Model Context Protocol (MCP) Integration](MCP_INTEGRATION.md)
 - [MCP Dedicated Docker Container](MCP_DOCKER_IMAGE.md)
+- [Presenton MCP Integration & Research-to-Presentation](PRESENTON_MCP_RESEARCH_PRESENTATIONS.md)
 - [Multi-Theme Architecture (Modern & Retro Themes)](UI_THEMES.md)
 - [PDF Export Styles & Branding Customization](PDF_EXPORT_CUSTOMIZATION.md)

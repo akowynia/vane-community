@@ -18,6 +18,7 @@ import {
   Copy,
   Download,
   NotebookPen,
+  Loader2,
   ChevronLeft,
   ChevronRight,
   ExternalLink,
@@ -333,6 +334,7 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
     handleUpdateItemOptimization,
     handleUpdateItemModel,
     handleDeleteItem,
+    handleDeleteSelected,
     handleAddNewItem,
     handleApplySourcesToAll,
     handleApplyOptimizationToAll,
@@ -343,6 +345,12 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
     selectedCount,
     progressPercent,
     compiledMarkdown,
+    saveToScratchpad,
+    isSavingToScratchpad,
+    exportAsMarkdown,
+    exportAsCsv,
+    exportAsTxt,
+    copyToClipboard,
   } = useBatchSearch();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -376,7 +384,12 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
   const completedOrHasResponseItems = useMemo(() => {
     return items
       .map((item, idx) => ({ item, idx }))
-      .filter(({ item }) => item.response || item.status === 'completed');
+      .filter(
+        ({ item }) =>
+          item.response ||
+          item.status === 'completed' ||
+          item.status === 'searching',
+      );
   }, [items]);
 
   const paginatedResultsItems = useMemo(() => {
@@ -447,100 +460,27 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
     stopBatchSearch();
   };
 
-  // Export handlers
+  // Export & persistence handlers
   const handleDownloadMarkdown = () => {
-    const blob = new Blob([compiledMarkdown], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `batch_research_notes_${new Date().toISOString().slice(0, 10)}.md`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportAsMarkdown();
   };
 
   const handleDownloadText = () => {
-    const blob = new Blob([compiledMarkdown], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `batch_research_notes_${new Date().toISOString().slice(0, 10)}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportAsTxt();
   };
 
   const handleDownloadCsv = () => {
-    const csvData = exportToCsv(items);
-    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `batch_research_export_${new Date().toISOString().slice(0, 10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportAsCsv();
   };
 
   const handleCopyToClipboard = () => {
-    navigator.clipboard.writeText(compiledMarkdown);
-    toast.success(t('common.copied') || 'Copied to clipboard!');
+    copyToClipboard();
   };
 
   const handleSaveToScratchpad = async () => {
-    try {
-      // Collect and deduplicate all sources from completed items
-      const aggregatedSources: any[] = [];
-      const seenUrls = new Set<string>();
-
-      items.forEach((item, itemIdx) => {
-        const itemSources = Array.isArray(item.sourcesList) ? item.sourcesList : [];
-        itemSources.forEach((src: any) => {
-          const url = src?.metadata?.url || src?.url || '';
-          const title = src?.metadata?.title || src?.title || `Query ${item.number}`;
-          const dedupKey = url ? url.toLowerCase().trim() : `${title.toLowerCase().trim()}-${itemIdx}`;
-          if (!seenUrls.has(dedupKey)) {
-            seenUrls.add(dedupKey);
-            aggregatedSources.push({
-              pageContent: src?.pageContent || src?.snippet || src?.metadata?.snippet || src?.content || '',
-              metadata: {
-                title,
-                url,
-                queryNumber: item.number,
-                queryText: item.query,
-                ...(src?.metadata || {}),
-              },
-            });
-          }
-        });
-      });
-
-      const res = await fetch('/api/scratchpad', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: `Batch Research: ${items[0]?.query || 'Queries'} (${items.length} items)`,
-          content: compiledMarkdown,
-          type: 'batch',
-          sources: aggregatedSources,
-          metadata: {
-            isBatchExport: true,
-            batchCount: items.length,
-            sourcesCount: aggregatedSources.length,
-            generatedAt: new Date().toISOString(),
-          },
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        toast.success(t('batchSearch.savedToScratchpadSuccess') || 'Saved note to Scratchpad!');
-        if (data?.scratchpad?.id) {
-          router.push(`/scratchpad/${data.scratchpad.id}`);
-        }
-      } else {
-        const data = await res.json();
-        toast.error(data.message || 'Failed to save note to Scratchpad.');
-      }
-    } catch (err: any) {
-      toast.error(err?.message || 'Error saving to Scratchpad.');
+    const res = await saveToScratchpad();
+    if (res?.id) {
+      router.push(`/scratchpad/${res.id}`);
     }
   };
 
@@ -634,15 +574,40 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
           </button>
         </div>
 
-        {isModal && onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-stone-400 hover:text-stone-100 p-1.5 rounded-lg hover:bg-light-200 dark:hover:bg-[#241c15] transition"
-          >
-            ✕
-          </button>
-        )}
+        <div className="flex items-center space-x-2">
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (
+                  window.confirm(
+                    t('batchSearch.confirmClearAll') ||
+                      'Czy na pewno chcesz usunąć wszystkie zapytania i zresetować studio?',
+                  )
+                ) {
+                  clearBatch();
+                }
+              }}
+              title={t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition whitespace-nowrap cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">
+                {t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
+              </span>
+            </button>
+          )}
+
+          {isModal && onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-stone-400 hover:text-stone-100 p-1.5 rounded-lg hover:bg-light-200 dark:hover:bg-[#241c15] transition"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Content Area based on Tab */}
@@ -967,17 +932,32 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                 {!isSearching ? (
                   <>
                     {completedCount === totalQueries && totalQueries > 0 ? (
-                      <button
-                        type="button"
-                        disabled={selectedCount === 0}
-                        onClick={() => regenerateBatchSearch(false)}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#b8864d] to-[#d4a373] text-[#0c0a09] font-medium text-xs disabled:opacity-40 hover:brightness-110 active:scale-95 transition shadow-sm flex items-center space-x-1.5"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>
-                          {t('batchSearch.regenerateAll') || 'Regenerate queries'} ({selectedCount})
-                        </span>
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          disabled={isSavingToScratchpad}
+                          onClick={handleSaveToScratchpad}
+                          className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition flex items-center space-x-1.5 disabled:opacity-50 cursor-pointer"
+                        >
+                          {isSavingToScratchpad ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <NotebookPen className="w-3.5 h-3.5" />
+                          )}
+                          <span>{t('batchSearch.saveToScratchpad') || 'Save to Scratchpad'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={selectedCount === 0}
+                          onClick={() => regenerateBatchSearch(false)}
+                          className="px-3 py-2 rounded-xl border border-light-300 dark:border-[#2a2119] text-stone-600 dark:text-stone-300 hover:border-[#b8864d] text-xs font-medium transition flex items-center space-x-1.5 disabled:opacity-40 cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>
+                            {t('batchSearch.regenerateAll') || 'Regenerate'} ({selectedCount})
+                          </span>
+                        </button>
+                      </>
                     ) : completedCount > 0 && completedCount < totalQueries ? (
                       <>
                         <button
@@ -991,6 +971,19 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                             {t('batchSearch.continueSearch') || 'Continue Search'} (
                             {totalQueries - completedCount} {t('batchSearch.remaining') || 'remaining'})
                           </span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSavingToScratchpad}
+                          onClick={handleSaveToScratchpad}
+                          className="px-3 py-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 text-xs font-medium transition flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+                        >
+                          {isSavingToScratchpad ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <NotebookPen className="w-3.5 h-3.5" />
+                          )}
+                          <span>{t('batchSearch.saveToScratchpad') || 'Save'}</span>
                         </button>
                         <button
                           type="button"
@@ -1097,6 +1090,49 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                 >
                   {t('batchSearch.deselectAll') || 'Deselect all'}
                 </button>
+                {selectedCount > 0 && (
+                  <>
+                    <span className="text-stone-400">•</span>
+                    <button
+                      type="button"
+                      onClick={handleDeleteSelected}
+                      className="text-red-400 hover:text-red-300 flex items-center space-x-1 font-medium transition cursor-pointer"
+                      title={
+                        t('batchSearch.deleteSelected', { count: selectedCount }) ||
+                        `Usuń zaznaczone (${selectedCount})`
+                      }
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>
+                        {t('batchSearch.deleteSelected', { count: selectedCount }) ||
+                          `Usuń zaznaczone (${selectedCount})`}
+                      </span>
+                    </button>
+                  </>
+                )}
+                {items.length > 0 && (
+                  <>
+                    <span className="text-stone-400">•</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            t('batchSearch.confirmClearAll') ||
+                              'Czy na pewno chcesz usunąć wszystkie zapytania i zresetować studio?',
+                          )
+                        ) {
+                          clearBatch();
+                        }
+                      }}
+                      className="text-stone-400 hover:text-red-400 flex items-center space-x-1 transition cursor-pointer"
+                      title={t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>{t('batchSearch.clearAllBtn') || 'Wyczyść studio'}</span>
+                    </button>
+                  </>
+                )}
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -1202,7 +1238,25 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                   <table className="w-full text-left text-xs">
                     <thead className="bg-light-secondary/70 dark:bg-[#181410] text-stone-500 dark:text-stone-400 border-b border-light-200 dark:border-[#221c16]">
                       <tr>
-                        <th className="p-3 w-10 text-center">✓</th>
+                        <th className="p-3 w-10 text-center">
+                          <input
+                            type="checkbox"
+                            checked={items.length > 0 && selectedCount === items.length}
+                            ref={(el) => {
+                              if (el) {
+                                el.indeterminate =
+                                  selectedCount > 0 && selectedCount < items.length;
+                              }
+                            }}
+                            onChange={(e) => handleSelectAll(e.target.checked)}
+                            className="w-4 h-4 rounded border-light-300 dark:border-[#2a2119] text-[#b8864d] focus:ring-[#b8864d] cursor-pointer"
+                            title={
+                              selectedCount === items.length
+                                ? t('batchSearch.deselectAll') || 'Deselect all'
+                                : t('batchSearch.selectAll') || 'Select all'
+                            }
+                          />
+                        </th>
                         <th className="p-3 w-16">{t('batchSearch.colNumber') || 'No.'}</th>
                         <th className="p-3 min-w-[240px]">{t('batchSearch.colQuery') || 'Query / Concept'}</th>
                         <th className="p-3 min-w-[190px]">{t('batchSearch.colSources') || 'Sources'}</th>
@@ -1327,16 +1381,51 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                 </p>
               </div>
 
-              {completedCount > 0 && (
+              <div className="flex items-center space-x-2">
                 <button
                   type="button"
-                  onClick={() => setActiveTab('export')}
-                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#b8864d] to-[#d4a373] text-[#0c0a09] font-medium text-xs shadow-sm flex items-center space-x-1.5"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        t('batchSearch.confirmClearAll') ||
+                          'Czy na pewno chcesz usunąć wszystkie zapytania i zresetować studio?',
+                      )
+                    ) {
+                      clearBatch();
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-medium transition flex items-center space-x-1.5 cursor-pointer"
+                  title={t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
                 >
-                  <span>Proceed to Final Export</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{t('batchSearch.clearAllBtn') || 'Wyczyść studio'}</span>
                 </button>
-              )}
+                {completedCount > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={isSavingToScratchpad}
+                      onClick={handleSaveToScratchpad}
+                      className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs shadow-sm flex items-center space-x-1.5 disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSavingToScratchpad ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <NotebookPen className="w-3.5 h-3.5" />
+                      )}
+                      <span>{t('batchSearch.saveToScratchpad') || 'Save to Scratchpad'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('export')}
+                      className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-[#b8864d] to-[#d4a373] text-[#0c0a09] font-medium text-xs shadow-sm flex items-center space-x-1.5 cursor-pointer"
+                    >
+                      <span>{t('batchSearch.exportTab') || 'Proceed to Final Export'}</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Live Search Runner Banner in Tab 3 */}
@@ -1460,16 +1549,31 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                             onClick={() => regenerateSingleQuery(idx)}
                             disabled={isSearching}
                             title={t('batchSearch.regenerateNote') || 'Regenerate Note'}
-                            className="px-2.5 py-1 rounded-lg text-xs font-medium border border-light-300 dark:border-[#2c2219] text-stone-600 dark:text-stone-300 hover:border-[#b8864d] hover:text-[#b8864d] transition flex items-center space-x-1 disabled:opacity-40"
+                            className="px-2.5 py-1 rounded-lg text-xs font-medium border border-light-300 dark:border-[#2c2219] text-stone-600 dark:text-stone-300 hover:border-[#b8864d] hover:text-[#b8864d] transition flex items-center space-x-1 disabled:opacity-40 cursor-pointer"
                           >
-                            <RotateCcw className="w-3 h-3" />
-                            <span>{t('batchSearch.regenerateNote') || 'Regenerate'}</span>
+                            {item.status === 'searching' ? (
+                              <Loader2 className="w-3 h-3 animate-spin text-cyan-400" />
+                            ) : (
+                              <RotateCcw className="w-3 h-3" />
+                            )}
+                            <span>
+                              {item.status === 'searching'
+                                ? t('library.regeneratingQuery') || 'Regenerating...'
+                                : t('batchSearch.regenerateNote') || 'Regenerate'}
+                            </span>
                           </button>
                         </div>
                       </div>
 
                       {/* Note Content (Preview or Textarea Editor) */}
-                      {isEditingThis ? (
+                      {item.status === 'searching' ? (
+                        <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center space-x-2.5 text-cyan-400 text-xs font-medium animate-pulse">
+                          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                          <span>
+                            {t('batchSearch.statusSearching') || 'Searching'} &amp; synthesizing updated research note...
+                          </span>
+                        </div>
+                      ) : isEditingThis ? (
                         <div className="space-y-2">
                           <textarea
                             value={item.response || ''}
@@ -1666,10 +1770,15 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                 </button>
                 <button
                   type="button"
+                  disabled={isSavingToScratchpad}
                   onClick={handleSaveToScratchpad}
-                  className="px-3 py-2 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-400 hover:bg-purple-500/25 text-xs font-medium transition flex items-center space-x-1.5"
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition flex items-center space-x-1.5 disabled:opacity-50 cursor-pointer"
                 >
-                  <NotebookPen className="w-3.5 h-3.5" />
+                  {isSavingToScratchpad ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <NotebookPen className="w-3.5 h-3.5" />
+                  )}
                   <span>{t('batchSearch.saveToScratchpad') || 'Save to Scratchpad'}</span>
                 </button>
               </div>

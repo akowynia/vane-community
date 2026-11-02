@@ -13,6 +13,7 @@ import { ChatProvider } from '@/lib/hooks/useChat';
 import { I18nProvider } from '@/lib/i18n';
 import { BatchSearchProvider } from '@/lib/batch-search/context';
 import { BatchFloatingStatus } from '@/components/BatchSearch/BatchFloatingStatus';
+import BatchSearchModal from '@/components/BatchSearch/BatchSearchModal';
 
 const montserrat = Montserrat({
   weight: ['300', '400', '500', '700'],
@@ -73,6 +74,7 @@ export default function RootLayout({
                 <BatchSearchProvider>
                   <Sidebar>{children}</Sidebar>
                   <BatchFloatingStatus />
+                  <BatchSearchModal />
                   <Toaster
                     toastOptions={{
                       unstyled: true,

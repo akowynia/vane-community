@@ -161,6 +161,8 @@ export interface Translations {
     qualityDesc: string;
     deepTitle?: string;
     deepDesc?: string;
+    presentonTitle?: string;
+    presentonDesc?: string;
   };
   focusModes: {
     web: string;
@@ -181,6 +183,8 @@ export interface Translations {
     betaOptionsDesc: string;
     betaPresentations: string;
     betaPresentationsDesc: string;
+    betaPresenton?: string;
+    betaPresentonDesc?: string;
     betaBannerTitle: string;
     betaBannerDesc: string;
     mcpTitle?: string;
@@ -333,6 +337,20 @@ export interface Translations {
     viewBatchNotes?: string;
     viewBatchNotesDesc?: string;
     batchNotesCount?: string;
+    saveBatchToScratchpad?: string;
+    savingBatchToScratchpad?: string;
+    exportBatch?: string;
+    clearBatchSession?: string;
+    clearBatchSessionConfirm?: string;
+    exportMarkdown?: string;
+    exportCsv?: string;
+    exportTxt?: string;
+    previewAndRegenerate?: string;
+    toggleQueryPreview?: string;
+    hideQueryPreview?: string;
+    regeneratingQuery?: string;
+    loadIntoStudio?: string;
+    loadedIntoStudio?: string;
   };
   discover: {
     title: string;
@@ -1127,6 +1145,11 @@ export interface Translations {
     newPresentation?: string;
     createPresentationTitle?: string;
     createPresentationSubtitle?: string;
+    engineSelectorTitle?: string;
+    engineBuiltIn?: string;
+    engineBuiltInDesc?: string;
+    enginePresenton?: string;
+    enginePresentonDesc?: string;
     topicLabel?: string;
     topicPlaceholder?: string;
     slideCountLabel?: string;
@@ -1268,6 +1291,10 @@ export interface Translations {
     setAllModel?: string;
     addRow?: string;
     clearAll?: string;
+    clearAllBtn?: string;
+    confirmClearAll?: string;
+    deleteSelected?: string;
+    deletedSelected?: string;
     colNumber?: string;
     colQuery?: string;
     colSources?: string;
@@ -1368,6 +1395,8 @@ export interface Translations {
     firecrawlPresetDesc?: string;
     crawl4aiPresetTitle?: string;
     crawl4aiPresetDesc?: string;
+    presentonPresetTitle?: string;
+    presentonPresetDesc?: string;
     quickConnect?: string;
     activeScraper?: string;
     builtinScraper?: string;
@@ -1375,6 +1404,8 @@ export interface Translations {
     presetFirecrawl?: string;
     presetCrawl4aiSse?: string;
     presetCrawl4aiStdio?: string;
+    presetPresenton?: string;
+    presentonTip?: string;
     apiKeyLabel?: string;
     apiKeyPlaceholder?: string;
     envVarsLabel?: string;
