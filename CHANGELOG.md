@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.0]
+
+### Added
+- Deep Research Agent with recursive query decomposition, autonomous exploration depth and breadth controls, and comprehensive synthesis reports
+- Model Context Protocol (MCP) dynamic client supporting SSE and stdio transports, tool discovery, runtime execution, and telemetry logging
+- Dedicated MCP Docker container and stdio-to-HTTP bridge for isolated execution of MCP servers
+- Presenton MCP integration and AI presentation workflows directly accessible from the Scratchpad canvas
+- Batch Search module supporting CSV query processing, parallel execution queues, streaming progress indicators, and multi-format exports
+- Pluggable advanced scraper engine architecture with native Firecrawl and Crawl4AI integrations
+- Highly customizable PDF export engine with branding styles, corporate headers and footers, and custom color themes
+- Multi-theme visual engine supporting Modern and Retro aesthetic styles with full localization across 12 languages
+- Waypoint Cron webhooks enabling proactive scheduled workspace research and external event triggers
+- Automated GitHub Pages continuous documentation deployment pipeline powered by Material for MkDocs
+
 ## [1.0.2]
 
 ### Fixed

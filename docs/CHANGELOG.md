@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.1.0]
+
+### Added
+- Deep Research Agent with recursive query decomposition, autonomous exploration depth and breadth controls, and comprehensive synthesis reports
+- Model Context Protocol (MCP) dynamic client supporting SSE and stdio transports, tool discovery, runtime execution, and telemetry logging
+- Dedicated MCP Docker container and stdio-to-HTTP bridge for isolated execution of MCP servers
+- Presenton MCP integration and AI presentation workflows directly accessible from the Scratchpad canvas
+- Batch Search module supporting CSV query processing, parallel execution queues, streaming progress indicators, and multi-format exports
+- Pluggable advanced scraper engine architecture with native Firecrawl and Crawl4AI integrations
+- Highly customizable PDF export engine with branding styles, corporate headers and footers, and custom color themes
+- Multi-theme visual engine supporting Modern and Retro aesthetic styles with full localization across 12 languages
+- Waypoint Cron webhooks enabling proactive scheduled workspace research and external event triggers
+- Automated GitHub Pages continuous documentation deployment pipeline powered by Material for MkDocs
+
+## [1.0.2]
+
+### Fixed
+- Fixed internal server error (500) on Docker deployments with local data volumes by fixing permission handling and directory initialization
+- Fixed session cookie rejection over HTTP deployments by dynamically checking connection security (RFC 6265bis compliance)
+- Fixed session handling in single-user onboarding to automatically authenticate admin users upon completing setup
+- Fixed Ollama model listing timeout and request blocking during response generation
+- Added Docker host-gateway mapping to enable connectivity with local host LLM instances
+- Improved resiliency across all model providers with safe fallback handling for uninitialized configurations
+
 ## [1.0.1]
 
 ### Added
