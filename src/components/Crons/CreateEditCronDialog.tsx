@@ -20,6 +20,10 @@ import {
   X,
   Sparkles,
   Waypoints as WaypointsIcon,
+  Bell,
+  Send,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import {
   GlobeIcon,
@@ -38,6 +42,7 @@ import {
   normalizeCronExpression,
 } from '@/lib/cron/parser';
 import { formatTimeDifference } from '@/lib/utils';
+import { CronWebhookConfig } from '@/lib/cron/types';
 
 export interface CronItem {
   id: string;
@@ -46,7 +51,7 @@ export interface CronItem {
   schedule: string;
   prompt: string;
   sources: string[];
-  optimizationMode: 'speed' | 'balanced' | 'quality';
+  optimizationMode: 'speed' | 'balanced' | 'quality' | 'deep';
   chatModelProvider: string;
   chatModelKey: string;
   embeddingModelProvider?: string | null;
@@ -66,6 +71,7 @@ export interface CronItem {
   waypointIcon?: string;
   waypointIsPublic?: boolean;
   isOwner?: boolean;
+  webhooks?: CronWebhookConfig[];
 }
 
 interface CreateEditCronDialogProps {
@@ -134,11 +140,12 @@ export const CreateEditCronDialog: React.FC<CreateEditCronDialogProps> = ({
   const [customCron, setCustomCron] = useState('0 8 * * *');
   const [timezone, setTimezone] = useState<string>(userTimeZone);
   const [sources, setSources] = useState<string[]>(['web']);
-  const [optimizationMode, setOptimizationMode] = useState<'speed' | 'balanced' | 'quality'>('balanced');
+  const [optimizationMode, setOptimizationMode] = useState<'speed' | 'balanced' | 'quality' | 'deep'>('balanced');
   const [chatModelProvider, setChatModelProvider] = useState('');
   const [chatModelKey, setChatModelKey] = useState('');
   const [systemInstructions, setSystemInstructions] = useState('');
   const [enabled, setEnabled] = useState(true);
+  const [webhooks, setWebhooks] = useState<CronWebhookConfig[]>([]);
 
   // External data
   const [waypointsList, setWaypointsList] = useState<any[]>([]);
@@ -198,6 +205,7 @@ export const CreateEditCronDialog: React.FC<CreateEditCronDialogProps> = ({
       setSystemInstructions(cron.systemInstructions || '');
       setTimezone(cron.timezone || userTimeZone);
       setEnabled(cron.enabled !== undefined ? cron.enabled : true);
+      setWebhooks(Array.isArray(cron.webhooks) ? cron.webhooks : []);
 
       // Parse schedule
       const sched = cron.schedule.trim();
@@ -235,6 +243,7 @@ export const CreateEditCronDialog: React.FC<CreateEditCronDialogProps> = ({
       setOptimizationMode('balanced');
       setSystemInstructions('');
       setEnabled(true);
+      setWebhooks([]);
     }
   }, [cron, isOpen, fixedWaypointId, userTimeZone]);
 
@@ -324,6 +333,7 @@ export const CreateEditCronDialog: React.FC<CreateEditCronDialogProps> = ({
         systemInstructions: systemInstructions.trim() || null,
         timezone: timezone || userTimeZone,
         enabled,
+        webhooks,
       };
 
       const url = cron ? `/api/crons/${cron.id}` : '/api/crons';
@@ -360,6 +370,30 @@ export const CreateEditCronDialog: React.FC<CreateEditCronDialogProps> = ({
       toast.error(err?.message || t('crons.saveErrorFallback') || 'Failed to save the schedule.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const [testingWebhookId, setTestingWebhookId] = useState<string | null>(null);
+
+  const handleTestWebhook = async (wh: CronWebhookConfig) => {
+    setTestingWebhookId(wh.id);
+    try {
+      toast.info(t('crons.testingWebhook') || 'Sending test notification...');
+      const res = await fetch('/api/crons/test-webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ webhook: wh }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        toast.success(t('crons.webhookTestSuccess') || 'Test notification sent successfully!');
+      } else {
+        toast.error(data.error || t('crons.webhookTestFailed') || 'Failed to dispatch test notification.');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Network error while testing webhook.');
+    } finally {
+      setTestingWebhookId(null);
     }
   };
 
@@ -594,7 +628,7 @@ export const CreateEditCronDialog: React.FC<CreateEditCronDialogProps> = ({
                         {t('crons.optimizationMode') || 'Optimization Mode'}
                       </label>
                       <div className="flex items-center gap-1.5">
-                        {(['speed', 'balanced', 'quality'] as const).map((mode) => (
+                        {(['speed', 'balanced', 'quality', 'deep'] as const).map((mode) => (
                           <button
                             key={mode}
                             type="button"
@@ -609,7 +643,9 @@ export const CreateEditCronDialog: React.FC<CreateEditCronDialogProps> = ({
                               ? t('optimization.speedTitle')
                               : mode === 'balanced'
                                 ? t('optimization.balancedTitle')
-                                : t('optimization.qualityTitle')}
+                                : mode === 'quality'
+                                  ? t('optimization.qualityTitle')
+                                  : (t('optimization.deepTitle') || 'Deep Research')}
                           </button>
                         ))}
                       </div>
@@ -659,6 +695,182 @@ export const CreateEditCronDialog: React.FC<CreateEditCronDialogProps> = ({
                       }
                       className="w-full px-3.5 py-2.5 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs text-black dark:text-stone-100 placeholder:text-black/35 dark:placeholder:text-stone-600 focus:outline-none focus:border-[#b8864d]/70 transition resize-none font-mono text-[11px]"
                     />
+                  </div>
+
+                  {/* Webhook Notifications Section */}
+                  <div className="rounded-2xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/40 dark:bg-[#15110d]/50 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Bell size={15} className="text-[#b8864d]" />
+                        <span className="text-xs font-semibold uppercase tracking-wider text-[#b8864d]">
+                          {t('crons.webhooksTitle') || 'Outbound Notifications & Webhooks'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newWh: CronWebhookConfig = {
+                            id: crypto.randomUUID(),
+                            type: 'telegram',
+                            enabled: true,
+                            mode: 'summary',
+                            events: ['success'],
+                            name: '',
+                            url: '',
+                            token: '',
+                            chatId: '',
+                            secret: '',
+                          };
+                          setWebhooks([...webhooks, newWh]);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-[#b8864d] bg-[#b8864d]/10 hover:bg-[#b8864d]/20 rounded-lg transition"
+                      >
+                        <Plus size={13} />
+                        <span>{t('crons.addWebhook') || 'Add Channel'}</span>
+                      </button>
+                    </div>
+
+                    {webhooks.length === 0 ? (
+                      <p className="text-[11px] text-black/50 dark:text-stone-500 italic">
+                        {t('crons.noWebhooksConfigured') ||
+                          'No notification channels configured. Add Telegram, Discord, Slack, or Webhook to receive alerts when this task executes.'}
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {webhooks.map((wh, idx) => (
+                          <div
+                            key={wh.id || idx}
+                            className="rounded-xl border border-light-200 dark:border-[#28211a] bg-light-primary dark:bg-[#181411] p-3 space-y-2.5 text-left"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={wh.type}
+                                  onChange={(e) => {
+                                    const updated = [...webhooks];
+                                    updated[idx] = { ...wh, type: e.target.value as any };
+                                    setWebhooks(updated);
+                                  }}
+                                  className="px-2.5 py-1 rounded-lg border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-medium text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                                >
+                                  <option value="telegram">Telegram</option>
+                                  <option value="discord">Discord</option>
+                                  <option value="slack">Slack</option>
+                                  <option value="generic">Generic Webhook (HTTP)</option>
+                                </select>
+
+                                <select
+                                  value={wh.mode || 'summary'}
+                                  onChange={(e) => {
+                                    const updated = [...webhooks];
+                                    updated[idx] = { ...wh, mode: e.target.value as any };
+                                    setWebhooks(updated);
+                                  }}
+                                  className="px-2 py-1 rounded-lg border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-[11px] text-black/70 dark:text-stone-300 focus:outline-none"
+                                >
+                                  <option value="summary">{t('crons.modeSummary') || 'Summary'}</option>
+                                  <option value="full">{t('crons.modeFull') || 'Full Research'}</option>
+                                </select>
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestWebhook(wh)}
+                                  disabled={testingWebhookId === wh.id}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-black/70 dark:text-stone-300 hover:text-[#b8864d] bg-light-secondary dark:bg-[#221c16] rounded-lg transition border border-light-200 dark:border-[#2d251d]"
+                                  title={t('crons.testNotification') || 'Send test notification'}
+                                >
+                                  <Send size={11} className={testingWebhookId === wh.id ? 'animate-pulse' : ''} />
+                                  <span>{t('crons.test') || 'Test'}</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setWebhooks(webhooks.filter((_, i) => i !== idx));
+                                  }}
+                                  className="p-1 text-black/40 dark:text-stone-500 hover:text-red-500 rounded-lg transition"
+                                  title={t('crons.removeWebhook') || 'Remove channel'}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {wh.type === 'telegram' ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <input
+                                  type="text"
+                                  placeholder={t('crons.telegramTokenPlaceholder') || 'Bot Token (e.g. 123456:ABC-DEF...)'}
+                                  value={wh.token || ''}
+                                  onChange={(e) => {
+                                    const updated = [...webhooks];
+                                    updated[idx] = { ...wh, token: e.target.value };
+                                    setWebhooks(updated);
+                                  }}
+                                  className="w-full px-2.5 py-1.5 rounded-lg border border-light-200 dark:border-[#2d251d] bg-light-secondary/40 dark:bg-[#15110d] text-xs text-black dark:text-stone-100 placeholder:text-black/30 dark:placeholder:text-stone-600 focus:outline-none focus:border-[#b8864d]"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder={t('crons.telegramChatIdPlaceholder') || 'Chat ID (e.g. -10012345678)'}
+                                  value={wh.chatId || ''}
+                                  onChange={(e) => {
+                                    const updated = [...webhooks];
+                                    updated[idx] = { ...wh, chatId: e.target.value };
+                                    setWebhooks(updated);
+                                  }}
+                                  className="w-full px-2.5 py-1.5 rounded-lg border border-light-200 dark:border-[#2d251d] bg-light-secondary/40 dark:bg-[#15110d] text-xs text-black dark:text-stone-100 placeholder:text-black/30 dark:placeholder:text-stone-600 focus:outline-none focus:border-[#b8864d]"
+                                />
+                              </div>
+                            ) : wh.type === 'generic' ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <input
+                                  type="url"
+                                  placeholder={t('crons.webhookUrlPlaceholder') || 'Target URL (https://...)'}
+                                  value={wh.url || ''}
+                                  onChange={(e) => {
+                                    const updated = [...webhooks];
+                                    updated[idx] = { ...wh, url: e.target.value };
+                                    setWebhooks(updated);
+                                  }}
+                                  className="w-full px-2.5 py-1.5 rounded-lg border border-light-200 dark:border-[#2d251d] bg-light-secondary/40 dark:bg-[#15110d] text-xs text-black dark:text-stone-100 placeholder:text-black/30 dark:placeholder:text-stone-600 focus:outline-none focus:border-[#b8864d]"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder={t('crons.secretPlaceholder') || 'Optional HMAC Secret (X-Vane-Signature)'}
+                                  value={wh.secret || ''}
+                                  onChange={(e) => {
+                                    const updated = [...webhooks];
+                                    updated[idx] = { ...wh, secret: e.target.value };
+                                    setWebhooks(updated);
+                                  }}
+                                  className="w-full px-2.5 py-1.5 rounded-lg border border-light-200 dark:border-[#2d251d] bg-light-secondary/40 dark:bg-[#15110d] text-xs text-black dark:text-stone-100 placeholder:text-black/30 dark:placeholder:text-stone-600 focus:outline-none focus:border-[#b8864d]"
+                                />
+                              </div>
+                            ) : (
+                              <div>
+                                <input
+                                  type="url"
+                                  placeholder={
+                                    wh.type === 'discord'
+                                      ? (t('crons.discordWebhookPlaceholder') || 'Discord Webhook URL (https://discord.com/api/webhooks/...)')
+                                      : (t('crons.slackWebhookPlaceholder') || 'Slack Webhook URL (https://hooks.slack.com/services/...)')
+                                  }
+                                  value={wh.url || ''}
+                                  onChange={(e) => {
+                                    const updated = [...webhooks];
+                                    updated[idx] = { ...wh, url: e.target.value };
+                                    setWebhooks(updated);
+                                  }}
+                                  className="w-full px-2.5 py-1.5 rounded-lg border border-light-200 dark:border-[#2d251d] bg-light-secondary/40 dark:bg-[#15110d] text-xs text-black dark:text-stone-100 placeholder:text-black/30 dark:placeholder:text-stone-600 focus:outline-none focus:border-[#b8864d]"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Active Toggle */}

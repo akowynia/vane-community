@@ -10,6 +10,10 @@ import {
   AlertTriangle,
   HelpCircle,
   Sliders,
+  Flame,
+  Zap,
+  Globe,
+  Sparkles,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
@@ -55,10 +59,27 @@ const getStepTitle = (
       results: step.reading.length === 1 ? t('common.result') : t('common.results'),
     });
   } else if (step.type === 'reading') {
-    return t('chat.readingSources', {
+    const baseTitle = t('chat.readingSources', {
       count: step.reading.length,
       sources: step.reading.length === 1 ? t('common.source') : t('common.sources'),
     });
+
+    const mcpItem = step.reading.find(
+      (r) => r.metadata?.scraperEngine && r.metadata.scraperEngine.includes('(MCP)'),
+    );
+    const resolvedItem =
+      mcpItem ||
+      step.reading.find(
+        (r) =>
+          r.metadata?.scraperEngine &&
+          r.metadata.scraperEngine !== 'Extracting...',
+      );
+
+    if (resolvedItem?.metadata?.scraperEngine) {
+      return `${baseTitle} • ${resolvedItem.metadata.scraperEngine}`;
+    }
+
+    return baseTitle;
   } else if (step.type === 'upload_searching') {
     return t('chat.scanningUploadedDocs');
   } else if (step.type === 'upload_search_results') {
@@ -361,6 +382,13 @@ const AssistantSteps = ({
                             {step.reading.slice(0, 4).map((result, idx) => {
                               const url = result?.metadata?.url || '';
                               const title = result?.metadata?.title || 'Untitled';
+                              const scraperEngine = result?.metadata?.scraperEngine;
+                              const searchEngine = result?.metadata?.searchEngine;
+                              const mcpFallback = result?.metadata?.mcpFallback;
+                              const isMcp = scraperEngine && scraperEngine.includes('(MCP)');
+                              const isFirecrawl = scraperEngine && scraperEngine.includes('Firecrawl');
+                              const isCrawl4Ai = scraperEngine && scraperEngine.includes('Crawl4AI');
+
                               let domain = '';
                               try {
                                 if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
@@ -391,6 +419,29 @@ const AssistantSteps = ({
                                     />
                                   )}
                                   <span className="line-clamp-1">{title}</span>
+                                  {isMcp ? (
+                                    <span
+                                      className={`inline-flex items-center gap-0.5 px-1.5 py-0.2 text-[9px] font-semibold rounded shrink-0 ${
+                                        isFirecrawl
+                                          ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30'
+                                          : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                      }`}
+                                    >
+                                      {isFirecrawl ? <Flame size={10} /> : <Zap size={10} />}
+                                      {isFirecrawl ? 'Firecrawl' : 'Crawl4AI'}
+                                    </span>
+                                  ) : mcpFallback ? (
+                                    <span
+                                      title={result?.metadata?.mcpError ? `${mcpFallback}: ${result.metadata.mcpError}` : `${mcpFallback} fallback to built-in`}
+                                      className="inline-flex items-center gap-0.5 px-1 py-0.2 text-[9px] font-medium rounded shrink-0 bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                    >
+                                      ⚠️ {mcpFallback.replace(' (MCP)', '')} fallback
+                                    </span>
+                                  ) : searchEngine ? (
+                                    <span className="px-1 py-0.2 text-[9px] font-mono text-black/50 dark:text-white/50 shrink-0">
+                                      {searchEngine}
+                                    </span>
+                                  ) : null}
                                 </a>
                               );
                             })}

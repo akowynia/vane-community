@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import React, { Suspense, useEffect, useState, useMemo } from 'react';
 import DeleteChat from '@/components/DeleteChat';
-import { formatTimeDifference } from '@/lib/utils';
+import { formatTimeDifference, cn } from '@/lib/utils';
 import {
   BookOpenText,
   ClockIcon,
@@ -16,6 +16,17 @@ import {
   Search,
   Sparkles,
   Filter,
+  Layers,
+  ExternalLink,
+  CheckCircle2,
+  RotateCcw,
+  Play,
+  NotebookPen,
+  Download,
+  Loader2,
+  Trash2,
+  ChevronDown,
+  Eye,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -23,6 +34,7 @@ import { useTranslation } from '@/lib/i18n';
 import CronList from '@/components/Crons/CronList';
 import CreateEditCronDialog, { CronItem } from '@/components/Crons/CreateEditCronDialog';
 import LoginDialog from '@/components/Auth/LoginDialog';
+import { useBatchSearch } from '@/lib/batch-search/context';
 
 export interface Chat {
   id: string;
@@ -34,13 +46,26 @@ export interface Chat {
 
 const LibraryContent = () => {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'crons' ? 'crons' : 'chats';
+  const initialTab =
+    searchParams.get('tab') === 'crons'
+      ? 'crons'
+      : searchParams.get('tab') === 'batch'
+        ? 'batch'
+        : 'chats';
 
-  const [activeTab, setActiveTab] = useState<'chats' | 'crons'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'chats' | 'crons' | 'batch'>(initialTab);
   const [chats, setChats] = useState<Chat[]>([]);
   const [crons, setCrons] = useState<CronItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingCrons, setLoadingCrons] = useState(true);
+
+  // Batch search & batch notes
+  const batchSearch = useBatchSearch();
+  const [batchNotes, setBatchNotes] = useState<any[]>([]);
+  const [loadingBatchNotes, setLoadingBatchNotes] = useState(false);
+  const [loadingNoteId, setLoadingNoteId] = useState<string | null>(null);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const [isPreviewExpanded, setIsPreviewExpanded] = useState(false);
 
   // Search & filtering for crons
   const [cronSearch, setCronSearch] = useState('');
@@ -113,10 +138,28 @@ const LibraryContent = () => {
     }
   };
 
+  const fetchBatchNotes = async () => {
+    setLoadingBatchNotes(true);
+    try {
+      const res = await fetch('/api/scratchpad');
+      if (res.ok) {
+        const data = await res.json();
+        const allScratchpads = Array.isArray(data.scratchpads) ? data.scratchpads : [];
+        setBatchNotes(allScratchpads.filter((item: any) => item.type === 'batch'));
+      }
+    } catch (err) {
+      console.error('Error fetching batch scratchpads:', err);
+      setBatchNotes([]);
+    } finally {
+      setLoadingBatchNotes(false);
+    }
+  };
+
   useEffect(() => {
     fetchCurrentUser();
     fetchChats();
     fetchCrons();
+    fetchBatchNotes();
   }, []);
 
   // Unique waypoints for filter dropdown
@@ -184,16 +227,25 @@ const LibraryContent = () => {
                 </span>
               </span>
             )}
+
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-light-200 dark:border-[#2b231b] bg-light-primary dark:bg-[#14110e] px-3 py-1 font-medium">
+              <Layers size={14} className="text-cyan-400" />
+              <span>
+                {loadingBatchNotes
+                  ? '...'
+                  : `${batchNotes.length} ${t('library.batchNotesCount') || 'batch'}`}
+              </span>
+            </span>
           </div>
         </div>
 
         {/* Tab Switcher */}
         <div className="flex items-center justify-between gap-3 mt-6 pt-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
             <button
               type="button"
               onClick={() => setActiveTab('chats')}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition shrink-0 ${
                 activeTab === 'chats'
                   ? 'bg-[#b8864d]/15 text-[#b8864d] border border-[#b8864d]/30 shadow-sm'
                   : 'text-black/60 dark:text-stone-400 hover:text-black dark:hover:text-stone-100 hover:bg-light-200/60 dark:hover:bg-[#181411]'
@@ -209,7 +261,7 @@ const LibraryContent = () => {
             <button
               type="button"
               onClick={() => setActiveTab('crons')}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition ${
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition shrink-0 ${
                 activeTab === 'crons'
                   ? 'bg-[#b8864d]/15 text-[#b8864d] border border-[#b8864d]/30 shadow-sm'
                   : 'text-black/60 dark:text-stone-400 hover:text-black dark:hover:text-stone-100 hover:bg-light-200/60 dark:hover:bg-[#181411]'
@@ -223,6 +275,28 @@ const LibraryContent = () => {
                 </span>
               )}
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('batch')}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition shrink-0 ${
+                activeTab === 'batch'
+                  ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-sm font-semibold'
+                  : 'text-black/60 dark:text-stone-400 hover:text-black dark:hover:text-stone-100 hover:bg-light-200/60 dark:hover:bg-[#181411]'
+              }`}
+            >
+              <Layers size={16} className={batchSearch.isSearching ? 'animate-pulse text-cyan-400' : ''} />
+              <span>{t('library.tabsBatch') || 'Batch Search'}</span>
+              {batchSearch.isSearching && (
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                </span>
+              )}
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-light-200 dark:bg-[#201b16] font-semibold">
+                {batchNotes.length}
+              </span>
+            </button>
           </div>
 
           {/* Action button in header if on crons tab and not guest */}
@@ -235,6 +309,18 @@ const LibraryContent = () => {
               <span className="hidden sm:inline">{t('crons.create') || 'New schedule'}</span>
               <span className="sm:hidden">{t('common.add') || 'Add'}</span>
             </button>
+          )}
+
+          {/* Action button in header if on batch tab */}
+          {activeTab === 'batch' && (
+            <Link
+              href="/batch-search"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-medium text-xs hover:brightness-110 active:scale-95 transition shadow-sm shrink-0"
+            >
+              <Plus size={15} />
+              <span className="hidden sm:inline">{t('batchSearch.newBatchSearch') || 'New Batch Search'}</span>
+              <span className="sm:hidden">{t('common.add') || 'Add'}</span>
+            </Link>
           )}
         </div>
       </div>
@@ -449,6 +535,410 @@ const LibraryContent = () => {
         </div>
       )}
 
+      {/* Tab 3: Batch Search View */}
+      {activeTab === 'batch' && (
+        <div className="pt-6 pb-28 px-2 space-y-6">
+          {/* Active Batch Session Banner / Card */}
+          {batchSearch.items.length > 0 && (
+            <div className="p-5 rounded-2xl border border-cyan-500/30 bg-cyan-950/10 dark:bg-[#10191c] shadow-md space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <h3 className="text-sm font-bold text-stone-900 dark:text-stone-100">
+                        {t('library.activeBatchSession') || 'Active Batch Search Session'}
+                      </h3>
+                      {batchSearch.isSearching ? (
+                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-semibold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                          <span>{t('batchSearch.statusSearching') || 'Searching'}</span>
+                        </span>
+                      ) : batchSearch.completedCount === batchSearch.totalQueries ? (
+                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>{t('batchSearch.statusCompleted') || 'Completed'}</span>
+                        </span>
+                      ) : batchSearch.isPaused ? (
+                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-semibold">
+                          <span>{t('batchSearch.pause') || 'Paused'}</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full bg-stone-500/20 text-stone-400 text-[10px] font-semibold">
+                          <span>{t('batchSearch.statusPending') || 'Ready'}</span>
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
+                      {batchSearch.completedCount} / {batchSearch.totalQueries} {t('batchSearch.statusCompleted') || 'completed'}
+                      {batchSearch.errorCount > 0 && ` (${batchSearch.errorCount} failed)`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {batchSearch.completedCount > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={batchSearch.isSavingToScratchpad}
+                        onClick={async () => {
+                          const res = await batchSearch.saveToScratchpad();
+                          if (res?.id) {
+                            await fetchBatchNotes();
+                          }
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-600/20 text-xs font-semibold flex items-center space-x-1.5 transition disabled:opacity-50 active:scale-95 cursor-pointer"
+                        title={t('library.saveBatchToScratchpad') || 'Zapisz w Szkicowniku'}
+                      >
+                        {batchSearch.isSavingToScratchpad ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <NotebookPen className="w-3.5 h-3.5" />
+                        )}
+                        <span>
+                          {batchSearch.isSavingToScratchpad
+                            ? t('library.savingBatchToScratchpad') || 'Zapisywanie...'
+                            : t('library.saveBatchToScratchpad') || 'Zapisz w Szkicowniku'}
+                        </span>
+                      </button>
+
+                      {/* Export options dropdown */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                          className="px-3 py-1.5 rounded-xl border border-stone-300 dark:border-[#2a241d] bg-light-secondary/60 dark:bg-[#1a140f] hover:border-cyan-500/40 text-xs font-medium text-stone-700 dark:text-stone-300 flex items-center space-x-1.5 transition cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5 text-stone-400" />
+                          <span>{t('library.exportBatch') || 'Eksportuj'}</span>
+                          <ChevronDown className="w-3 h-3 text-stone-400" />
+                        </button>
+                        {isExportDropdownOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-40"
+                              onClick={() => setIsExportDropdownOpen(false)}
+                            />
+                            <div className="absolute right-0 mt-1 w-44 rounded-xl border border-light-300 dark:border-[#2a241d] bg-light-primary dark:bg-[#15120e] shadow-xl py-1 z-50 text-xs">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  batchSearch.exportAsMarkdown();
+                                  setIsExportDropdownOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-light-secondary dark:hover:bg-[#201a14] flex items-center space-x-2 text-stone-700 dark:text-stone-300 cursor-pointer"
+                              >
+                                <FileText className="w-3.5 h-3.5 text-cyan-400" />
+                                <span>{t('library.exportMarkdown') || 'Markdown (.md)'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  batchSearch.exportAsCsv();
+                                  setIsExportDropdownOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-light-secondary dark:hover:bg-[#201a14] flex items-center space-x-2 text-stone-700 dark:text-stone-300 cursor-pointer"
+                              >
+                                <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>{t('library.exportCsv') || 'CSV (.csv)'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  batchSearch.exportAsTxt();
+                                  setIsExportDropdownOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-2 hover:bg-light-secondary dark:hover:bg-[#201a14] flex items-center space-x-2 text-stone-700 dark:text-stone-300 cursor-pointer"
+                              >
+                                <FileText className="w-3.5 h-3.5 text-amber-400" />
+                                <span>{t('library.exportTxt') || 'Tekst (.txt)'}</span>
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      batchSearch.setActiveTab('results');
+                      batchSearch.openModal();
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-semibold flex items-center space-x-1.5 transition cursor-pointer"
+                    title={t('library.previewAndRegenerate') || 'Podgląd i regeneracja'}
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>{t('library.previewAndRegenerate') || 'Podgląd i regeneracja'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      batchSearch.setActiveTab(
+                        batchSearch.completedCount > 0 ? 'results' : 'queue',
+                      );
+                      batchSearch.openModal();
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center space-x-1.5 transition cursor-pointer"
+                  >
+                    <span>{t('library.openBatchStudio') || 'Open Studio'}</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+
+                  {(batchSearch.completedCount === batchSearch.totalQueries || !batchSearch.isSearching) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            t('library.clearBatchSessionConfirm') ||
+                              'Czy na pewno chcesz wyczyścić bieżącą sesję wyszukiwania wsadowego?',
+                          )
+                        ) {
+                          batchSearch.clearBatch();
+                        }
+                      }}
+                      title={t('library.clearBatchSession') || 'Wyczyść sesję'}
+                      className="p-1.5 rounded-xl border border-stone-300 dark:border-[#2a241d] hover:border-red-500/40 text-stone-400 hover:text-red-400 transition cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div className="space-y-1">
+                <div className="w-full h-2 rounded-full bg-stone-200 dark:bg-[#1d262b] overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-cyan-500 to-teal-400 transition-all duration-300"
+                    style={{
+                      width: `${batchSearch.totalQueries > 0 ? (batchSearch.completedCount / batchSearch.totalQueries) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+                {batchSearch.isSearching && batchSearch.currentRunningQuery && (
+                  <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate">
+                    {t('batchSearch.statusSearching') || 'Searching'}: &ldquo;{batchSearch.currentRunningQuery}&rdquo;
+                  </p>
+                )}
+              </div>
+
+              {/* Expandable Query Preview with inline regeneration */}
+              {batchSearch.items.length > 0 && batchSearch.completedCount > 0 && (
+                <div className="pt-2 border-t border-cyan-500/20">
+                  <button
+                    type="button"
+                    onClick={() => setIsPreviewExpanded(!isPreviewExpanded)}
+                    className="w-full flex items-center justify-between text-xs text-cyan-400 hover:text-cyan-300 font-medium py-1 transition cursor-pointer"
+                  >
+                    <span className="flex items-center space-x-1.5">
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>
+                        {isPreviewExpanded
+                          ? t('library.hideQueryPreview') || 'Ukryj podgląd pytań'
+                          : `${t('library.toggleQueryPreview') || 'Pokaż podgląd pytań i odpowiedzi'} (${batchSearch.completedCount})`}
+                      </span>
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        'w-3.5 h-3.5 transition-transform duration-200',
+                        isPreviewExpanded && 'rotate-180',
+                      )}
+                    />
+                  </button>
+
+                  {isPreviewExpanded && (
+                    <div className="mt-3 space-y-3 max-h-[460px] overflow-y-auto pr-1">
+                      {batchSearch.items.map((it, idx) => {
+                        if (
+                          !it.response &&
+                          it.status !== 'completed' &&
+                          it.status !== 'searching'
+                        )
+                          return null;
+                        const isRegeneratingThis = it.status === 'searching';
+                        return (
+                          <div
+                            key={it.id || `preview-${idx}`}
+                            className="p-3.5 rounded-xl bg-light-primary/80 dark:bg-[#141210] border border-stone-200 dark:border-[#2a231c] text-xs space-y-2"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center space-x-2 min-w-0">
+                                <span className="font-mono font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded text-[11px] shrink-0">
+                                  #{it.number}
+                                </span>
+                                <span className="font-semibold text-stone-900 dark:text-stone-100 truncate">
+                                  {it.query}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-1.5 shrink-0">
+                                <span className="text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-stone-100 dark:bg-[#201a14] text-stone-400">
+                                  {it.optimizationMode || 'balanced'}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={batchSearch.isSearching}
+                                  onClick={() => batchSearch.regenerateSingleQuery(idx)}
+                                  title={t('batchSearch.regenerateNote') || 'Regeneruj tę notatkę'}
+                                  className="px-2 py-1 rounded-lg border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 text-xs font-medium transition flex items-center space-x-1 disabled:opacity-40 cursor-pointer"
+                                >
+                                  {isRegeneratingThis ? (
+                                    <Loader2 className="w-3 h-3 animate-spin text-cyan-400" />
+                                  ) : (
+                                    <RotateCcw className="w-3 h-3" />
+                                  )}
+                                  <span className="text-[11px]">
+                                    {isRegeneratingThis
+                                      ? t('library.regeneratingQuery') || 'Regenerowanie...'
+                                      : t('batchSearch.regenerateNote') || 'Regeneruj'}
+                                  </span>
+                                </button>
+                              </div>
+                            </div>
+                            {isRegeneratingThis ? (
+                              <div className="p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center space-x-2 text-cyan-400 text-[11px] animate-pulse">
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <span>
+                                  {t('batchSearch.statusSearching') || 'Searching'} &amp; synthesising updated note...
+                                </span>
+                              </div>
+                            ) : (
+                              <p className="text-[11px] text-stone-600 dark:text-stone-300 line-clamp-3 leading-relaxed">
+                                {it.response}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Saved Batch Research Notes */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-light-200 dark:border-[#221c16]">
+              <div>
+                <h2 className="text-base font-bold text-black dark:text-stone-100 flex items-center space-x-2">
+                  <span>{t('library.viewBatchNotes') || 'Saved Batch Research'}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 font-semibold">
+                    {batchNotes.length}
+                  </span>
+                </h2>
+                <p className="text-xs text-stone-500 dark:text-stone-400">
+                  {t('library.viewBatchNotesDesc') || 'Structured research documents generated from batch queries and saved to Scratchpad.'}
+                </p>
+              </div>
+            </div>
+
+            {loadingBatchNotes ? (
+              <div className="flex flex-row items-center justify-center min-h-[30vh]">
+                <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : batchNotes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 px-4 text-center rounded-3xl border border-dashed border-light-300 dark:border-[#2a241d] bg-light-secondary/20 dark:bg-[#14100d]/20">
+                <div className="p-4 rounded-3xl bg-cyan-500/10 text-cyan-400 mb-4">
+                  <Layers className="w-8 h-8" />
+                </div>
+                <h3 className="text-base font-semibold text-stone-800 dark:text-stone-200">
+                  {t('library.noBatchSearchesTitle') || 'No batch research saved yet'}
+                </h3>
+                <p className="text-xs text-stone-500 dark:text-stone-400 max-w-md mt-1 mb-6">
+                  {t('library.noBatchSearchesDesc') || 'Run structured batch search across dozens or hundreds of concepts from CSV and save them here.'}
+                </p>
+                <Link
+                  href="/batch-search"
+                  className="flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-semibold text-xs transition shadow-lg shadow-cyan-600/20"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>{t('batchSearch.newBatchSearch') || 'Launch Batch Search'}</span>
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {batchNotes.map((note) => (
+                  <Link
+                    key={note.id}
+                    href={`/scratchpad/${note.id}`}
+                    className="group flex flex-col justify-between p-5 rounded-2xl bg-light-secondary dark:bg-[#14110e] border border-cyan-500/20 hover:border-cyan-500/60 dark:hover:border-cyan-500/60 transition-all duration-200 shadow-sm hover:shadow-lg hover:shadow-black/20"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[10px] font-bold tracking-wider uppercase flex items-center space-x-1 shrink-0">
+                          <Layers className="w-2.5 h-2.5" />
+                          <span>{t('scratchpad.badgeBatch') || 'BATCH RESEARCH'}</span>
+                        </span>
+                        <span className="text-[11px] text-stone-400 flex items-center space-x-1">
+                          <Clock className="w-3 h-3" />
+                          <span>{formatTimeDifference(note.updatedAt, locale)}</span>
+                        </span>
+                      </div>
+
+                      <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 group-hover:text-cyan-400 transition line-clamp-1 mb-1.5">
+                        {note.title || t('scratchpad.untitled') || 'Untitled Batch Note'}
+                      </h3>
+
+                      <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-3 leading-relaxed mb-4">
+                        {note.excerpt || `(${t('scratchpad.blankSketch') || 'Empty note'})`}
+                      </p>
+                    </div>
+
+                    <div className="pt-3 border-t border-light-200/50 dark:border-[#221c16] flex items-center justify-between text-[11px] text-stone-400">
+                      <div className="flex items-center space-x-2">
+                        {note.metadata?.batchCount && (
+                          <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 font-medium text-[10px]">
+                            {note.metadata.batchCount} {t('scratchpad.queries') || 'queries'}
+                          </span>
+                        )}
+                        {note.sourcesCount > 0 && (
+                          <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500 font-medium text-[10px]">
+                            {note.sourcesCount} {t('common.sources') || 'sources'}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          type="button"
+                          disabled={loadingNoteId === note.id}
+                          onClick={async (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setLoadingNoteId(note.id);
+                            try {
+                              await batchSearch.loadSavedBatchSession(note);
+                            } finally {
+                              setLoadingNoteId(null);
+                            }
+                          }}
+                          title={t('library.loadIntoStudio') || 'Załaduj do studia i regeneruj'}
+                          className="px-2 py-0.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-[10px] font-semibold flex items-center space-x-1 transition cursor-pointer disabled:opacity-50"
+                        >
+                          {loadingNoteId === note.id ? (
+                            <Loader2 className="w-2.5 h-2.5 animate-spin text-cyan-400" />
+                          ) : (
+                            <RotateCcw className="w-2.5 h-2.5" />
+                          )}
+                          <span>{t('library.loadIntoStudio') || 'Regeneruj'}</span>
+                        </button>
+                        <ExternalLink className="w-3.5 h-3.5 text-stone-400 group-hover:text-cyan-400 transition" />
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Login Dialog if needed */}
       <LoginDialog
         isOpen={isLoginOpen}
@@ -458,6 +948,7 @@ const LibraryContent = () => {
           fetchCurrentUser();
           fetchChats();
           fetchCrons();
+          fetchBatchNotes();
         }}
       />
     </div>

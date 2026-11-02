@@ -22,6 +22,8 @@ const ALLOWED_CONFIG_KEYS = new Set([
   'preferences.autoMediaSearch',
   'preferences.showWeatherWidget',
   'preferences.showNewsWidget',
+  'preferences.pdfExportStyle',
+  'preferences.pdfShowBranding',
   'personalization.systemInstructions',
   'search.searxngURL',
   'search.braveApiKey',
@@ -46,7 +48,11 @@ const ALLOWED_CONFIG_KEYS = new Set([
   'globalLimits.tokenLimitPerMonth',
   'globalLimits.maxTokensPerRequest',
   'globalLimits.qualityModeMaxTokens',
+  'beta.enablePresentations',
+  'beta.enablePresentonBeta',
+  'beta.presentations',
   'auth.adminPassword',
+  'mcpServers',
 ]);
 
 const ALLOWED_LANGUAGES = new Set([
@@ -143,6 +149,10 @@ class ConfigManager {
     search: {
       searxngURL: '',
     },
+    beta: {
+      enablePresentations: true,
+      enablePresentonBeta: true,
+    },
   };
   uiConfigSections: UIConfigSections = {
     preferences: [
@@ -152,16 +162,40 @@ class ConfigManager {
         type: 'select',
         options: [
           {
-            name: 'Light',
+            name: 'Dark (Modern)',
+            value: 'dark',
+          },
+          {
+            name: 'Light (Minimal)',
             value: 'light',
           },
           {
-            name: 'Dark',
-            value: 'dark',
+            name: 'Cyberpunk (Neon)',
+            value: 'cyberpunk',
+          },
+          {
+            name: 'Nordic (Frost)',
+            value: 'nord',
+          },
+          {
+            name: 'Retro CRT Terminal',
+            value: 'retro-terminal',
+          },
+          {
+            name: '80s Synthwave',
+            value: 'synthwave',
+          },
+          {
+            name: 'Vintage Paper',
+            value: 'vintage-paper',
+          },
+          {
+            name: 'Matrix Digital Rain',
+            value: 'matrix',
           },
         ],
         required: false,
-        description: 'Choose between light and dark layouts for the app.',
+        description: 'Choose between modern and retro layouts for the app.',
         default: 'dark',
         scope: 'client',
       },
@@ -235,6 +269,44 @@ class ConfigManager {
         default: true,
         scope: 'client',
       },
+      {
+        name: 'PDF Export Style',
+        key: 'pdfExportStyle',
+        type: 'select',
+        options: [
+          {
+            name: 'Vane Classic (Branded)',
+            value: 'vane',
+          },
+          {
+            name: 'Minimal Neutral (Clean)',
+            value: 'minimal',
+          },
+          {
+            name: 'Corporate Executive',
+            value: 'corporate',
+          },
+          {
+            name: 'Academic Paper',
+            value: 'academic',
+          },
+        ],
+        required: false,
+        description:
+          'Choose the visual styling and layout for exported PDF documents and reports.',
+        default: 'vane',
+        scope: 'client',
+      },
+      {
+        name: 'Vane Branding in PDF',
+        key: 'pdfShowBranding',
+        type: 'switch',
+        required: false,
+        description:
+          'Include Vane logo, header badge, and community attribution in exported PDF documents.',
+        default: true,
+        scope: 'client',
+      },
     ],
     personalization: [
       {
@@ -260,6 +332,28 @@ class ConfigManager {
         default: '',
         scope: 'server',
         env: 'SEARXNG_API_URL',
+      },
+    ],
+    beta: [
+      {
+        name: 'AI Presentations',
+        key: 'enablePresentations',
+        type: 'switch',
+        required: false,
+        description:
+          'Enable experimental AI Presentation Generator with Deep Research in Scratchpad.',
+        default: true,
+        scope: 'client',
+      },
+      {
+        name: 'Presenton Presentations (MCP)',
+        key: 'enablePresentonBeta',
+        type: 'switch',
+        required: false,
+        description:
+          'Generate editable PowerPoint (.pptx) and PDF decks via Presenton MCP using deep web research.',
+        default: true,
+        scope: 'client',
       },
     ],
   };
@@ -538,7 +632,16 @@ class ConfigManager {
   }
 
   private migrateConfig(config: Config): Config {
-    /* TODO: Add migrations */
+    if (!config.beta) {
+      config.beta = {
+        enablePresentations: false,
+        enablePresentonBeta: false,
+      };
+    } else {
+      if (config.beta.enablePresentonBeta === undefined) {
+        config.beta.enablePresentonBeta = false;
+      }
+    }
     return config;
   }
 
@@ -734,8 +837,20 @@ class ConfigManager {
 
     // Strict type and value validation per config key
     if (key === 'preferences.theme') {
-      if (val !== 'light' && val !== 'dark') {
-        throw new Error('Theme must be either "light" or "dark".');
+      const allowedThemes = new Set([
+        'dark',
+        'light',
+        'cyberpunk',
+        'nord',
+        'retro-terminal',
+        'synthwave',
+        'vintage-paper',
+        'matrix',
+      ]);
+      if (!allowedThemes.has(val)) {
+        throw new Error(
+          `Theme must be one of: ${Array.from(allowedThemes).join(', ')}.`,
+        );
       }
     } else if (key === 'preferences.language') {
       if (typeof val !== 'string' || !ALLOWED_LANGUAGES.has(val)) {
@@ -750,7 +865,10 @@ class ConfigManager {
     } else if (
       key === 'preferences.autoMediaSearch' ||
       key === 'preferences.showWeatherWidget' ||
-      key === 'preferences.showNewsWidget'
+      key === 'preferences.showNewsWidget' ||
+      key === 'beta.enablePresentations' ||
+      key === 'beta.enablePresentonBeta' ||
+      key === 'beta.presentations'
     ) {
       if (typeof val !== 'boolean') {
         throw new Error(`Value for "${key}" must be a boolean.`);

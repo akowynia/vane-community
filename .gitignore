@@ -7,6 +7,7 @@ yarn-error.log
 .next/
 out/
 dist/
+site/
 
 # IDE/Editor specific
 .vscode/

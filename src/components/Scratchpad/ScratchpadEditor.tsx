@@ -1,6 +1,4 @@
-'use client';
-
-import React, { useRef, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useDeferredValue } from 'react';
 import {
   Bold,
   Italic,
@@ -26,9 +24,13 @@ import {
   Layers,
   Info,
   X,
+  ChevronLeft,
+  ChevronRight,
+  ListFilter,
 } from 'lucide-react';
 import Markdown, { MarkdownToJSX, RuleType } from 'markdown-to-jsx';
 import CodeBlock from '../MessageRenderer/CodeBlock';
+import ErrorBoundary from '../ErrorBoundary';
 import { useTranslation } from '@/lib/i18n';
 
 interface ScratchpadEditorProps {
@@ -56,11 +58,70 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
   onHoverCitation,
   templateInfo = null,
 }) => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [viewMode, setViewMode] = useState<'edit' | 'preview' | 'split'>('split');
   const [selectionRange, setSelectionRange] = useState<{ start: number; end: number } | null>(null);
   const [isTemplateBannerDismissed, setIsTemplateBannerDismissed] = useState(false);
+
+  const previewContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Large document section pagination state
+  const [sectionPage, setSectionPage] = useState(0);
+  const [showAllSections, setShowAllSections] = useState(false);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  // Use deferred value for preview so typing in textarea remains fluid at 60fps
+  const deferredContent = useDeferredValue(content);
+  const isLargeDocument = Boolean(
+    deferredContent &&
+      (deferredContent.length > 10000 || (deferredContent.match(/(?:^|\n)#\s+/g) || []).length >= 4),
+  );
+
+  // Detect separate query/note sections for bulk batch documents
+  const detectedSections = useMemo(() => {
+    if (!deferredContent) return null;
+
+    // Strategy 1: Batch export format with divider followed by H1 header (# )
+    if (/\n\s*---\s*\n(?=#\s)/.test(deferredContent)) {
+      const parts = deferredContent.split(/\n\s*---\s*\n(?=#\s)/).filter((p) => p.trim());
+      if (parts.length >= 2) return parts;
+    }
+
+    // Strategy 2: If document contains multiple top-level Markdown headers (# )
+    const h1Matches = deferredContent.match(/(?:^|\n)#\s+[^\n]+/g);
+    if (h1Matches && h1Matches.length >= 4) {
+      const parts = deferredContent
+        .split(/(?:^|\n)(?=#\s+[^\n]+)/)
+        .map((p) => p.replace(/^\s*---\s*\n*/, '').trim())
+        .filter((p) => p.trim());
+      if (parts.length >= 4) return parts;
+    }
+
+    // Strategy 3: General horizontal rule divider fallback (---)
+    const parts = deferredContent.split(/\n\s*---\s*\n/).filter((p) => p.trim());
+    return parts.length >= 4 ? parts : null;
+  }, [deferredContent]);
+
+  const totalPages = detectedSections ? Math.max(1, Math.ceil(detectedSections.length / pageSize)) : 1;
+
+  useEffect(() => {
+    if (detectedSections) {
+      const maxPage = Math.max(0, Math.ceil(detectedSections.length / pageSize) - 1);
+      if (sectionPage > maxPage) {
+        setSectionPage(maxPage);
+      }
+    }
+  }, [detectedSections, pageSize, sectionPage]);
+
+  const handlePageChange = (newPage: number) => {
+    const maxPage = detectedSections ? Math.max(0, Math.ceil(detectedSections.length / pageSize) - 1) : 0;
+    const clampedPage = Math.max(0, Math.min(newPage, maxPage));
+    setSectionPage(clampedPage);
+    if (previewContainerRef.current) {
+      previewContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Check if template info is present or if content contains template placeholder structures
   const isTemplateActive = useMemo(() => {
@@ -75,11 +136,11 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
 
   const isLocked = Boolean(readOnly || isGenerating);
 
-  // Process markdown text so that sentences with citations [1], [2] and user selection are wrapped with interactive hooks
-  const processedPreviewContent = useMemo(() => {
-    if (!content) return '';
+  // Helper to process markdown lines with citations without regex backtracking
+  const processMarkdownString = (rawText: string, isBulk: boolean): string => {
+    if (!rawText) return '';
 
-    const lines = content.split('\n');
+    const lines = rawText.split('\n');
     let inCodeBlock = false;
 
     const processedLines = lines.map((line) => {
@@ -90,22 +151,36 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
       }
       if (inCodeBlock) return line;
 
-      // Skip table delimiter rows (e.g., | :--- | :--- |)
+      // Never modify heading lines - preserve Markdown headers
+      if (line.trim().startsWith('#')) {
+        return line;
+      }
+
+      // Skip table delimiter rows
       if (/^\s*\|?\s*[:\-]+(?:\s*\|\s*[:\-]+)+\s*\|?\s*$/.test(line)) {
         return line;
+      }
+
+      // For large bulk documents, avoid expensive backtracking across sentences
+      if (isBulk) {
+        let lineWithCitations = line.replace(/(?<![a-zA-Z0-9_-])\[([\d,\s]+)\]/g, (match, numbersStr) => {
+          const numbers = numbersStr.split(',').map((n: string) => n.trim()).filter(Boolean);
+          const primaryNum = numbers[0];
+          return `<span className="citation-badge" data-source="${primaryNum}" data-sources="${numbers.join(',')}">${primaryNum}</span>`;
+        });
+        lineWithCitations = lineWithCitations.replace(/<(?!\/?(?:span|div|p|a|b|i|strong|em|br|hr|code|pre|table|thead|tbody|tr|th|td|ul|ol|li)\b[^>]*>)/gi, '&lt;');
+        return lineWithCitations;
       }
 
       // Check if line is a table row (contains pipes)
       if (line.includes('|')) {
         const cells = line.split('|');
         const processedCells = cells.map((cell, idx) => {
-          // Keep empty boundary parts of "| cell 1 | cell 2 |" untouched
           if ((idx === 0 || idx === cells.length - 1) && !cell.trim()) {
             return cell;
           }
 
           let cellText = cell;
-          // Process citations within this cell boundary only without crossing pipe delimiters
           const cellCitationRegex = /([^.\n?!;:*#_`]*?)\s*\[([\d,\s]+)\]/g;
           cellText = cellText.replace(cellCitationRegex, (match, clause, numbersStr) => {
             const numbers = numbersStr.split(',').map((n: string) => n.trim()).filter(Boolean);
@@ -121,7 +196,7 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
         return processedCells.join('|');
       }
 
-      // Regular lines (prose, list items, headings)
+      // Regular lines (prose, list items)
       let processedLine = line;
       const lineCitationRegex = /([^.\n?!;:#>|]+?)\s*\[([\d,\s]+)\]/g;
       processedLine = processedLine.replace(lineCitationRegex, (match, sentence, numbersStr) => {
@@ -154,8 +229,14 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
       }
     }
 
+    result = result.replace(/<(?!\/?(?:span|div|p|a|b|i|strong|em|br|hr|code|pre|table|thead|tbody|tr|th|td|ul|ol|li)\b[^>]*>)/gi, '&lt;');
     return result;
-  }, [content, selectedText]);
+  };
+
+  // Process markdown text so that sentences with citations and user selection are wrapped
+  const processedPreviewContent = useMemo(() => {
+    return processMarkdownString(deferredContent, isLargeDocument);
+  }, [deferredContent, selectedText, isLargeDocument]);
 
   const markdownOverrides: MarkdownToJSX.Options = {
     overrides: {
@@ -626,10 +707,185 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
 
         {/* Preview Area */}
         {(viewMode === 'preview' || viewMode === 'split') && (
-          <div className={`h-full overflow-y-auto p-6 ${viewMode === 'split' ? 'w-1/2' : 'w-full'} bg-light-primary dark:bg-[#120f0d]`}>
+          <div
+            ref={previewContainerRef}
+            className={`h-full overflow-y-auto p-6 ${viewMode === 'split' ? 'w-1/2' : 'w-full'} bg-light-primary dark:bg-[#120f0d] flex flex-col`}
+          >
             {content.trim() ? (
-              <div className="prose prose-stone dark:prose-invert max-w-none text-sm leading-relaxed">
-                <Markdown options={markdownOverrides}>{processedPreviewContent || content}</Markdown>
+              <div className="flex-1 flex flex-col min-h-0">
+                {detectedSections ? (
+                  <div className="flex flex-col space-y-4">
+                    {/* Bulk Section Navigation Header */}
+                    <div className="p-3 rounded-xl border border-[#b8864d]/30 bg-[#b8864d]/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center space-x-2">
+                        <Layers className="w-4 h-4 text-[#b8864d]" />
+                        <span className="font-semibold text-stone-900 dark:text-stone-100">
+                          {t('scratchpad.batchViewTitle') || 'Batch Research View'}:
+                        </span>
+                        <span className="text-stone-600 dark:text-stone-300">
+                          {showAllSections
+                            ? `${detectedSections.length} ${t('scratchpad.sectionsCount') && t('scratchpad.sectionsCount') !== 'scratchpad.sectionsCount' ? t('scratchpad.sectionsCount') : 'sections'}`
+                            : `${sectionPage * pageSize + 1}–${Math.min(detectedSections.length, (sectionPage + 1) * pageSize)} ${t('common.of') && t('common.of') !== 'common.of' ? t('common.of') : (locale === 'pl' ? 'z' : 'of')} ${detectedSections.length}`}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        {!showAllSections ? (
+                          <>
+                            <select
+                              value={pageSize}
+                              onChange={(e) => {
+                                setPageSize(Number(e.target.value));
+                                setSectionPage(0);
+                              }}
+                              aria-label="Page size"
+                              className="px-2 py-1 rounded-lg border border-light-300 dark:border-[#382b20] bg-light-secondary dark:bg-[#1f1914] text-xs text-stone-700 dark:text-stone-200 focus:outline-none"
+                            >
+                              <option value={10}>10</option>
+                              <option value={20}>20</option>
+                              <option value={50}>50</option>
+                            </select>
+
+                            <button
+                              type="button"
+                              disabled={sectionPage === 0}
+                              onClick={() => handlePageChange(Math.max(0, sectionPage - 1))}
+                              className="px-2 py-1 rounded-lg border border-light-300 dark:border-[#382b20] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 transition flex items-center space-x-1"
+                            >
+                              <ChevronLeft className="w-3.5 h-3.5" />
+                              <span>
+                                {t('common.previous') && t('common.previous') !== 'common.previous'
+                                  ? t('common.previous')
+                                  : locale === 'pl'
+                                    ? 'Poprzednia'
+                                    : 'Prev'}
+                              </span>
+                            </button>
+                            <span className="text-[11px] font-mono text-stone-400">
+                              {sectionPage + 1} / {totalPages}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={(sectionPage + 1) * pageSize >= detectedSections.length}
+                              onClick={() => handlePageChange(sectionPage + 1)}
+                              className="px-2 py-1 rounded-lg border border-light-300 dark:border-[#382b20] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 transition flex items-center space-x-1"
+                            >
+                              <span>
+                                {t('common.next') && t('common.next') !== 'common.next'
+                                  ? t('common.next')
+                                  : locale === 'pl'
+                                    ? 'Następna'
+                                    : 'Next'}
+                              </span>
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowAllSections(true)}
+                              className="px-2.5 py-1 rounded-lg bg-[#b8864d]/15 text-[#b8864d] hover:bg-[#b8864d]/25 font-medium transition"
+                            >
+                              {t('scratchpad.showAll') || 'Show All'}
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllSections(false)}
+                            className="px-2.5 py-1 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 text-stone-600 dark:text-stone-300 font-medium transition"
+                          >
+                            {t('scratchpad.paginateView') || 'Paginated View'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Rendered Sections List */}
+                    <div className="space-y-6">
+                      {(showAllSections
+                        ? detectedSections
+                        : detectedSections.slice(sectionPage * pageSize, (sectionPage + 1) * pageSize)
+                      ).map((secText, idx) => {
+                        const actualIdx = showAllSections ? idx : sectionPage * pageSize + idx;
+                        const processedSec = processMarkdownString(secText, isLargeDocument);
+                        return (
+                          <div
+                            key={actualIdx}
+                            className="p-4 rounded-xl border border-light-200 dark:border-[#221c16] bg-light-secondary/20 dark:bg-[#15110e]/40 shadow-sm prose prose-stone dark:prose-invert max-w-none text-sm leading-relaxed"
+                          >
+                            <ErrorBoundary
+                              fallback={
+                                <div className="whitespace-pre-wrap font-sans text-stone-900 dark:text-stone-100">
+                                  {secText}
+                                </div>
+                              }
+                            >
+                              <Markdown options={markdownOverrides}>
+                                {processedSec}
+                              </Markdown>
+                            </ErrorBoundary>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Bottom Section Navigation */}
+                    {!showAllSections && totalPages > 1 && (
+                      <div className="p-3 mt-4 rounded-xl border border-[#b8864d]/30 bg-[#b8864d]/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span className="text-stone-600 dark:text-stone-300">
+                          {sectionPage * pageSize + 1}–${Math.min(detectedSections.length, (sectionPage + 1) * pageSize)} {t('common.of') && t('common.of') !== 'common.of' ? t('common.of') : (locale === 'pl' ? 'z' : 'of')} ${detectedSections.length}
+                        </span>
+
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            disabled={sectionPage === 0}
+                            onClick={() => handlePageChange(Math.max(0, sectionPage - 1))}
+                            className="px-2 py-1 rounded-lg border border-light-300 dark:border-[#382b20] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 transition flex items-center space-x-1"
+                          >
+                            <ChevronLeft className="w-3.5 h-3.5" />
+                            <span>
+                              {t('common.previous') && t('common.previous') !== 'common.previous'
+                                ? t('common.previous')
+                                : locale === 'pl'
+                                  ? 'Poprzednia'
+                                  : 'Prev'}
+                            </span>
+                          </button>
+                          <span className="text-[11px] font-mono text-stone-400">
+                            {sectionPage + 1} / {totalPages}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={(sectionPage + 1) * pageSize >= detectedSections.length}
+                            onClick={() => handlePageChange(sectionPage + 1)}
+                            className="px-2 py-1 rounded-lg border border-light-300 dark:border-[#382b20] hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 transition flex items-center space-x-1"
+                          >
+                            <span>
+                              {t('common.next') && t('common.next') !== 'common.next'
+                                ? t('common.next')
+                                : locale === 'pl'
+                                  ? 'Następna'
+                                  : 'Next'}
+                            </span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="prose prose-stone dark:prose-invert max-w-none text-sm leading-relaxed">
+                    <ErrorBoundary
+                      fallback={
+                        <div className="whitespace-pre-wrap font-sans text-stone-900 dark:text-stone-100">
+                          {processedPreviewContent || content}
+                        </div>
+                      }
+                    >
+                      <Markdown options={markdownOverrides}>{processedPreviewContent || content}</Markdown>
+                    </ErrorBoundary>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="h-full flex items-center justify-center text-xs text-stone-400 dark:text-stone-600 italic">

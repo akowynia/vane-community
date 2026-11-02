@@ -8,6 +8,8 @@ import { useChat } from '@/lib/hooks/useChat';
 import ModelSelector from './MessageInputActions/ChatModelSelector';
 import WaypointSelector from './MessageInputActions/WaypointSelector';
 import { useTranslation } from '@/lib/i18n';
+import BatchSearchTrigger from './BatchSearch/BatchSearchTrigger';
+import BatchSearchModal from './BatchSearch/BatchSearchModal';
 
 const EmptyChatMessageInput = () => {
   const { sendMessage } = useChat();
@@ -71,7 +73,10 @@ const EmptyChatMessageInput = () => {
           />
         </div>
         <div className="flex flex-row items-center justify-between mt-3 pt-2 border-t border-light-200/50 dark:border-[#28221b]/70">
-          <Optimization />
+          <div className="flex flex-row items-center space-x-1.5">
+            <Optimization />
+            <BatchSearchTrigger position="bottom" />
+          </div>
           <div className="flex flex-row items-center space-x-2">
             <div className="flex flex-row items-center space-x-1">
               <WaypointSelector />
@@ -89,6 +94,7 @@ const EmptyChatMessageInput = () => {
           </div>
         </div>
       </div>
+      <BatchSearchModal />
     </form>
   );
 };

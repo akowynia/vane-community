@@ -13,11 +13,12 @@ import { getLocalizedBuiltinTemplate } from '@/lib/scratchpad/builtinTemplates';
 const createScratchpadSchema = z.object({
   title: z.string().max(200).optional().default('Untitled'),
   content: z.string().optional().default(''),
-  type: z.enum(['note', 'presentation']).optional().default('note'),
+  type: z.enum(['note', 'presentation', 'batch']).optional().default('note'),
   metadata: z.record(z.string(), z.any()).optional().default({}),
   templateId: z.string().optional().nullable(),
   waypointId: z.string().optional().nullable(),
   prompt: z.string().optional().nullable(),
+  sources: z.array(z.any()).optional().default([]),
 });
 
 export const GET = async (req: Request) => {
@@ -157,7 +158,7 @@ export const POST = async (req: Request) => {
       );
     }
 
-    let { title, content, type, metadata, templateId, waypointId } = parsed.data;
+    let { title, content, type, metadata, templateId, waypointId, sources } = parsed.data;
     const now = new Date().toISOString();
     const id = crypto.randomUUID();
 
@@ -194,6 +195,7 @@ export const POST = async (req: Request) => {
 
     const initialTitle = (title || '').trim() || (type === 'presentation' ? 'New presentation' : 'New scratchpad');
     const initialContent = content || '';
+    const initialSources = Array.isArray(sources) ? sources : [];
 
     await db.insert(scratchpads).values({
       id,
@@ -204,7 +206,7 @@ export const POST = async (req: Request) => {
       userId: user?.id || null,
       waypointId: waypointId || null,
       templateId: templateId || null,
-      sources: [],
+      sources: initialSources,
       createdAt: now,
       updatedAt: now,
     });
@@ -220,9 +222,11 @@ export const POST = async (req: Request) => {
         ? 'Created from template'
         : type === 'presentation'
           ? 'Presentation created'
-          : 'Scratchpad created',
+          : type === 'batch'
+            ? 'Batch research notes imported'
+            : 'Scratchpad created',
       prompt: parsed.data.prompt || null,
-      sources: [],
+      sources: initialSources,
       author: 'user',
       createdAt: now,
     });

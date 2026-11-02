@@ -8,8 +8,12 @@ import {
   Sliders,
   ToggleRight,
   Lock,
+  FlaskConical,
+  Plug,
 } from 'lucide-react';
 import Preferences from './Sections/Preferences';
+import Beta from './Sections/Beta';
+import MCPSection from './Sections/MCP';
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -69,6 +73,22 @@ const SettingsDialogue = ({
       icon: Search,
       component: SearchSection,
       dataAdd: 'search',
+    },
+    {
+      key: 'beta',
+      name: t('settings.betaOptions') || 'Beta Options',
+      description: t('settings.betaOptionsDesc') || 'Experimental features and tools in testing.',
+      icon: FlaskConical,
+      component: Beta,
+      dataAdd: 'beta',
+    },
+    {
+      key: 'mcp',
+      name: t('settings.mcpTitle') || 'MCP Servers',
+      description: t('settings.mcpDesc') || 'Model Context Protocol tool connections and integrations.',
+      icon: Plug,
+      component: MCPSection,
+      dataAdd: 'mcp',
     },
   ];
 

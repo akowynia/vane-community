@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogBackdrop,
@@ -21,8 +21,10 @@ import {
   Zap,
   BookOpen,
   Check,
+  Server,
 } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n';
+import { getEnablePresentonBeta } from '@/lib/config/clientRegistry';
 
 export interface CreatePresentationConfig {
   title: string;
@@ -35,6 +37,7 @@ export interface CreatePresentationConfig {
   researchIntensity: 'speed' | 'balanced' | 'quality';
   includeSpeakerNotes: boolean;
   includeCitations: boolean;
+  generatorEngine?: 'builtIn' | 'presenton';
 }
 
 interface CreatePresentationDialogProps {
@@ -75,8 +78,21 @@ const CreatePresentationDialog: React.FC<CreatePresentationDialogProps> = ({
   const [researchIntensity, setResearchIntensity] = useState<'speed' | 'balanced' | 'quality'>('balanced');
   const [includeSpeakerNotes, setIncludeSpeakerNotes] = useState(true);
   const [includeCitations, setIncludeCitations] = useState(true);
+  const [generatorEngine, setGeneratorEngine] = useState<'builtIn' | 'presenton'>('builtIn');
+  const [presentonBetaEnabled, setPresentonBetaEnabled] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+    const checkFlag = () => {
+      setPresentonBetaEnabled(getEnablePresentonBeta());
+    };
+    checkFlag();
+    window.addEventListener('client-config-changed', checkFlag);
+    return () => {
+      window.removeEventListener('client-config-changed', checkFlag);
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,6 +111,7 @@ const CreatePresentationDialog: React.FC<CreatePresentationDialogProps> = ({
         researchIntensity,
         includeSpeakerNotes,
         includeCitations,
+        generatorEngine,
       });
       onClose();
     } catch (err) {
@@ -245,6 +262,53 @@ const CreatePresentationDialog: React.FC<CreatePresentationDialogProps> = ({
                     </select>
                   </div>
                 </div>
+
+                {/* Engine Selector (Beta) */}
+                {presentonBetaEnabled && (
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-2.5 flex items-center space-x-1.5">
+                      <Server className="w-3.5 h-3.5" />
+                      <span>{t('presentation.engineSelectorTitle') || 'Generation Engine (Beta)'}</span>
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setGeneratorEngine('builtIn')}
+                        className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+                          generatorEngine === 'builtIn'
+                            ? 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-500/5'
+                            : 'border-light-200 dark:border-[#251f19] bg-light-secondary/40 dark:bg-[#16120e] hover:border-stone-400 dark:hover:border-stone-600'
+                        }`}
+                      >
+                        <div className="font-semibold text-xs text-stone-900 dark:text-stone-100 mb-1">
+                          🎨 {t('presentation.engineBuiltIn') || 'Vane Native Canvas'}
+                        </div>
+                        <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                          {t('presentation.engineBuiltInDesc') || 'Interactive 16:9 React canvas with charts & slide player.'}
+                        </p>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGeneratorEngine('presenton')}
+                        className={`p-3 rounded-xl border text-left transition flex flex-col justify-between ${
+                          generatorEngine === 'presenton'
+                            ? 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-500/5'
+                            : 'border-light-200 dark:border-[#251f19] bg-light-secondary/40 dark:bg-[#16120e] hover:border-stone-400 dark:hover:border-stone-600'
+                        }`}
+                      >
+                        <div className="font-semibold text-xs text-stone-900 dark:text-stone-100 mb-1 flex items-center justify-between">
+                          <span>📊 {t('presentation.enginePresenton') || 'Presenton MCP'}</span>
+                          <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold uppercase">
+                            BETA
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                          {t('presentation.enginePresentonDesc') || 'Generates editable PowerPoint (.pptx) and PDF via Presenton MCP.'}
+                        </p>
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Theme Selector */}
                 <div>

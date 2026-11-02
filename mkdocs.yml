@@ -1,0 +1,111 @@
+site_name: Vane-Community
+site_description: Privacy-focused, local-first AI answering engine and deep research platform
+site_author: Artur Kowynia
+site_url: https://akowynia.github.io/vane-community/
+repo_url: https://github.com/akowynia/vane-community
+repo_name: akowynia/vane-community
+edit_uri: edit/dev/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Overview: index.md
+  - Getting Started:
+      - Installation & Updating: installation/UPDATING.md
+      - Contributing: CONTRIBUTING.md
+  - Architecture:
+      - Overview: architecture/README.md
+      - Workflow & Engine:
+          - High-Level Architecture: architecture/WORKING.md
+          - Deep Research Agent: architecture/DEEP_RESEARCH.md
+          - Batch Search & CSV: architecture/BATCH_SEARCH.md
+          - Unified Search Panel: architecture/UNIFIED_SEARCH_PANEL.md
+          - Quality Mode Optimizations: architecture/QUALITY_MODE_OPTIMIZATIONS.md
+          - Search & Response Optimizations: architecture/SEARCH_AND_RESPONSE_OPTIMIZATIONS.md
+          - Search Diagnostics & Resilience: architecture/SEARCH_DIAGNOSTICS_AND_RESILIENCE.md
+          - Search Streaming Resilience: architecture/SEARCH_STREAMING_RESILIENCE.md
+          - Search Warnings: architecture/SEARCH_WARNINGS.md
+          - Search Engines Configuration: architecture/SEARCH_ENGINES_CONFIG.md
+      - Integrations & Tools:
+          - MCP Integration: architecture/MCP_INTEGRATION.md
+          - MCP Dedicated Docker Image: architecture/MCP_DOCKER_IMAGE.md
+          - Presenton MCP & Presentations: architecture/PRESENTON_MCP_RESEARCH_PRESENTATIONS.md
+          - Advanced Scrapers (Firecrawl & Crawl4AI): architecture/ADVANCED_SCRAPER_INTEGRATION.md
+          - Scraper Telemetry: architecture/SCRAPER_EXTRACTION_AND_TELEMETRY.md
+      - Models & Scheduling:
+          - Provider Queue & Model Scheduling: architecture/PROVIDER_QUEUE_AND_MODEL_SCHEDULING.md
+          - Model Selection & Metadata: architecture/MODEL_SELECTION_AND_RESPONSE_METADATA.md
+          - Model Statistics & Telemetry: architecture/MODEL_STATISTICS.md
+      - Workspaces & User Experience:
+          - Waypoints: architecture/WAYPOINTS.md
+          - Waypoint Crons: architecture/WAYPOINT_CRONS.md
+          - Waypoint Cron Webhooks: architecture/WAYPOINT_CRON_WEBHOOKS.md
+          - Scratchpad Canvas: architecture/SCRATCHPAD.md
+          - AI Presentation Generator: architecture/PRESENTATIONS.md
+          - PDF Export Customization: architecture/PDF_EXPORT_CUSTOMIZATION.md
+          - UI Themes: architecture/UI_THEMES.md
+          - Localization System: architecture/LOCALIZATION.md
+          - Beta Options: architecture/BETA_OPTIONS.md
+      - Security & DevOps:
+          - Security Architecture: architecture/SECURITY.md
+          - Roles, Vault & Multi-User: architecture/ROLES_VAULT_AND_MULTIUSER.md
+          - API Access & Playground: architecture/API_ACCESS_AND_PLAYGROUND.md
+          - Docker Multi-Arch Build Pipeline: architecture/DOCKER_RELEASE_PIPELINE.md
+          - GitHub Pages Deployment: architecture/GITHUB_PAGES_DEPLOYMENT.md
+  - API Reference:
+      - Search API: API/SEARCH.md
+  - Releases:
+      - Changelog: CHANGELOG.md
+      - License: LICENSE.md
+

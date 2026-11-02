@@ -8,6 +8,8 @@ import ModelSelector from './MessageInputActions/ChatModelSelector';
 import WaypointSelector from './MessageInputActions/WaypointSelector';
 import { useChat } from '@/lib/hooks/useChat';
 import { useTranslation } from '@/lib/i18n';
+import BatchSearchTrigger from './BatchSearch/BatchSearchTrigger';
+import BatchSearchModal from './BatchSearch/BatchSearchModal';
 
 const MessageInput = () => {
   const {
@@ -87,7 +89,10 @@ const MessageInput = () => {
           />
         </div>
         <div className="flex flex-row items-center justify-between mt-3 pt-2 border-t border-light-200/50 dark:border-[#28221b]/70">
-          <Optimization position="top" align="left" />
+          <div className="flex flex-row items-center space-x-1.5">
+            <Optimization position="top" align="left" />
+            <BatchSearchTrigger position="top" />
+          </div>
           <div className="flex flex-row items-center space-x-2">
             <div className="flex flex-row items-center space-x-1">
               <WaypointSelector position="top" />
@@ -119,6 +124,7 @@ const MessageInput = () => {
           </div>
         </div>
       </div>
+      <BatchSearchModal />
     </form>
   );
 };

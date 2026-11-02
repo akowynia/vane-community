@@ -1,6 +1,6 @@
 import db, { ensureWaypointCronsTable } from '@/lib/db';
-import { waypointCrons, waypoints, chats, users } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { waypointCrons, waypoints, chats, users, messages } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 import ModelRegistry from '@/lib/models/registry';
 import SearchAgent from '@/lib/agents/search';
 import SessionManager from '@/lib/session';
@@ -9,6 +9,8 @@ import { computeNextRun } from './parser';
 import configManager from '@/lib/config';
 import crypto from 'crypto';
 import providerQueueManager from '@/lib/queue';
+import { dispatchCronWebhooks } from './webhooks';
+import { Block, TextBlock, SourceBlock } from '@/lib/types';
 
 export interface ExecuteCronResult {
   success: boolean;
@@ -158,7 +160,7 @@ export async function executeCronJob(cronId: string): Promise<ExecuteCronResult>
           llm,
           embedding,
           sources: safeSources as SearchSources[],
-          mode: (cron.optimizationMode as 'speed' | 'balanced' | 'quality') || 'balanced',
+          mode: (cron.optimizationMode as 'speed' | 'balanced' | 'quality' | 'deep') || 'balanced',
           fileIds: [],
           systemInstructions: effectiveSystemInstructions || 'None',
           providerId: cron.chatModelProvider,
@@ -187,6 +189,54 @@ export async function executeCronJob(cronId: string): Promise<ExecuteCronResult>
       })
       .where(eq(waypointCrons.id, cronId));
 
+    // 8. Extract response blocks and dispatch webhooks
+    try {
+      const generatedMsg = await db.query.messages.findFirst({
+        where: and(eq(messages.chatId, chatId), eq(messages.messageId, messageId)),
+      });
+
+      let fullContent = '';
+      let sourcesList: Array<{ title?: string; url?: string }> = [];
+
+      if (generatedMsg && Array.isArray(generatedMsg.responseBlocks)) {
+        for (const block of generatedMsg.responseBlocks as Block[]) {
+          if (block.type === 'text') {
+            fullContent += (block as TextBlock).data + '\n\n';
+          } else if (block.type === 'source') {
+            const srcBlock = block as SourceBlock;
+            if (Array.isArray(srcBlock.data)) {
+              for (const chunk of srcBlock.data) {
+                if (chunk.metadata?.url) {
+                  sourcesList.push({
+                    title: chunk.metadata.title || chunk.metadata.url,
+                    url: chunk.metadata.url,
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+
+      fullContent = fullContent.trim();
+      const summaryText = fullContent.length > 500 ? fullContent.substring(0, 497) + '...' : fullContent;
+
+      await dispatchCronWebhooks(cron.webhooks, {
+        cronId: cron.id,
+        cronName: cron.name,
+        waypointName: waypoint.name,
+        chatId: chatId,
+        status: 'success',
+        prompt: cron.prompt,
+        summary: summaryText,
+        fullContent: fullContent,
+        sources: sourcesList,
+        executedAt: now.toISOString(),
+      });
+    } catch (whErr) {
+      console.warn(`[CronExecutor] Webhook notification dispatch warning (${cronId}):`, whErr);
+    }
+
     return { success: true, chatId };
   } catch (err: any) {
     console.error(`Error executing cron job (${cronId}):`, err);
@@ -202,6 +252,22 @@ export async function executeCronJob(cronId: string): Promise<ExecuteCronResult>
         updatedAt: new Date().toISOString(),
       })
       .where(eq(waypointCrons.id, cronId));
+
+    try {
+      if (cron && cron.webhooks) {
+        await dispatchCronWebhooks(cron.webhooks, {
+          cronId: cron.id,
+          cronName: cron.name,
+          chatId: undefined,
+          status: 'error',
+          prompt: cron.prompt,
+          error: errorMessage,
+          executedAt: now.toISOString(),
+        });
+      }
+    } catch (whErr) {
+      console.warn(`[CronExecutor] Webhook error notification warning (${cronId}):`, whErr);
+    }
 
     return { success: false, error: errorMessage };
   }

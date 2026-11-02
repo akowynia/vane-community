@@ -52,6 +52,10 @@ const MessageSources = ({
           hoveredSourceIndex === sourceNumber;
         const url = getUrl(source);
         const title = getTitle(source);
+        const scraperEngine = source?.metadata?.scraperEngine;
+        const searchEngine = source?.metadata?.searchEngine;
+        const isMcp = scraperEngine && scraperEngine.includes('(MCP)');
+        const isFirecrawl = scraperEngine && scraperEngine.includes('Firecrawl');
         const isFile =
           !url ||
           url.includes('file_id://') ||
@@ -60,9 +64,26 @@ const MessageSources = ({
 
         const cardContent = (
           <>
-            <p className="dark:text-white text-xs overflow-hidden whitespace-nowrap text-ellipsis">
-              {title}
-            </p>
+            <div className="flex items-start justify-between gap-1 w-full">
+              <p className="dark:text-white text-xs overflow-hidden whitespace-nowrap text-ellipsis flex-1">
+                {title}
+              </p>
+              {isMcp ? (
+                <span
+                  className={`shrink-0 inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-semibold ${
+                    isFirecrawl
+                      ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30'
+                      : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                  }`}
+                >
+                  {isFirecrawl ? '🔥' : '⚡'} {isFirecrawl ? 'Firecrawl' : 'Crawl4AI'}
+                </span>
+              ) : searchEngine ? (
+                <span className="shrink-0 px-1 py-0.2 rounded text-[8.5px] font-mono bg-light-200 dark:bg-dark-200 text-black/60 dark:text-white/60">
+                  {searchEngine}
+                </span>
+              ) : null}
+            </div>
             <div className="flex flex-row items-center justify-between">
               <div className="flex flex-row items-center space-x-1">
                 {isFile ? (
@@ -196,6 +217,10 @@ const MessageSources = ({
                         hoveredSourceIndex === sourceNumber;
                       const url = getUrl(source);
                       const title = getTitle(source);
+                      const scraperEngine = source?.metadata?.scraperEngine;
+                      const searchEngine = source?.metadata?.searchEngine;
+                      const isMcp = scraperEngine && scraperEngine.includes('(MCP)');
+                      const isFirecrawl = scraperEngine && scraperEngine.includes('Firecrawl');
                       const isFile =
                         !url ||
                         url.includes('file_id://') ||
@@ -204,9 +229,26 @@ const MessageSources = ({
 
                       const modalItemContent = (
                         <>
-                          <p className="dark:text-white text-xs overflow-hidden whitespace-nowrap text-ellipsis">
-                            {title}
-                          </p>
+                          <div className="flex items-start justify-between gap-1 w-full">
+                            <p className="dark:text-white text-xs overflow-hidden whitespace-nowrap text-ellipsis flex-1">
+                              {title}
+                            </p>
+                            {isMcp ? (
+                              <span
+                                className={`shrink-0 inline-flex items-center gap-0.5 px-1 py-0.2 rounded text-[9px] font-semibold ${
+                                  isFirecrawl
+                                    ? 'bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30'
+                                    : 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                                }`}
+                              >
+                                {isFirecrawl ? '🔥' : '⚡'} {isFirecrawl ? 'Firecrawl' : 'Crawl4AI'}
+                              </span>
+                            ) : searchEngine ? (
+                              <span className="shrink-0 px-1 py-0.2 rounded text-[8.5px] font-mono bg-light-200 dark:bg-dark-200 text-black/60 dark:text-white/60">
+                                {searchEngine}
+                              </span>
+                            ) : null}
+                          </div>
                           <div className="flex flex-row items-center justify-between">
                             <div className="flex flex-row items-center space-x-1">
                               {isFile ? (

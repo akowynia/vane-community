@@ -21,6 +21,9 @@ import {
   Cpu,
   Zap,
   Loader2,
+  Flame,
+  Globe,
+  Search,
 } from 'lucide-react';
 import Markdown, { MarkdownToJSX, RuleType } from 'markdown-to-jsx';
 import Copy from './MessageActions/Copy';
@@ -87,6 +90,30 @@ const MessageBox = ({
   );
 
   const sources = sourceBlocks.flatMap((block) => block.data);
+
+  const scraperEngines = Array.from(
+    new Set(
+      sources
+        .map((s) => s?.metadata?.scraperEngine)
+        .filter((e): e is string => Boolean(e) && e !== 'Extracting...'),
+    ),
+  );
+
+  const searchEngines = Array.from(
+    new Set(
+      sources
+        .map((s) => s?.metadata?.searchEngine)
+        .filter((e): e is string => Boolean(e)),
+    ),
+  );
+
+  const mcpFallbacks = Array.from(
+    new Set(
+      sources
+        .map((s) => s?.metadata?.mcpFallback)
+        .filter((e): e is string => Boolean(e)),
+    ),
+  );
 
   const tokenLimitWarning = section.message.responseBlocks
     .filter(
@@ -417,10 +444,10 @@ const MessageBox = ({
                   </Markdown>
                 </ErrorBoundary>
 
-                {/* Telemetry metadata: Model, Duration, Tokens */}
-                {section.metrics && (
+                {/* Telemetry metadata: Model, Duration, Tokens, Scraper & Search Engines */}
+                {(section.metrics || scraperEngines.length > 0 || searchEngines.length > 0) && (
                   <div className="flex flex-wrap items-center gap-1.5 pt-3 pb-1 text-[11px] text-black/60 dark:text-stone-400">
-                    {section.metrics.modelKey && (
+                    {section.metrics?.modelKey && (
                       <span
                         title={section.metrics.providerId ? `${t('statistics.providers') || 'Provider'}: ${section.metrics.providerId}` : undefined}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-light-200/80 dark:bg-[#181513] border border-light-300/60 dark:border-[#2b241d] text-black/80 dark:text-stone-300 shadow-sm"
@@ -431,7 +458,7 @@ const MessageBox = ({
                         </span>
                       </span>
                     )}
-                    {section.metrics.durationMs !== undefined && section.metrics.durationMs > 0 && (
+                    {section.metrics?.durationMs !== undefined && section.metrics.durationMs > 0 && (
                       <span
                         title={t('statistics.duration') || 'Duration'}
                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-light-200/80 dark:bg-[#181513] border border-light-300/60 dark:border-[#2b241d] text-black/70 dark:text-stone-300 shadow-sm"
@@ -442,7 +469,7 @@ const MessageBox = ({
                         </span>
                       </span>
                     )}
-                    {section.metrics.totalTokens !== undefined && section.metrics.totalTokens > 0 && (
+                    {section.metrics?.totalTokens !== undefined && section.metrics.totalTokens > 0 && (
                       <span
                         title={
                           t('chat.tokensBreakdown', {
@@ -456,6 +483,64 @@ const MessageBox = ({
                         <Zap size={12} className="text-amber-500" />
                         <span className="font-mono text-[10.5px]">
                           {section.metrics.totalTokens} tok.
+                        </span>
+                      </span>
+                    )}
+
+                    {scraperEngines.map((engine, idx) => {
+                      const isMcp = engine.includes('(MCP)');
+                      const isFirecrawl = engine.includes('Firecrawl');
+                      const isCrawl4Ai = engine.includes('Crawl4AI');
+
+                      return (
+                        <span
+                          key={`scraper-${idx}`}
+                          title={
+                            isMcp
+                              ? `${t('mcp.activeScraper') || 'Scraper Engine'}: ${engine}`
+                              : `${t('mcp.builtinScraper') || 'Scraper Engine'}: ${engine}`
+                          }
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border shadow-sm ${
+                            isMcp
+                              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-800 dark:text-emerald-300'
+                              : 'bg-light-200/80 dark:bg-[#181513] border-light-300/60 dark:border-[#2b241d] text-black/80 dark:text-stone-300'
+                          }`}
+                        >
+                          {isFirecrawl ? (
+                            <Flame size={12} className="text-orange-500" />
+                          ) : isCrawl4Ai ? (
+                            <Zap size={12} className="text-emerald-400" />
+                          ) : (
+                            <Globe size={12} className="text-stone-400" />
+                          )}
+                          <span className="font-medium font-mono text-[10.5px]">
+                            {engine}
+                          </span>
+                        </span>
+                      );
+                    })}
+
+                    {mcpFallbacks.map((fb, idx) => (
+                      <span
+                        key={`mcp-fb-${idx}`}
+                        title={t('chat.mcpScraperFallback') || 'MCP scraper encountered an error and fell back to built-in extractor'}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 shadow-sm"
+                      >
+                        <AlertTriangle size={12} className="text-amber-500" />
+                        <span className="font-mono text-[10.5px]">
+                          {fb} fallback
+                        </span>
+                      </span>
+                    ))}
+
+                    {searchEngines.length > 0 && (
+                      <span
+                        title={`Search Provider: SearXNG (${searchEngines.join(', ')})`}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-light-200/80 dark:bg-[#181513] border border-light-300/60 dark:border-[#2b241d] text-black/70 dark:text-stone-300 shadow-sm"
+                      >
+                        <Search size={12} className="text-stone-400" />
+                        <span className="font-mono text-[10.5px]">
+                          {searchEngines.slice(0, 3).join(', ')}{searchEngines.length > 3 ? '...' : ''}
                         </span>
                       </span>
                     )}

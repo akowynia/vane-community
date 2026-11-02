@@ -11,6 +11,8 @@ import MermaidBlock from '../MermaidBlock';
 const SyntaxHighlighterComponent =
   SyntaxHighlighter as unknown as React.ComponentType<any>;
 
+import { isThemeDark } from '@/lib/theme';
+
 const CodeBlock = ({
   language,
   children,
@@ -29,7 +31,7 @@ const CodeBlock = ({
 
   const syntaxTheme = useMemo(() => {
     if (!mounted) return lightTheme;
-    return resolvedTheme === 'dark' ? darkTheme : lightTheme;
+    return isThemeDark(resolvedTheme) ? darkTheme : lightTheme;
   }, [mounted, resolvedTheme]);
 
   const extractText = (node: any): string => {

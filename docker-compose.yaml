@@ -1,5 +1,6 @@
 services:
   vane-community:
+    container_name: vane-community
     image: vane-community:latest
     build:
       context: .
@@ -14,6 +15,46 @@ services:
       - 'host.docker.internal:host-gateway'
     restart: unless-stopped
 
+  # Optional local Crawl4AI scraper service (activate with: docker compose --profile crawl4ai up -d)
+  crawl4ai:
+    image: unclecode/crawl4ai:basic
+    container_name: vane-crawl4ai
+    ports:
+      - '11235:11235'
+    environment:
+      - CRAWL4AI_API_TOKEN=${CRAWL4AI_API_TOKEN:-}
+    restart: unless-stopped
+    profiles:
+      - scrapers
+      - crawl4ai
+
+  # Optional local Presenton AI presentation service (activate with: docker compose --profile presenton up -d)
+  presenton:
+    image: ghcr.io/presenton/presenton:latest
+    container_name: vane-presenton
+    ports:
+      - '5001:80'
+    volumes:
+      - presenton-data:/app_data
+    environment:
+      - CAN_CHANGE_KEYS=true
+      - PRESENTATION_GENERATION_MODE=both
+      - DISABLE_AUTH=true
+      - LLM=${PRESENTON_LLM:-ollama}
+      - OLLAMA_URL=${OLLAMA_URL:-http://host.docker.internal:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5-coder:latest}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+    restart: unless-stopped
+    profiles:
+      - presentations
+      - presenton
+
 volumes:
   data:
     name: 'vane-community-data'
+    external: true
+  presenton-data:
+    name: 'vane-presenton-data'

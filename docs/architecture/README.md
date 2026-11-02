@@ -2,7 +2,7 @@
 
 Vane-Community is a Next.js application that combines an AI chat experience with search.
 
-For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation details, see [CONTRIBUTING.md](../../CONTRIBUTING.md).
+For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation details, see [Contributing Guidelines](https://github.com/akowynia/vane-community/blob/master/CONTRIBUTING.md).
 
 ## Key components
 
@@ -56,4 +56,16 @@ For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation d
 - [Quality Mode Optimizations](QUALITY_MODE_OPTIMIZATIONS.md)
 - [Model Selection & Response Metadata](MODEL_SELECTION_AND_RESPONSE_METADATA.md)
 - [Scraper Extraction & Telemetry](SCRAPER_EXTRACTION_AND_TELEMETRY.md)
+- [Advanced Scraper Integration (Firecrawl & Crawl4AI)](ADVANCED_SCRAPER_INTEGRATION.md)
 - [Search & Response Pipeline Optimizations](SEARCH_AND_RESPONSE_OPTIMIZATIONS.md)
+- [Beta Options & Feature Flags](BETA_OPTIONS.md)
+- [Batch Search & CSV Processing](BATCH_SEARCH.md)
+- [Docker Multi-Architecture Build & Versioning Pipeline](DOCKER_RELEASE_PIPELINE.md)
+- [Deep Research & Recursive Autonomous Exploration](DEEP_RESEARCH.md)
+- [Waypoint Cron Webhooks & Proactive Notifications](WAYPOINT_CRON_WEBHOOKS.md)
+- [Model Context Protocol (MCP) Integration](MCP_INTEGRATION.md)
+- [MCP Dedicated Docker Container](MCP_DOCKER_IMAGE.md)
+- [Presenton MCP Integration & Research-to-Presentation](PRESENTON_MCP_RESEARCH_PRESENTATIONS.md)
+- [Multi-Theme Architecture (Modern & Retro Themes)](UI_THEMES.md)
+- [PDF Export Styles & Branding Customization](PDF_EXPORT_CUSTOMIZATION.md)
+- [GitHub Pages Continuous Documentation Deployment](GITHUB_PAGES_DEPLOYMENT.md)

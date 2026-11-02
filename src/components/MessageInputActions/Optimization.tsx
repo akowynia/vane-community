@@ -1,4 +1,4 @@
-import { ChevronDown, Sliders, Star, Zap } from 'lucide-react';
+import { ChevronDown, Sliders, Star, Zap, Sparkles, Presentation } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Popover,
@@ -6,10 +6,11 @@ import {
   PopoverPanel,
   Transition,
 } from '@headlessui/react';
-import { Fragment } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { useChat } from '@/lib/hooks/useChat';
 import { AnimatePresence, motion } from 'motion/react';
 import { useTranslation } from '@/lib/i18n';
+import { getEnablePresentonBeta } from '@/lib/config/clientRegistry';
 
 interface OptimizationProps {
   position?: 'top' | 'bottom';
@@ -22,6 +23,18 @@ const Optimization = ({
 }: OptimizationProps) => {
   const { optimizationMode, setOptimizationMode } = useChat();
   const { t } = useTranslation();
+  const [presentonEnabled, setPresentonEnabled] = useState(false);
+
+  useEffect(() => {
+    const checkFlag = () => {
+      setPresentonEnabled(getEnablePresentonBeta());
+    };
+    checkFlag();
+    window.addEventListener('client-config-changed', checkFlag);
+    return () => {
+      window.removeEventListener('client-config-changed', checkFlag);
+    };
+  }, []);
 
   const optimizationModes = [
     {
@@ -47,6 +60,37 @@ const Optimization = ({
         />
       ),
     },
+    {
+      key: 'deep',
+      title: t('optimization.deepTitle') || 'Deep Research',
+      description:
+        t('optimization.deepDesc') ||
+        'Multi-hop autonomous recursive exploration with full whitepaper synthesis.',
+      icon: (
+        <Sparkles
+          size={16}
+          className="text-purple-500 fill-purple-500/20"
+        />
+      ),
+    },
+    ...(presentonEnabled
+      ? [
+          {
+            key: 'presentation',
+            title: t('optimization.presentonTitle') || 'Presentation',
+            badge: 'BETA',
+            description:
+              t('optimization.presentonDesc') ||
+              'Researches the topic online and generates an editable slide deck via Presenton MCP.',
+            icon: (
+              <Presentation
+                size={16}
+                className="text-amber-500 fill-amber-500/20"
+              />
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -105,9 +149,14 @@ const Optimization = ({
                       )}
                     >
                       <div className="flex flex-row justify-between w-full text-black dark:text-white">
-                        <div className="flex flex-row space-x-1">
+                        <div className="flex flex-row space-x-1.5 items-center">
                           {mode.icon}
                           <p className="text-xs font-medium">{mode.title}</p>
+                          {mode.badge && (
+                            <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                              {mode.badge}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <p className="text-black/70 dark:text-white/70 text-xs">

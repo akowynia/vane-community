@@ -101,6 +101,10 @@ type Config = {
   search: {
     [key: string]: any;
   };
+  beta?: {
+    [key: string]: any;
+  };
+  mcpServers?: string;
 };
 
 type EnvMap = {
@@ -121,6 +125,7 @@ type UIConfigSections = {
   personalization: UIConfigField[];
   modelProviders: ModelProviderUISection[];
   search: UIConfigField[];
+  beta?: UIConfigField[];
 };
 
 export type {

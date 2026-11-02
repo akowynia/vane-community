@@ -266,6 +266,7 @@ export interface SSRFValidationResult {
  */
 export async function validateUrlForSSRF(
   urlString: string,
+  options?: { allowLocal?: boolean },
 ): Promise<SSRFValidationResult> {
   if (!urlString || typeof urlString !== 'string') {
     return { valid: false, reason: 'URL must be a non-empty string' };
@@ -299,8 +300,19 @@ export async function validateUrlForSSRF(
     return { valid: false, reason: 'URL must contain a valid hostname' };
   }
 
-  // Check static blocked hostnames
-  if (isBlockedHostname(hostname)) {
+  // Always block cloud metadata endpoints
+  if (
+    CLOUD_METADATA_HOSTNAMES.has(hostname.toLowerCase().trim()) ||
+    CLOUD_METADATA_SUFFIXES.some((suffix) => hostname.toLowerCase().trim().endsWith(suffix))
+  ) {
+    return {
+      valid: false,
+      reason: `Access to cloud metadata hostname "${hostname}" is blocked.`,
+    };
+  }
+
+  // Check static blocked hostnames unless local endpoints are explicitly permitted
+  if (!options?.allowLocal && isBlockedHostname(hostname)) {
     return {
       valid: false,
       reason: `Access to internal hostname "${hostname}" is blocked.`,
@@ -313,7 +325,13 @@ export async function validateUrlForSSRF(
     : hostname;
 
   if (net.isIP(ipLiteral)) {
-    if (isPrivateOrBlockedIP(ipLiteral)) {
+    if (isCloudMetadataIP(ipLiteral)) {
+      return {
+        valid: false,
+        reason: `Access to cloud metadata IP "${ipLiteral}" is blocked.`,
+      };
+    }
+    if (!options?.allowLocal && isPrivateOrBlockedIP(ipLiteral)) {
       return {
         valid: false,
         reason: `Access to private or restricted IP address "${ipLiteral}" is blocked.`,
@@ -337,7 +355,14 @@ export async function validateUrlForSSRF(
     const resolvedIPs = addresses.map((a) => a.address);
 
     for (const addr of addresses) {
-      if (isPrivateOrBlockedIP(addr.address)) {
+      if (isCloudMetadataIP(addr.address)) {
+        return {
+          valid: false,
+          reason: `Hostname "${hostname}" resolves to cloud metadata IP "${addr.address}".`,
+          resolvedIPs,
+        };
+      }
+      if (!options?.allowLocal && isPrivateOrBlockedIP(addr.address)) {
         return {
           valid: false,
           reason: `Hostname "${hostname}" resolves to private/blocked IP address "${addr.address}".`,
@@ -348,6 +373,10 @@ export async function validateUrlForSSRF(
 
     return { valid: true, url: parsed, resolvedIPs };
   } catch (dnsErr: any) {
+    // If local is allowed and hostname looks like a local container/host, permit without public DNS
+    if (options?.allowLocal) {
+      return { valid: true, url: parsed, resolvedIPs: [] };
+    }
     return {
       valid: false,
       reason: `DNS lookup failed for "${hostname}": ${dnsErr.message || 'unknown error'}`,

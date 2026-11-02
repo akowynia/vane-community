@@ -3,7 +3,7 @@
 import React, { useEffect, useId, useMemo, useState } from 'react';
 import { useTheme } from 'next-themes';
 import { Check, Copy, AlertCircle, RefreshCw } from 'lucide-react';
-import CodeBlock from './CodeBlock';
+import { isThemeDark } from '@/lib/theme';
 
 interface MermaidBlockProps {
   chart: string;
@@ -23,7 +23,13 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
   const [copied, setCopied] = useState<boolean>(false);
 
   const cleanChart = useMemo(() => {
-    return (chart || '').trim();
+    let cleaned = (chart || '').trim();
+    if (cleaned.startsWith('```mermaid')) {
+      cleaned = cleaned.replace(/^```mermaid\s*\n?/, '').replace(/\n?```$/, '');
+    } else if (cleaned.startsWith('```')) {
+      cleaned = cleaned.replace(/^```\w*\s*\n?/, '').replace(/\n?```$/, '');
+    }
+    return cleaned.trim();
   }, [chart]);
 
   useEffect(() => {
@@ -43,9 +49,10 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
 
         mermaid.initialize({
           startOnLoad: false,
-          theme: resolvedTheme === 'dark' ? 'dark' : 'default',
+          theme: isThemeDark(resolvedTheme) ? 'dark' : 'default',
           securityLevel: 'loose',
           fontFamily: 'inherit',
+          suppressErrorRendering: true,
         });
 
         // Use unique container ID to avoid colliding with other diagrams
@@ -62,6 +69,15 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
         }
       } catch (err: any) {
         if (isMounted) {
+          try {
+            const stray = document.querySelectorAll(`[id*="${cleanId}"]`);
+            stray.forEach((el) => {
+              if (el.parentElement === document.body) {
+                el.remove();
+              }
+            });
+          } catch {}
+
           console.warn('[MermaidBlock] Failed to render mermaid chart:', err);
           setError(err?.message || 'Failed to render Mermaid diagram');
           setIsLoading(false);
@@ -95,6 +111,7 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
             <span>Diagram Syntax View</span>
           </div>
           <button
+            type="button"
             onClick={handleCopy}
             className="flex items-center gap-1 hover:text-amber-900 dark:hover:text-amber-200 transition-colors"
           >
@@ -102,7 +119,9 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
             <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
         </div>
-        <CodeBlock language="mermaid">{cleanChart}</CodeBlock>
+        <pre className="p-3 rounded-lg bg-black/5 dark:bg-white/5 font-mono text-xs overflow-x-auto whitespace-pre text-stone-800 dark:text-stone-200 leading-relaxed">
+          <code>{cleanChart}</code>
+        </pre>
       </div>
     );
   }

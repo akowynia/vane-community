@@ -8,7 +8,9 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
-    "format:write": "prettier . --write"
+    "format:write": "prettier . --write",
+    "docs:dev": "mkdocs serve",
+    "docs:build": "mkdocs build --strict"
   },
   "dependencies": {
     "@google/genai": "^1.34.0",
