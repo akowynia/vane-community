@@ -2,7 +2,7 @@
 
 Vane-Community is a Next.js application that combines an AI chat experience with search.
 
-For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation details, see [CONTRIBUTING.md](../../CONTRIBUTING.md).
+For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation details, see [Contributing Guidelines](https://github.com/akowynia/vane-community/blob/master/CONTRIBUTING.md).
 
 ## Key components
 
@@ -68,3 +68,4 @@ For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation d
 - [Presenton MCP Integration & Research-to-Presentation](PRESENTON_MCP_RESEARCH_PRESENTATIONS.md)
 - [Multi-Theme Architecture (Modern & Retro Themes)](UI_THEMES.md)
 - [PDF Export Styles & Branding Customization](PDF_EXPORT_CUSTOMIZATION.md)
+- [GitHub Pages Continuous Documentation Deployment](GITHUB_PAGES_DEPLOYMENT.md)

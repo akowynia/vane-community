@@ -4,7 +4,7 @@ This is a high level overview of how Vane-Community answers a question.
 
 If you want a component level overview, see [README.md](README.md).
 
-If you want implementation details, see [CONTRIBUTING.md](../../CONTRIBUTING.md).
+If you want implementation details, see [Contributing Guidelines](https://github.com/akowynia/vane-community/blob/master/CONTRIBUTING.md).
 
 ## What happens when you ask a question
 
