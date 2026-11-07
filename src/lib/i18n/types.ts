@@ -1347,6 +1347,8 @@ export interface Translations {
     regenerateQuery?: string;
     regenerateNote?: string;
     newBatchSearch?: string;
+    mergedMissingToast?: string;
+    allQueriesAlreadyPresentToast?: string;
   };
   mcp?: {
     nameRequired?: string;

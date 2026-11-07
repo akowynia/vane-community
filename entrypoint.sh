@@ -56,4 +56,5 @@ fi
 cd /home/vane-community
 echo "Starting Vane-Community..."
 
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=4096}"
 exec gosu vane-community node server.js

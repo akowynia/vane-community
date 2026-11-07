@@ -18,9 +18,10 @@ const providerConfigFields: UIConfigField[] = [
     type: 'string',
     name: 'Base URL',
     key: 'baseURL',
-    description: 'The base URL for Lemonade API',
+    description: 'The base URL for Lemonade AMD AI Server',
     required: true,
-    placeholder: 'https://api.lemonade.ai/v1',
+    placeholder: 'http://localhost:13305/v1',
+    default: 'http://localhost:13305/v1',
     env: 'LEMONADE_BASE_URL',
     scope: 'server',
   },
@@ -41,22 +42,50 @@ class LemonadeProvider extends BaseModelProvider<LemonadeConfig> {
     super(id, name, config);
   }
 
+  private normalizeBaseURL(url: string): string {
+    const trimmed = url.trim().replace(/\/+$/, '');
+    return trimmed;
+  }
+
   async getDefaultModels(): Promise<ModelList> {
     try {
-      const res = await fetch(`${this.config.baseURL}/models`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(this.config.apiKey
-            ? { Authorization: `Bearer ${this.config.apiKey}` }
-            : {}),
-        },
-        signal: AbortSignal.timeout(5000),
-      });
+      const baseURL = this.normalizeBaseURL(this.config.baseURL);
+      const urlCandidates = [
+        `${baseURL}/models`,
+        `${baseURL}/v1/models`,
+        `${baseURL}/api/v1/models`,
+      ];
 
-      if (!res.ok) {
-        throw new Error(
-          `Lemonade API returned HTTP ${res.status}: ${res.statusText || 'Error'}`,
+      let res: Response | null = null;
+      let lastError: any = null;
+
+      for (const targetUrl of urlCandidates) {
+        try {
+          const candidateRes = await fetch(targetUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(this.config.apiKey
+                ? { Authorization: `Bearer ${this.config.apiKey}` }
+                : {}),
+            },
+            signal: AbortSignal.timeout(5000),
+          });
+          if (candidateRes.ok) {
+            res = candidateRes;
+            break;
+          }
+        } catch (err) {
+          lastError = err;
+        }
+      }
+
+      if (!res || !res.ok) {
+        throw (
+          lastError ||
+          new Error(
+            `Lemonade API returned HTTP ${res?.status || 404}: ${res?.statusText || 'Error'}`,
+          )
         );
       }
 
@@ -71,14 +100,13 @@ class LemonadeProvider extends BaseModelProvider<LemonadeConfig> {
         throw new Error('Lemonade API returned unexpected response format.');
       }
 
-      const models: Model[] = (data.data || [])
-        .filter((m: any) => m.recipe === 'llamacpp')
-        .map((m: any) => {
-          return {
-            name: m.id,
-            key: m.id,
-          };
-        });
+      const models: Model[] = (data.data || []).map((m: any) => {
+        const id = m.id || m.name;
+        return {
+          name: id,
+          key: id,
+        };
+      });
 
       return {
         embedding: models,
@@ -126,10 +154,13 @@ class LemonadeProvider extends BaseModelProvider<LemonadeConfig> {
       );
     }
 
+    const trimmed = (this.config.baseURL || 'http://localhost:13305').trim().replace(/\/+$/, '');
+    const normalizedBase = trimmed.endsWith('/v1') || trimmed.endsWith('/api/v1') ? trimmed : `${trimmed}/v1`;
+
     return new LemonadeLLM({
       apiKey: this.config.apiKey || 'not-needed',
       model: key,
-      baseURL: this.config.baseURL,
+      baseURL: normalizedBase,
     });
   }
 
@@ -143,10 +174,13 @@ class LemonadeProvider extends BaseModelProvider<LemonadeConfig> {
       );
     }
 
+    const trimmed = (this.config.baseURL || 'http://localhost:13305').trim().replace(/\/+$/, '');
+    const normalizedBase = trimmed.endsWith('/v1') || trimmed.endsWith('/api/v1') ? trimmed : `${trimmed}/v1`;
+
     return new LemonadeEmbedding({
       apiKey: this.config.apiKey || 'not-needed',
       model: key,
-      baseURL: this.config.baseURL,
+      baseURL: normalizedBase,
     });
   }
 

@@ -47,7 +47,11 @@ class OllamaProvider extends BaseModelProvider<OllamaConfig> {
   }
 
   async getDefaultModels(): Promise<ModelList> {
-    const cacheKey = this.config.baseURL;
+    const cleanBaseURL = (this.config.baseURL || 'http://host.docker.internal:11434')
+      .trim()
+      .replace(/\/+$/, '')
+      .replace(/\/(api|v1)$/i, '');
+    const cacheKey = cleanBaseURL;
     const cached = OllamaProvider.cachedModels[cacheKey];
     const now = Date.now();
     if (cached && now - cached.timestamp < 15000) {
@@ -55,7 +59,7 @@ class OllamaProvider extends BaseModelProvider<OllamaConfig> {
     }
 
     try {
-      const res = await fetch(`${this.config.baseURL}/api/tags`, {
+      const res = await fetch(`${cleanBaseURL}/api/tags`, {
         method: 'GET',
         headers: {
           'Content-type': 'application/json',

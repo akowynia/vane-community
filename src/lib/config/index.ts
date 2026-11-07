@@ -1036,23 +1036,56 @@ class ConfigManager {
     type: 'embedding' | 'chat',
     model: any,
   ) {
-    const provider = this.currentConfig.modelProviders.find(
-      (p) => p.id === providerId,
+    let provider = this.currentConfig.modelProviders.find(
+      (p) => p.id === providerId || p.type === providerId,
     );
 
-    if (!provider) throw new Error('Invalid provider id');
+    if (!provider) {
+      const decodedId = decodeURIComponent(providerId);
+      provider = this.currentConfig.modelProviders.find(
+        (p) => p.id === decodedId || p.type === decodedId,
+      );
+    }
+
+    if (!provider) throw new Error(`Invalid provider id: "${providerId}"`);
 
     delete model.type;
 
+    if (!Array.isArray(provider.chatModels)) {
+      provider.chatModels = [];
+    }
+    if (!Array.isArray(provider.embeddingModels)) {
+      provider.embeddingModels = [];
+    }
+
+    const cleanModel = {
+      name: String(model.name || model.key).trim(),
+      key: String(model.key || model.name).trim(),
+    };
+
     if (type === 'chat') {
-      provider.chatModels.push(model);
+      const existingIdx = provider.chatModels.findIndex(
+        (m) => m && m.key === cleanModel.key,
+      );
+      if (existingIdx !== -1) {
+        provider.chatModels[existingIdx] = cleanModel;
+      } else {
+        provider.chatModels.push(cleanModel);
+      }
     } else {
-      provider.embeddingModels.push(model);
+      const existingIdx = provider.embeddingModels.findIndex(
+        (m) => m && m.key === cleanModel.key,
+      );
+      if (existingIdx !== -1) {
+        provider.embeddingModels[existingIdx] = cleanModel;
+      } else {
+        provider.embeddingModels.push(cleanModel);
+      }
     }
 
     this.saveConfig();
 
-    return model;
+    return cleanModel;
   }
 
   public removeProviderModel(
@@ -1060,19 +1093,26 @@ class ConfigManager {
     type: 'embedding' | 'chat',
     modelKey: string,
   ) {
-    const provider = this.currentConfig.modelProviders.find(
-      (p) => p.id === providerId,
+    let provider = this.currentConfig.modelProviders.find(
+      (p) => p.id === providerId || p.type === providerId,
     );
 
-    if (!provider) throw new Error('Invalid provider id');
+    if (!provider) {
+      const decodedId = decodeURIComponent(providerId);
+      provider = this.currentConfig.modelProviders.find(
+        (p) => p.id === decodedId || p.type === decodedId,
+      );
+    }
+
+    if (!provider) throw new Error(`Invalid provider id: "${providerId}"`);
 
     if (type === 'chat') {
-      provider.chatModels = provider.chatModels.filter(
-        (m) => m.key !== modelKey,
+      provider.chatModels = (provider.chatModels || []).filter(
+        (m) => m && m.key !== modelKey,
       );
     } else {
-      provider.embeddingModels = provider.embeddingModels.filter(
-        (m) => m.key != modelKey,
+      provider.embeddingModels = (provider.embeddingModels || []).filter(
+        (m) => m && m.key !== modelKey,
       );
     }
 

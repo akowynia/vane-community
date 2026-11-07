@@ -38,23 +38,31 @@ const AddModel = ({
       });
 
       if (!res.ok) {
-        throw new Error('Failed to add model');
+        const errJson = await res.json().catch(() => null);
+        throw new Error(errJson?.message || 'Failed to add model');
       }
 
       setProviders((prev) =>
         prev.map((provider) => {
           if (provider.id === providerId) {
             const newModel = { name: modelName, key: modelKey };
+            const currentChat = Array.isArray(provider.chatModels)
+              ? provider.chatModels
+              : [];
+            const currentEmbedding = Array.isArray(provider.embeddingModels)
+              ? provider.embeddingModels
+              : [];
+
             return {
               ...provider,
               chatModels:
                 type === 'chat'
-                  ? [...provider.chatModels, newModel]
-                  : provider.chatModels,
+                  ? [...currentChat.filter((m) => m.key !== newModel.key), newModel]
+                  : currentChat,
               embeddingModels:
                 type === 'embedding'
-                  ? [...provider.embeddingModels, newModel]
-                  : provider.embeddingModels,
+                  ? [...currentEmbedding.filter((m) => m.key !== newModel.key), newModel]
+                  : currentEmbedding,
             };
           }
           return provider;
@@ -65,9 +73,9 @@ const AddModel = ({
       setModelName('');
       setModelKey('');
       setOpen(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding model:', error);
-      toast.error(t('settings.modelAddError'));
+      toast.error(error?.message || t('settings.modelAddError'));
     } finally {
       setLoading(false);
     }

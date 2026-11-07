@@ -95,8 +95,8 @@ The application communicates with external and local services (Web Search & Scra
    - Safe internal rendering protocols (`data:`, `about:blank`) are allowed through for document rendering.
 
 6. **`baseURL` Validation for AI Providers (`validateProviderBaseURL`)**:
-   - For cloud providers (OpenAI, Anthropic, Gemini, Groq, Lemonade), a publicly reachable IP address is required, with no ability to query private subnets.
-   - For local providers (Ollama, LMStudio), communication with `localhost`, `127.0.0.1`, `host.docker.internal`, and the LAN is allowed, while cloud metadata addresses and dangerous schemes remain unconditionally blocked.
+   - For cloud providers (OpenAI, Anthropic, Gemini, Groq, Ollama Cloud), a publicly reachable IP address is required, with no ability to query private subnets.
+   - For local providers (Ollama, LMStudio, Lemonade), communication with `localhost`, `127.0.0.1`, `host.docker.internal`, and the LAN is allowed, while cloud metadata addresses and dangerous schemes remain unconditionally blocked.
    - Requests that fetch the model list carry a timeout (`signal: AbortSignal.timeout(5000)`), protecting the server against hung connections (DoS).
 
 ---

@@ -31,14 +31,20 @@ class APISearchAgent {
       });
 
       let searchPromise: Promise<ResearcherOutput> | null = null;
+      let researchSession: SessionManager | null = null;
 
       if (!classification.classification.skipSearch) {
         const researcher = new Researcher();
-        searchPromise = researcher.research(SessionManager.createSession(), {
+        researchSession = SessionManager.createSession();
+        searchPromise = researcher.research(researchSession, {
           chatHistory: input.chatHistory,
           followUp: input.followUp,
           classification: classification,
           config: input.config,
+        }).finally(() => {
+          if (researchSession) {
+            researchSession.destroy();
+          }
         });
       }
 

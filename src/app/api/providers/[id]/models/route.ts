@@ -8,6 +8,7 @@ export const POST = async (
 ) => {
   try {
     const { id } = await params;
+    const providerId = decodeURIComponent(id || '').trim();
 
     const body: Partial<Model> & { type: 'embedding' | 'chat' } =
       await req.json();
@@ -25,7 +26,7 @@ export const POST = async (
 
     const registry = new ModelRegistry();
 
-    await registry.addProviderModel(id, body.type, body);
+    await registry.addProviderModel(providerId, body.type, body);
 
     return Response.json(
       {
@@ -35,14 +36,14 @@ export const POST = async (
         status: 200,
       },
     );
-  } catch (err) {
+  } catch (err: any) {
     console.error('An error occurred while adding provider model', err);
     return Response.json(
       {
-        message: 'An error has occurred.',
+        message: err?.message || 'An error has occurred.',
       },
       {
-        status: 500,
+        status: 400,
       },
     );
   }
@@ -54,13 +55,14 @@ export const DELETE = async (
 ) => {
   try {
     const { id } = await params;
+    const providerId = decodeURIComponent(id || '').trim();
 
     const body: { key: string; type: 'embedding' | 'chat' } = await req.json();
 
     if (!body.key) {
       return Response.json(
         {
-          message: 'Key and name must be provided',
+          message: 'Key must be provided',
         },
         {
           status: 400,
@@ -70,24 +72,24 @@ export const DELETE = async (
 
     const registry = new ModelRegistry();
 
-    await registry.removeProviderModel(id, body.type, body.key);
+    await registry.removeProviderModel(providerId, body.type, body.key);
 
     return Response.json(
       {
-        message: 'Model added successfully',
+        message: 'Model deleted successfully',
       },
       {
         status: 200,
       },
     );
-  } catch (err) {
+  } catch (err: any) {
     console.error('An error occurred while deleting provider model', err);
     return Response.json(
       {
-        message: 'An error has occurred.',
+        message: err?.message || 'An error has occurred.',
       },
       {
-        status: 500,
+        status: 400,
       },
     );
   }
