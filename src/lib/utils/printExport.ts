@@ -176,8 +176,8 @@ export const convertMarkdownToPrintHtml = async (
 
   const { includeSources = true, sources, sourcesHeadingText } = options;
 
-  // Step 1: Strip thinking tags <think>...</think>
-  let text = markdownText.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  // Step 1: Strip thinking tags <think>...</think>, <thought>...</thought>, <thinking>...</thinking>
+  let text = markdownText.replace(/<(think|thought|thinking)>[\s\S]*?<\/\1>/gi, '').trim();
 
   // Step 2: Extract and placeholder all <citation ...>NUM</citation> tags
   // Attributes may appear in any order: href, title, source-index, snippet, date, etc.

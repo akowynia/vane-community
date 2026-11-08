@@ -86,6 +86,7 @@ nav:
       - Models & Scheduling:
           - Provider Queue & Model Scheduling: architecture/PROVIDER_QUEUE_AND_MODEL_SCHEDULING.md
           - Model Selection & Metadata: architecture/MODEL_SELECTION_AND_RESPONSE_METADATA.md
+          - Model Reasoning & Thinking Process: architecture/MODEL_REASONING_AND_THINKING_ISOLATION.md
           - Model Statistics & Telemetry: architecture/MODEL_STATISTICS.md
       - Workspaces & User Experience:
           - Waypoints: architecture/WAYPOINTS.md

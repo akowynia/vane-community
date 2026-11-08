@@ -175,7 +175,11 @@ export function compileDocument(
         ? `${item.query} [${item.number}]`
         : `[${item.number}] ${item.query}`;
 
-    let sectionContent = `# ${formattedHeader}\n\n${(item.response || '').trim()}`;
+    const cleanResponse = (item.response || '')
+      .replace(/<(think|thought|thinking)>[\s\S]*?<\/\1>/gi, '')
+      .trim();
+
+    let sectionContent = `# ${formattedHeader}\n\n${cleanResponse}`;
 
     if (includeSources && item.sourcesList && item.sourcesList.length > 0) {
       const sourceLinks = item.sourcesList
@@ -198,9 +202,12 @@ export function exportToCsv(items: BatchQueryItem[]): string {
   const rows = ['nr;pytanie / pojęcia;treść notatki'];
 
   for (const item of items) {
+    const cleanResponse = (item.response || '')
+      .replace(/<(think|thought|thinking)>[\s\S]*?<\/\1>/gi, '')
+      .trim();
     const escapedNumber = `"${(item.number || '').replace(/"/g, '""')}"`;
     const escapedQuery = `"${(item.query || '').replace(/"/g, '""')}"`;
-    const escapedResponse = `"${(item.response || '').replace(/"/g, '""')}"`;
+    const escapedResponse = `"${cleanResponse.replace(/"/g, '""')}"`;
     rows.push(`${escapedNumber};${escapedQuery};${escapedResponse}`);
   }
 

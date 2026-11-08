@@ -68,4 +68,5 @@ For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation d
 - [Presenton MCP Integration & Research-to-Presentation](PRESENTON_MCP_RESEARCH_PRESENTATIONS.md)
 - [Multi-Theme Architecture (Modern & Retro Themes)](UI_THEMES.md)
 - [PDF Export Styles & Branding Customization](PDF_EXPORT_CUSTOMIZATION.md)
+- [Model Reasoning & Thinking Process Isolation](MODEL_REASONING_AND_THINKING_ISOLATION.md)
 - [GitHub Pages Continuous Documentation Deployment](GITHUB_PAGES_DEPLOYMENT.md)

@@ -29,7 +29,46 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
     } else if (cleaned.startsWith('```')) {
       cleaned = cleaned.replace(/^```\w*\s*\n?/, '').replace(/\n?```$/, '');
     }
-    return cleaned.trim();
+    cleaned = cleaned.trim();
+
+    // Auto-repair common LLM Mermaid syntax issues
+    // 1. Replace non-breaking hyphens (U+2011) with standard hyphens
+    cleaned = cleaned.replace(/\u2011/g, '-');
+
+    // 2. Quote unquoted subgraph titles: subgraph ID[Title] -> subgraph ID["Title"]
+    cleaned = cleaned.replace(
+      /(subgraph\s+[a-zA-Z0-9_-]+)\[([^"\]\r\n]+)\]/g,
+      (match, id, label) => {
+        const trimmed = label.trim();
+        return trimmed.startsWith('"') && trimmed.endsWith('"')
+          ? match
+          : `${id}["${trimmed}"]`;
+      },
+    );
+
+    // 3. Quote unquoted node labels in [...] containing parentheses, slashes, backslashes, colons or dashes
+    cleaned = cleaned.replace(
+      /(\b[a-zA-Z0-9_-]+)\[([^"\]\r\n]*[\(\)\/\\–—][^"\]\r\n]*)\]/g,
+      (match, id, label) => {
+        const trimmed = label.trim();
+        return trimmed.startsWith('"') && trimmed.endsWith('"')
+          ? match
+          : `${id}["${trimmed}"]`;
+      },
+    );
+
+    // 4. Quote unquoted node labels in {...} containing parentheses, question marks, slashes, or dashes
+    cleaned = cleaned.replace(
+      /(\b[a-zA-Z0-9_-]+)\{([^"\}\r\n]*[\(\)\/\\–—\?][^"\}\r\n]*)\}/g,
+      (match, id, label) => {
+        const trimmed = label.trim();
+        return trimmed.startsWith('"') && trimmed.endsWith('"')
+          ? match
+          : `${id}{"${trimmed}"}`;
+      },
+    );
+
+    return cleaned;
   }, [chart]);
 
   useEffect(() => {

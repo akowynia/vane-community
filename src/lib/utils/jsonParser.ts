@@ -7,8 +7,8 @@ export function sanitizeJsonString(raw: string): string {
 
   let cleaned = raw.trim();
 
-  // 1. Strip any reasoning-model thinking tags (<think>...</think>)
-  cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  // 1. Strip any reasoning-model thinking tags (<think>...</think>, <thought>...</thought>, <thinking>...</thinking>)
+  cleaned = cleaned.replace(/<(think|thought|thinking)>[\s\S]*?<\/\1>/gi, '').trim();
 
   // 2. Extract content from markdown code blocks ```json ... ``` or ``` ... ```
   const codeBlockMatch = cleaned.match(/```(?:\w+)?\s*([\s\S]*?)\s*```/i);

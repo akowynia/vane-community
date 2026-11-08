@@ -568,7 +568,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
   const executeQuery = async (
     item: BatchQueryItem,
     signal: AbortSignal,
-  ): Promise<{ response: string; sourcesList: any[] }> => {
+  ): Promise<{ response: string; reasoning?: string; sourcesList: any[] }> => {
     const payload = {
       query: item.query,
       sources: item.sources && item.sources.length > 0 ? item.sources : ['web'],
@@ -597,8 +597,20 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     const data = await res.json();
+    const thinkRegex = /<(think|thought|thinking)>([\s\S]*?)<\/\1>/gi;
+    let extractedReasoning = data.reasoning || '';
+    let cleanResponse = data.message || '';
+    if (!extractedReasoning) {
+      const matches = [...cleanResponse.matchAll(thinkRegex)];
+      if (matches.length > 0) {
+        extractedReasoning = matches.map((m) => m[2].trim()).join('\n\n');
+      }
+    }
+    cleanResponse = cleanResponse.replace(thinkRegex, '').trim();
+
     return {
-      response: data.message || '',
+      response: cleanResponse,
+      reasoning: extractedReasoning || undefined,
       sourcesList: data.sources || [],
     };
   };
@@ -748,6 +760,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
                       ...it,
                       status: 'completed',
                       response: result.response,
+                      reasoning: result.reasoning,
                       sourcesList: result.sourcesList,
                       durationMs: duration,
                     }

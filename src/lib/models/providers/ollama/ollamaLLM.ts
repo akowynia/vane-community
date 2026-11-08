@@ -123,8 +123,19 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
         throw err;
       });
 
+    const rawContent = res.message.content || '';
+    const reasoning = (res.message.thinking || '').trim();
+    let content = rawContent;
+    if (reasoning.length > 0 && !rawContent.includes('<think>')) {
+      if (rawContent.length > 0) {
+        content = `<think>\n${reasoning}\n</think>\n\n${rawContent}`;
+      } else {
+        content = `<think>\n${reasoning}\n</think>`;
+      }
+    }
+
     return {
-      content: res.message.content,
+      content,
       toolCalls:
         res.message.tool_calls?.map((tc) => ({
           id: crypto.randomUUID(),
@@ -187,9 +198,48 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
         throw err;
       });
 
+    let isThinking = false;
+    let hasEmittedThinkOpen = false;
+
     for await (const chunk of stream) {
+      const contentDelta = chunk.message.content || '';
+      const reasoningDelta = chunk.message.thinking || '';
+
+      let textChunk = '';
+
+      if (reasoningDelta.length > 0) {
+        if (!isThinking) {
+          isThinking = true;
+          if (!hasEmittedThinkOpen && !reasoningDelta.includes('<think>')) {
+            textChunk += '<think>\n';
+            hasEmittedThinkOpen = true;
+          }
+        }
+        textChunk += reasoningDelta;
+        if (reasoningDelta.includes('</think>')) {
+          isThinking = false;
+        }
+      }
+
+      if (contentDelta.length > 0) {
+        if (isThinking) {
+          isThinking = false;
+          if (!contentDelta.includes('</think>')) {
+            textChunk += '\n</think>\n\n';
+          }
+        }
+        textChunk += contentDelta;
+      }
+
+      if (chunk.done && isThinking) {
+        isThinking = false;
+        if (!textChunk.includes('</think>')) {
+          textChunk += '\n</think>\n\n';
+        }
+      }
+
       yield {
-        contentChunk: chunk.message.content,
+        contentChunk: textChunk,
         toolCallChunk:
           chunk.message.tool_calls?.map((tc, i) => ({
             id: crypto
@@ -205,6 +255,15 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
         additionalInfo: {
           reasoning: chunk.message.thinking,
         },
+      };
+    }
+
+    if (isThinking) {
+      isThinking = false;
+      yield {
+        contentChunk: '\n</think>\n\n',
+        toolCallChunk: [],
+        done: true,
       };
     }
   }
