@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1]
+
+### Improved
+- Batch Search Concurrency & Queueing: Introduced adaptive worker pool managing concurrent executions for cloud APIs while serializing local model runs to prevent VRAM contention
+- Memory Management & Lifecycle: Implemented proactive session cleanup and browser recycling after high-volume page crawling to eliminate memory growth
+- Queue Resilience: Added non-destructive re-import and smart state preservation for batch query processing
+- Model Providers: Added support for local Lemonade hardware instances and remote Ollama Cloud integration, with dynamic OpenAI model discovery
+- Security Enhancements: Reinforced SSRF network boundary validation and scheme protections across hybrid local and cloud model provider endpoints
+
 ## [1.1.0]
 
 ### Added

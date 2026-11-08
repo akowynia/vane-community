@@ -1,7 +1,7 @@
 # Vane-Community 🔍
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)](CHANGELOG.md)
 [![Docker Pulls](https://img.shields.io/docker/pulls/akowynia/vane-community.svg)](https://hub.docker.com/r/akowynia/vane-community)
 [![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue.svg)](https://akowynia.github.io/vane-community/)
 
