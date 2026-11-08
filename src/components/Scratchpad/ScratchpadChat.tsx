@@ -29,6 +29,7 @@ import Sources from '../MessageInputActions/Sources';
 import Attach from '../MessageInputActions/Attach';
 import WaypointSelector from '../MessageInputActions/WaypointSelector';
 import MessageSources from '../MessageSources';
+import ThinkBox from '../ThinkBox';
 import Markdown, { MarkdownToJSX, RuleType } from 'markdown-to-jsx';
 import CodeBlock from '../MessageRenderer/CodeBlock';
 import { Chunk } from '@/lib/types';
@@ -125,6 +126,11 @@ const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
 
   const markdownOverrides: MarkdownToJSX.Options = {
     overrides: {
+      think: {
+        component: ({ children }: any) => (
+          <ThinkBox content={children} thinkingEnded={!loading} />
+        ),
+      },
       table: {
         component: ({ children, ...props }: any) => (
           <div className="w-full my-3 overflow-x-auto rounded-xl border border-light-200 dark:border-[#2a241d] bg-light-secondary/20 dark:bg-[#16120f]/40 shadow-sm">
@@ -214,6 +220,25 @@ const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
 
     // Strip unintended meta prefixes like "Part 1 (Chat Commentary):", "Part 1:", "Chat Commentary:"
     text = text.replace(/^(?:Part\s*1(?:\s*\([^)]*\))?:?|Chat\s*Commentary:?|Komentarz\s*asystenta:?|Komentarz:?)\s*/i, '');
+
+    // Normalize and auto-close thinking tags for markdown rendering
+    if (text.includes('<thought>') || text.includes('</thought>')) {
+      text = text.replace(/<thought>/gi, '<think>').replace(/<\/thought>/gi, '</think>');
+    }
+    if (text.includes('<thinking>') || text.includes('</thinking>')) {
+      text = text.replace(/<thinking>/gi, '<think>').replace(/<\/thinking>/gi, '</think>');
+    }
+    if (text.includes('</think>') && !text.includes('<think>')) {
+      text = '<think>' + text;
+    }
+    if (text.includes('<think>')) {
+      const openCount = (text.match(/<think>/g) || []).length;
+      const closeCount = (text.match(/<\/think>/g) || []).length;
+      if (openCount > closeCount) {
+        text += '</think> <a> </a>'.repeat(openCount - closeCount);
+      }
+    }
+
     return text.trim();
   };
 

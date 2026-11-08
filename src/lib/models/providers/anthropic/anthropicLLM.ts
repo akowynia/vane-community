@@ -142,11 +142,14 @@ class AnthropicLLM extends BaseLLM<AnthropicConfig> {
 
     const data = await res.json();
     let textContent = '';
+    let thinkingContent = '';
     const toolCalls: ToolCall[] = [];
 
     (data.content || []).forEach((block: any) => {
       if (block.type === 'text') {
         textContent += block.text;
+      } else if (block.type === 'thinking') {
+        thinkingContent += block.thinking || '';
       } else if (block.type === 'tool_use') {
         toolCalls.push({
           id: block.id,
@@ -156,12 +159,22 @@ class AnthropicLLM extends BaseLLM<AnthropicConfig> {
       }
     });
 
+    let content = textContent;
+    if (thinkingContent.trim().length > 0 && !textContent.includes('<think>')) {
+      if (textContent.length > 0) {
+        content = `<think>\n${thinkingContent.trim()}\n</think>\n\n${textContent}`;
+      } else {
+        content = `<think>\n${thinkingContent.trim()}\n</think>`;
+      }
+    }
+
     return {
-      content: textContent,
+      content,
       toolCalls,
       additionalInfo: {
         finishReason: data.stop_reason,
         usage: data.usage,
+        reasoning: thinkingContent || undefined,
       },
     };
   }
@@ -216,6 +229,8 @@ class AnthropicLLM extends BaseLLM<AnthropicConfig> {
       number,
       { id: string; name: string; json: string }
     > = {};
+    let isThinking = false;
+    let hasEmittedThinkOpen = false;
 
     while (true) {
       const { done, value } = await reader.read();
@@ -255,9 +270,29 @@ class AnthropicLLM extends BaseLLM<AnthropicConfig> {
                 };
               }
             } else if (currentEventType === 'content_block_delta') {
-              if (data.delta?.type === 'text_delta') {
+              if (data.delta?.type === 'thinking_delta') {
+                let textChunk = '';
+                if (!isThinking) {
+                  isThinking = true;
+                  if (!hasEmittedThinkOpen) {
+                    textChunk += '<think>\n';
+                    hasEmittedThinkOpen = true;
+                  }
+                }
+                textChunk += data.delta.thinking || '';
                 yield {
-                  contentChunk: data.delta.text || '',
+                  contentChunk: textChunk,
+                  toolCallChunk: [],
+                };
+              } else if (data.delta?.type === 'text_delta') {
+                let textChunk = '';
+                if (isThinking) {
+                  isThinking = false;
+                  textChunk += '\n</think>\n\n';
+                }
+                textChunk += data.delta.text || '';
+                yield {
+                  contentChunk: textChunk,
                   toolCallChunk: [],
                 };
               } else if (data.delta?.type === 'input_json_delta') {
@@ -277,8 +312,13 @@ class AnthropicLLM extends BaseLLM<AnthropicConfig> {
                 }
               }
             } else if (currentEventType === 'message_delta') {
+              let textChunk = '';
+              if (isThinking) {
+                isThinking = false;
+                textChunk = '\n</think>\n\n';
+              }
               yield {
-                contentChunk: '',
+                contentChunk: textChunk,
                 toolCallChunk: [],
                 done: true,
                 additionalInfo: {
@@ -292,6 +332,15 @@ class AnthropicLLM extends BaseLLM<AnthropicConfig> {
           }
         }
       }
+    }
+
+    if (isThinking) {
+      isThinking = false;
+      yield {
+        contentChunk: '\n</think>\n\n',
+        toolCallChunk: [],
+        done: true,
+      };
     }
   }
 

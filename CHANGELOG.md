@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.2]
+
+### Fixed
+- Model Reasoning & Thinking Stream Isolation: Encapsulated internal thinking/reasoning streams (`reasoning_content`, `reasoning`, `thinking`, `thinking_delta`) inside `<think>...</think>` tags across OpenAI, Groq, Ollama, and Anthropic providers, preventing reasoning tokens from leaking into responses
+- Thinking Tag Normalization: Unified alternative tags (`<thought>`, `<thinking>`) into canonical `<think>` tags across chat rendering, JSON sanitization, print export, and navigation utilities
+- Batch Search Note Quality: Separated reasoning logic from search responses in `/api/search` and Batch Search notes, adding an on-demand collapsible thinking process inspector while keeping final research notes clean
+- Batch Search Document & CSV Exports: Sanitized exported compiled documents, CSVs, and Scratchpad notes against thinking tag leakage
+- Mermaid Diagram Auto-Repair: Added automatic syntax repair in `MermaidBlock` to auto-quote unquoted node labels with parentheses, slashes, and special characters, and convert non-breaking hyphens to prevent parser syntax errors
+- Batch Search Diagram Rendering: Added full Markdown and Mermaid diagram visualization in Batch Search note card previews
+
 ## [1.1.1]
 
 ### Improved

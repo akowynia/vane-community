@@ -250,8 +250,8 @@ const exportAsMarkdown = (
 
     if (section.message.responseBlocks.length > 0) {
       let rawText = section.parsedTextBlocks.join('\n\n');
-      // Clean think tags
-      rawText = rawText.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      // Clean think tags (<think>, <thought>, <thinking>)
+      rawText = rawText.replace(/<(think|thought|thinking)>[\s\S]*?<\/\1>/gi, '').trim();
       // Clean citation tags with arbitrary attributes to [NUM](URL) or [NUM]
       rawText = rawText.replace(
         /<citation\b([^>]*)>([\s\S]*?)<\/citation>/gi,

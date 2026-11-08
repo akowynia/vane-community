@@ -129,10 +129,9 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
 
     if (response.choices && response.choices.length > 0) {
       const msg = response.choices[0].message as any;
-      const content =
-        (typeof msg.content === 'string' && msg.content.trim().length > 0
-          ? msg.content
-          : '') ||
+      const rawContent =
+        typeof msg.content === 'string' ? msg.content.trim() : '';
+      const reasoning = (
         (typeof msg.reasoning_content === 'string' &&
         msg.reasoning_content.trim().length > 0
           ? msg.reasoning_content
@@ -142,8 +141,17 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
           : '') ||
         (typeof msg.thinking === 'string' && msg.thinking.trim().length > 0
           ? msg.thinking
-          : '') ||
-        '';
+          : '')
+      ).trim();
+
+      let content = rawContent;
+      if (reasoning.length > 0 && !rawContent.includes('<think>')) {
+        if (rawContent.length > 0) {
+          content = `<think>\n${reasoning}\n</think>\n\n${rawContent}`;
+        } else {
+          content = `<think>\n${reasoning}\n</think>`;
+        }
+      }
 
       return {
         content,
@@ -228,15 +236,20 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
       { name: string; id: string; arguments: string }
     > = {};
 
+    let isThinking = false;
+    let hasEmittedThinkOpen = false;
+
     for await (const chunk of stream) {
       if (chunk.choices && chunk.choices.length > 0) {
         const choice = chunk.choices[0];
         const delta = (choice?.delta || (choice as any)?.message || {}) as any;
         const toolCalls = delta?.tool_calls;
-        const textChunk =
-          (typeof delta?.content === 'string' && delta.content.length > 0
+
+        const contentDelta =
+          typeof delta?.content === 'string' && delta.content.length > 0
             ? delta.content
-            : '') ||
+            : '';
+        const reasoningDelta =
           (typeof delta?.reasoning_content === 'string' &&
           delta.reasoning_content.length > 0
             ? delta.reasoning_content
@@ -246,8 +259,40 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
             : '') ||
           (typeof delta?.thinking === 'string' && delta.thinking.length > 0
             ? delta.thinking
-            : '') ||
-          '';
+            : '');
+
+        let textChunk = '';
+
+        if (reasoningDelta.length > 0) {
+          if (!isThinking) {
+            isThinking = true;
+            if (!hasEmittedThinkOpen && !reasoningDelta.includes('<think>')) {
+              textChunk += '<think>\n';
+              hasEmittedThinkOpen = true;
+            }
+          }
+          textChunk += reasoningDelta;
+          if (reasoningDelta.includes('</think>')) {
+            isThinking = false;
+          }
+        }
+
+        if (contentDelta.length > 0) {
+          if (isThinking) {
+            isThinking = false;
+            if (!contentDelta.includes('</think>')) {
+              textChunk += '\n</think>\n\n';
+            }
+          }
+          textChunk += contentDelta;
+        }
+
+        if (choice.finish_reason !== null && isThinking) {
+          isThinking = false;
+          if (!textChunk.includes('</think>')) {
+            textChunk += '\n</think>\n\n';
+          }
+        }
 
         yield {
           contentChunk: textChunk,
@@ -302,6 +347,15 @@ class OpenAILLM extends BaseLLM<OpenAIConfig> {
           },
         };
       }
+    }
+
+    if (isThinking) {
+      isThinking = false;
+      yield {
+        contentChunk: '\n</think>\n\n',
+        toolCallChunk: [],
+        done: true,
+      };
     }
   }
 

@@ -507,6 +507,14 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
           const citationRegex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
           const regex = /\[(\d+(?:\s*,\s*\d+)*)\]/g;
 
+          // Normalize alternative thinking tags to <think>
+          if (processedText.includes('<thought>') || processedText.includes('</thought>')) {
+            processedText = processedText.replace(/<thought>/gi, '<think>').replace(/<\/thought>/gi, '</think>');
+          }
+          if (processedText.includes('<thinking>') || processedText.includes('</thinking>')) {
+            processedText = processedText.replace(/<thinking>/gi, '<think>').replace(/<\/thinking>/gi, '</think>');
+          }
+
           if (processedText.includes('</think>') && !processedText.includes('<think>')) {
             processedText = '<think>' + processedText;
           }
@@ -520,7 +528,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
             }
           }
 
-          if (typeof block.data === 'string' && block.data.includes('</think>')) {
+          const rawData = typeof block.data === 'string' ? block.data : '';
+          if (rawData.includes('</think>') || rawData.includes('</thought>') || rawData.includes('</thinking>')) {
             thinkingEnded = true;
           }
 

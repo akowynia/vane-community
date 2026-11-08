@@ -31,12 +31,17 @@ import {
   Cpu,
   Search,
   Sparkles,
+  BrainCircuit,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/lib/i18n';
 import { MinimalProvider } from '@/lib/models/types';
+import Markdown, { MarkdownToJSX, RuleType } from 'markdown-to-jsx';
+import CodeBlock from '../MessageRenderer/CodeBlock';
 import {
   BatchQueryItem,
   HeaderFormatType,
@@ -355,6 +360,23 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
 
   const [isDragging, setIsDragging] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [expandedReasoningIdx, setExpandedReasoningIdx] = useState<number | null>(null);
+
+  const noteMarkdownOverrides: MarkdownToJSX.Options = useMemo(
+    () => ({
+      renderRule(next, node, renderChildren, state) {
+        if (node.type === RuleType.codeBlock) {
+          return (
+            <CodeBlock key={state.key} language={node.lang || ''}>
+              {node.text ?? ''}
+            </CodeBlock>
+          );
+        }
+        return next();
+      },
+    }),
+    [],
+  );
 
   // Pagination states for smooth 60fps rendering with 100+ items
   const [queuePage, setQueuePage] = useState(0);
@@ -1576,7 +1598,7 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                       ) : isEditingThis ? (
                         <div className="space-y-2">
                           <textarea
-                            value={item.response || ''}
+                            value={(item.response || '').replace(/<(think|thought|thinking)>[\s\S]*?<\/\1>/gi, '').trim()}
                             onChange={(e) => {
                               const newResp = e.target.value;
                               setItems((prev) =>
@@ -1591,8 +1613,42 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                           </p>
                         </div>
                       ) : (
-                        <div className="prose prose-sm dark:prose-invert max-w-none text-xs leading-relaxed text-stone-700 dark:text-stone-300 whitespace-pre-wrap">
-                          {item.response}
+                        <div className="space-y-3">
+                          {item.reasoning && (
+                            <div className="rounded-lg border border-light-200 dark:border-[#28211a] bg-light-secondary/40 dark:bg-[#16120e] overflow-hidden">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setExpandedReasoningIdx(
+                                    expandedReasoningIdx === idx ? null : idx,
+                                  )
+                                }
+                                className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-stone-600 dark:text-stone-300 hover:bg-light-200 dark:hover:bg-[#201812] transition"
+                              >
+                                <div className="flex items-center space-x-1.5">
+                                  <BrainCircuit className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" />
+                                  <span className="font-medium text-[11px]">
+                                    {t('chat.thinkingProcess') || 'Thinking Process'}
+                                  </span>
+                                </div>
+                                {expandedReasoningIdx === idx ? (
+                                  <ChevronUp className="w-3.5 h-3.5 text-stone-400" />
+                                ) : (
+                                  <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
+                                )}
+                              </button>
+                              {expandedReasoningIdx === idx && (
+                                <div className="px-3 py-2 text-xs font-mono text-stone-600 dark:text-stone-300 bg-light-primary dark:bg-[#120d0a] border-t border-light-200 dark:border-[#221b14] whitespace-pre-wrap max-h-60 overflow-y-auto leading-relaxed">
+                                  {item.reasoning}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <div className="prose prose-sm dark:prose-invert max-w-none text-xs leading-relaxed text-stone-700 dark:text-stone-300">
+                            <Markdown options={noteMarkdownOverrides}>
+                              {(item.response || '').replace(/<(think|thought|thinking)>[\s\S]*?<\/\1>/gi, '').trim()}
+                            </Markdown>
+                          </div>
                         </div>
                       )}
 

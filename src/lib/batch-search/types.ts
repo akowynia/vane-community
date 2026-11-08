@@ -15,6 +15,7 @@ export interface BatchQueryItem {
   selected: boolean;
   status: 'pending' | 'searching' | 'completed' | 'error';
   response?: string;
+  reasoning?: string;
   sourcesList?: BatchSourceResult[];
   error?: string;
   durationMs?: number;

@@ -395,7 +395,26 @@ export const POST = async (req: Request): Promise<Response> => {
             if (event === 'end') {
               queueHandle.finish();
               session.destroy();
-              resolve(Response.json({ message, sources }, { status: 200 }));
+
+              // Extract any reasoning blocks (<think>, <thought>, <thinking>) from message
+              const thinkRegex = /<(think|thought|thinking)>([\s\S]*?)<\/\1>/gi;
+              let reasoning = '';
+              const matches = [...message.matchAll(thinkRegex)];
+              if (matches.length > 0) {
+                reasoning = matches.map((m) => m[2].trim()).join('\n\n');
+              }
+              const cleanMessage = message.replace(thinkRegex, '').trim();
+
+              resolve(
+                Response.json(
+                  {
+                    message: cleanMessage,
+                    reasoning: reasoning || undefined,
+                    sources,
+                  },
+                  { status: 200 },
+                ),
+              );
             }
 
             if (event === 'error') {
