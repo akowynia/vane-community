@@ -288,7 +288,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
     };
   }, []);
 
-  // Parse CSV
+  // Parse CSV with intelligent merge to preserve completed results and only restore missing queries
   const handleParseAndSetItems = useCallback(
     (text: string) => {
       try {
@@ -306,11 +306,76 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
           );
           return;
         }
-        setItems(parsed);
-        toast.success(
-          t('batchSearch.parseSuccess', { count: parsed.length }) ||
-            `Loaded ${parsed.length} queries successfully.`,
-        );
+
+        setItems((prevItems) => {
+          if (!prevItems || prevItems.length === 0) {
+            toast.success(
+              t('batchSearch.parseSuccess', { count: parsed.length }) ||
+                `Loaded ${parsed.length} queries successfully.`,
+            );
+            return parsed;
+          }
+
+          // Build fast lookup maps for existing items to preserve results and execution status
+          const existingByQuery = new Map<string, BatchQueryItem>();
+          const existingByNumber = new Map<string, BatchQueryItem>();
+
+          for (const item of prevItems) {
+            const cleanQuery = item.query.trim().toLowerCase();
+            if (cleanQuery) {
+              existingByQuery.set(cleanQuery, item);
+            }
+            if (item.number) {
+              existingByNumber.set(item.number.trim(), item);
+            }
+          }
+
+          let addedCount = 0;
+          let preservedCount = 0;
+
+          const mergedList: BatchQueryItem[] = [];
+
+          for (const incoming of parsed) {
+            const cleanQuery = incoming.query.trim().toLowerCase();
+            const cleanNum = incoming.number.trim();
+
+            const existing =
+              existingByQuery.get(cleanQuery) ||
+              (cleanNum ? existingByNumber.get(cleanNum) : undefined);
+
+            if (existing) {
+              // Existing item found: keep its execution results and status, do not search again
+              mergedList.push({
+                ...existing,
+                number: incoming.number || existing.number,
+                query: existing.query || incoming.query,
+              });
+              preservedCount++;
+            } else {
+              // Missing or newly added item: append as pending
+              mergedList.push(incoming);
+              addedCount++;
+            }
+          }
+
+          if (addedCount > 0) {
+            toast.success(
+              t('batchSearch.mergedMissingToast', {
+                added: addedCount,
+                preserved: preservedCount,
+              }) ||
+                `Zaimportowano: dodano ${addedCount} brakujących pytań, zachowano ${preservedCount} wykonanych wyników.`,
+            );
+          } else {
+            toast.info(
+              t('batchSearch.allQueriesAlreadyPresentToast') ||
+                `Wszystkie pytania (${preservedCount}) są już w kolejce. Zachowano dotychczasowe wyniki.`,
+            );
+          }
+
+          return mergedList;
+        });
+
         setActiveTab('queue');
       } catch {
         toast.error(
@@ -538,6 +603,37 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
     };
   };
 
+  // Helper to determine if a query item uses a local LLM or cloud API
+  const isItemLocalModel = useCallback(
+    (item: BatchQueryItem): boolean => {
+      const providerId = item.providerId || defaultProviderId;
+      if (!providerId) return false;
+      const target = providerId.toLowerCase();
+      const matched = providers.find(
+        (p) =>
+          p.id === providerId ||
+          (p.type && p.type.toLowerCase() === target) ||
+          (p.name && p.name.toLowerCase() === target),
+      );
+      if (!matched) {
+        return (
+          target === 'ollama' ||
+          target === 'lmstudio' ||
+          target === 'lemonade' ||
+          target === 'local'
+        );
+      }
+      const provType = (matched.type || '').toLowerCase();
+      return (
+        provType === 'ollama' ||
+        provType === 'lmstudio' ||
+        provType === 'lemonade' ||
+        provType === 'local'
+      );
+    },
+    [defaultProviderId, providers],
+  );
+
   // Batch orchestrator
   const startBatchSearch = useCallback(
     async (
@@ -577,72 +673,119 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
       }
 
       let processedCount = 0;
+      let localRunning = false;
+      const queue = [...targets];
 
-      for (const { item, idx } of targets) {
-        // Handle pause condition
-        while (isPausedRef.current) {
-          await new Promise((resolve) => setTimeout(resolve, 300));
+      // If at least one target uses an external API, allow concurrent workers (e.g. 3 at a time)
+      // For local models, localRunning semaphore ensures strictly 1 local query at a time to protect VRAM
+      const isAnyApi = targets.some(({ item }) => !isItemLocalModel(item));
+      const concurrency = isAnyApi ? Math.min(3, targets.length) : 1;
+
+      const runWorker = async () => {
+        while (queue.length > 0) {
           if (abortControllerRef.current?.signal.aborted) {
             break;
           }
-        }
 
-        if (abortControllerRef.current?.signal.aborted) {
-          break;
-        }
+          // Handle pause condition
+          while (isPausedRef.current) {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            if (abortControllerRef.current?.signal.aborted) {
+              break;
+            }
+          }
 
-        setCurrentRunningIndex(idx);
-        setItems((prev) =>
-          prev.map((it, i) =>
-            i === idx ? { ...it, status: 'searching', error: undefined } : it,
-          ),
-        );
+          if (abortControllerRef.current?.signal.aborted) {
+            break;
+          }
 
-        const startTime = Date.now();
-        try {
-          const result = await executeQuery(
-            item,
-            abortControllerRef.current.signal,
-          );
-          const duration = Date.now() - startTime;
+          // Pick the next available item from the queue
+          let pickIndex = -1;
+          for (let i = 0; i < queue.length; i++) {
+            const isLocal = isItemLocalModel(queue[i].item);
+            if (isLocal) {
+              if (!localRunning) {
+                pickIndex = i;
+                break;
+              }
+            } else {
+              pickIndex = i;
+              break;
+            }
+          }
 
+          if (pickIndex === -1) {
+            // All remaining items are local and a local query is already executing. Wait briefly and retry.
+            await new Promise((resolve) => setTimeout(resolve, 200));
+            continue;
+          }
+
+          const [{ item, idx }] = queue.splice(pickIndex, 1);
+          const isLocal = isItemLocalModel(item);
+          if (isLocal) {
+            localRunning = true;
+          }
+
+          setCurrentRunningIndex(idx);
           setItems((prev) =>
             prev.map((it, i) =>
-              i === idx
-                ? {
-                    ...it,
-                    status: 'completed',
-                    response: result.response,
-                    sourcesList: result.sourcesList,
-                    durationMs: duration,
-                  }
-                : it,
+              i === idx ? { ...it, status: 'searching', error: undefined } : it,
             ),
           );
-          processedCount++;
-        } catch (err: any) {
-          if (err.name === 'AbortError') {
-            setItems((prev) =>
-              prev.map((it, i) =>
-                i === idx ? { ...it, status: 'pending' } : it,
-              ),
+
+          const startTime = Date.now();
+          try {
+            const result = await executeQuery(
+              item,
+              abortControllerRef.current!.signal,
             );
-            break;
-          } else {
+            const duration = Date.now() - startTime;
+
             setItems((prev) =>
               prev.map((it, i) =>
                 i === idx
                   ? {
                       ...it,
-                      status: 'error',
-                      error: err?.message || 'Search execution failed.',
+                      status: 'completed',
+                      response: result.response,
+                      sourcesList: result.sourcesList,
+                      durationMs: duration,
                     }
                   : it,
               ),
             );
+            processedCount++;
+          } catch (err: any) {
+            if (err.name === 'AbortError') {
+              setItems((prev) =>
+                prev.map((it, i) =>
+                  i === idx ? { ...it, status: 'pending' } : it,
+                ),
+              );
+              break;
+            } else {
+              setItems((prev) =>
+                prev.map((it, i) =>
+                  i === idx
+                    ? {
+                        ...it,
+                        status: 'error',
+                        error: err?.message || 'Search execution failed.',
+                      }
+                    : it,
+                ),
+              );
+            }
+          } finally {
+            if (isLocal) {
+              localRunning = false;
+            }
           }
         }
-      }
+      };
+
+      const workers = Array.from({ length: concurrency }, () => runWorker());
+      await Promise.all(workers);
 
       setCurrentRunningIndex(null);
       setIsSearching(false);
@@ -654,7 +797,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
         );
       }
     },
-    [items, defaultModelKey, defaultProviderId, t],
+    [items, defaultModelKey, defaultProviderId, isItemLocalModel, t],
   );
 
   const regenerateBatchSearch = useCallback(

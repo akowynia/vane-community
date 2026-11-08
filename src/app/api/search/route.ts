@@ -394,11 +394,13 @@ export const POST = async (req: Request): Promise<Response> => {
 
             if (event === 'end') {
               queueHandle.finish();
+              session.destroy();
               resolve(Response.json({ message, sources }, { status: 200 }));
             }
 
             if (event === 'error') {
               queueHandle.finish(data);
+              session.destroy();
               reject(
                 Response.json(
                   { message: 'Search error', error: data },

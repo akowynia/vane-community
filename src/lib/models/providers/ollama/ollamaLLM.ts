@@ -36,8 +36,13 @@ class OllamaLLM extends BaseLLM<OllamaConfig> {
   constructor(protected config: OllamaConfig) {
     super(config);
 
+    const cleanHost = (this.config.baseURL || 'http://localhost:11434')
+      .trim()
+      .replace(/\/+$/, '')
+      .replace(/\/(api|v1)$/i, '');
+
     this.ollamaClient = new Ollama({
-      host: this.config.baseURL || 'http://localhost:11434',
+      host: cleanHost,
     });
   }
 

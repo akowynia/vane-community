@@ -1342,6 +1342,8 @@ export const en: Translations = {
     regenerateQuery: 'Regenerate',
     regenerateNote: 'Regenerate',
     newBatchSearch: 'New Batch Search',
+    mergedMissingToast: 'Imported: added {added} missing queries, preserved {preserved} completed results.',
+    allQueriesAlreadyPresentToast: 'All queries are already in the queue. Existing results were preserved.',
   },
   mcp: {
     nameRequired: 'Server name is required',

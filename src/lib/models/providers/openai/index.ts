@@ -137,7 +137,58 @@ class OpenAIProvider extends BaseModelProvider<OpenAIConfig> {
   }
 
   async getDefaultModels(): Promise<ModelList> {
-    if (this.config.baseURL === 'https://api.openai.com/v1') {
+    const apiKey = (this.config.apiKey || '').trim();
+    const baseURL = (this.config.baseURL || 'https://api.openai.com/v1').trim().replace(/\/+$/, '');
+
+    if (apiKey) {
+      try {
+        const res = await fetch(`${baseURL}/models`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          signal: AbortSignal.timeout(5000),
+        });
+
+        if (!res.ok) {
+          throw new Error(
+            `OpenAI API returned HTTP ${res.status}: ${res.statusText || 'Authentication/Connection Error'}`,
+          );
+        }
+
+        const data = await res.json();
+        if (data && Array.isArray(data.data)) {
+          const modelMap = new Map<string, Model>();
+          defaultChatModels.forEach((m) => modelMap.set(m.key, m));
+
+          // Also add relevant chat models from fetched list
+          data.data.forEach((m: any) => {
+            const id = m.id;
+            if (
+              typeof id === 'string' &&
+              (id.startsWith('gpt-') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4') || id.startsWith('chatgpt-'))
+            ) {
+              if (!modelMap.has(id)) {
+                modelMap.set(id, { name: id, key: id });
+              }
+            }
+          });
+
+          return {
+            embedding: defaultEmbeddingModels,
+            chat: Array.from(modelMap.values()),
+          };
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes('OpenAI API returned HTTP')) {
+          throw err;
+        }
+        console.warn('Could not fetch dynamic models from OpenAI, using defaults:', err?.message || err);
+      }
+    }
+
+    if (baseURL === 'https://api.openai.com/v1') {
       return {
         embedding: defaultEmbeddingModels,
         chat: defaultChatModels,

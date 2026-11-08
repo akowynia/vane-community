@@ -15,6 +15,7 @@ class SessionManager {
   private events: { event: string; data: any }[] = [];
   private emitter = new EventEmitter();
   private TTL_MS = 30 * 60 * 1000;
+  private ttlTimeout?: NodeJS.Timeout;
 
   constructor(id?: string) {
     this.id = id ?? crypto.randomUUID();
@@ -22,8 +23,8 @@ class SessionManager {
     // Default error listener preventing ERR_UNHANDLED_ERROR crashes in Node EventEmitter
     this.emitter.on('error', () => {});
 
-    setTimeout(() => {
-      SessionManager.sessions.delete(this.id);
+    this.ttlTimeout = setTimeout(() => {
+      this.destroy();
     }, this.TTL_MS);
   }
 
@@ -39,6 +40,26 @@ class SessionManager {
     const session = new SessionManager();
     this.sessions.set(session.id, session);
     return session;
+  }
+
+  static destroySession(id: string): void {
+    const session = this.sessions.get(id);
+    if (session) {
+      session.destroy();
+    } else {
+      this.sessions.delete(id);
+    }
+  }
+
+  destroy(): void {
+    if (this.ttlTimeout) {
+      clearTimeout(this.ttlTimeout);
+      this.ttlTimeout = undefined;
+    }
+    this.removeAllListeners();
+    this.events = [];
+    this.blocks.clear();
+    SessionManager.sessions.delete(this.id);
   }
 
   removeAllListeners() {

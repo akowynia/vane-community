@@ -13,6 +13,7 @@ The **Batch Search** module introduces an asynchronous, high-throughput research
    - Automatic delimiter detection (semicolon `;`, comma `,`, or tab `\t`).
    - Intelligent header row detection and handling of quotes and numbering.
    - Built-in CSV template download and sample dataset loader for instant demonstration.
+   - **Intelligent Non-Destructive Re-import & Merge**: If an existing batch session has active or completed queries and a CSV is re-imported (e.g. after accidentally deleting an item from the queue or appending new rows), the parser intelligently detects missing items and only restores the missing entries without resetting or re-executing already completed search queries.
 
 2. **Per-Query & Bulk Customization**:
    - Each query item can be customized individually before execution:
@@ -141,3 +142,20 @@ flowchart TD
 ## 5. Localization & Internationalization
 
 All user interface labels, status badges, column headers, toasts, and guidance notes are fully internationalized across all 12 supported languages (`en`, `pl`, `de`, `es`, `fr`, `it`, `pt`, `ru`, `uk`, `zh`, `ja`, `ko`).
+
+---
+
+## 6. High-Volume Batch Processing, Concurrency & Memory Resilience (>150 Queries)
+
+When executing large batches exceeding 150 conceptual queries, specialized architectural mechanisms guarantee high throughput without exceeding Docker container limits or crashing under memory exhaustion:
+
+### 6.1. Adaptive Concurrency Worker Pool
+* **Provider-Aware Routing**: The batch runner dynamically detects whether each query targets a local model or an external cloud API.
+* **Concurrent Execution for Cloud APIs**: For remote providers (such as OpenAI, Anthropic, Google Gemini, Groq, or Ollama Cloud), requests are dispatched concurrently through a managed worker pool (up to 3 parallel workers), delivering a multi-fold speedup.
+* **Serialized Execution for Local Models**: For hardware-constrained local backends (such as Ollama Local, LM Studio, or Lemonade AMD NPU), a semaphore restricts local execution to exactly one query at a time, preventing GPU VRAM thrashing and process crashes.
+* **Responsive Control Flow**: Pause, Resume, and Abort controls instantly coordinate across all active workers, cleanly halting new dequeues while allowing inflight queries to wrap up.
+
+### 6.2. Memory Leak Mitigation & Container Stability
+* **Active Session Lifecycle Management**: Every non-streaming batch query explicitly releases its session upon completion or failure. Internal event buffers, block maps, and EventEmitter listeners are completely pruned immediately rather than lingering across 30-minute default time-to-live windows.
+* **Headless Browser Recycling**: Scraper browser instances are proactively recycled after a threshold of page visits (15 pages) and upon idle timeout. This prevents long-running Chromium processes from accumulating cache, DOM trees, and memory leaks across prolonged multi-hour batch crawls.
+* **Container Memory Headroom**: Container runtimes configure Node memory ceilings (`--max-old-space-size=4096`), ensuring high-volume batches with full academic and web retrieval complete without triggering Docker out-of-memory container terminations.

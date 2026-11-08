@@ -584,6 +584,7 @@ export async function validateProviderBaseURL(
   const isLocalProvider =
     providerType === 'ollama' ||
     providerType === 'lmstudio' ||
+    providerType === 'lemonade' ||
     providerType === 'local';
 
   if (isLocalProvider) {

@@ -1342,6 +1342,8 @@ export const pl: Translations = {
     regenerateQuery: 'Regeneruj',
     regenerateNote: 'Regeneruj',
     newBatchSearch: 'Nowe wyszukiwanie',
+    mergedMissingToast: 'Zaimportowano: dodano {added} brakujących zapytań, zachowano {preserved} wykonanych wyników.',
+    allQueriesAlreadyPresentToast: 'Wszystkie zapytania są już w kolejce. Zachowano dotychczasowe wyniki.',
   },
   mcp: {
     nameRequired: 'Nazwa serwera jest wymagana',

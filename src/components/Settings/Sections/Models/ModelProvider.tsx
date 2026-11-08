@@ -46,12 +46,12 @@ const ModelProvider = ({
                 ...provider,
                 ...(type === 'chat'
                   ? {
-                      chatModels: provider.chatModels.filter(
+                      chatModels: (provider.chatModels || []).filter(
                         (m) => m.key !== modelKey,
                       ),
                     }
                   : {
-                      embeddingModels: provider.embeddingModels.filter(
+                      embeddingModels: (provider.embeddingModels || []).filter(
                         (m) => m.key !== modelKey,
                       ),
                     }),

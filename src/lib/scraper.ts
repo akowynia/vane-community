@@ -80,6 +80,8 @@ class Scraper {
   private static idleTimeout: NodeJS.Timeout | undefined;
   private static browserMutex = new Mutex();
   private static userCount = 0;
+  private static pagesProcessedSinceRestart = 0;
+  private static MAX_PAGES_BEFORE_RESTART = 15;
 
   private static async initBrowser() {
     await this.browserMutex.runExclusive(async () => {
@@ -109,8 +111,9 @@ class Scraper {
       await this.browserMutex.runExclusive(async () => {
         if (this.browser && this.userCount === 0) {
           {
-            await this.browser.close();
+            await this.browser.close().catch(() => undefined);
             this.browser = undefined;
+            this.pagesProcessedSinceRestart = 0;
           }
         }
       });
@@ -694,10 +697,23 @@ class Scraper {
     } finally {
       this.userCount--;
 
+      await page.close().catch(() => undefined);
       await context.close().catch(() => undefined);
 
+      this.pagesProcessedSinceRestart++;
+
       if (this.userCount === 0) {
-        this.scheduleIdleKill();
+        if (this.pagesProcessedSinceRestart >= Scraper.MAX_PAGES_BEFORE_RESTART) {
+          await this.browserMutex.runExclusive(async () => {
+            if (this.browser && this.userCount === 0) {
+              await this.browser.close().catch(() => undefined);
+              this.browser = undefined;
+              this.pagesProcessedSinceRestart = 0;
+            }
+          });
+        } else {
+          this.scheduleIdleKill();
+        }
       }
     }
   }
