@@ -59,6 +59,21 @@ if (!isBuildPhase) {
       "ALTER TABLE scratchpads ADD COLUMN metadata TEXT DEFAULT '{}';",
     );
   } catch {}
+  try {
+    sqlite.exec('ALTER TABLE users ADD COLUMN token_limit_5h INTEGER;');
+  } catch {}
+  try {
+    sqlite.exec('ALTER TABLE users ADD COLUMN token_limit_weekly INTEGER;');
+  } catch {}
+  try {
+    sqlite.exec('ALTER TABLE users ADD COLUMN token_limit_per_day INTEGER;');
+  } catch {}
+  try {
+    sqlite.exec('ALTER TABLE users ADD COLUMN token_limit_per_month INTEGER;');
+  } catch {}
+  try {
+    sqlite.exec('ALTER TABLE users ADD COLUMN max_tokens_per_request INTEGER;');
+  } catch {}
 
   // Ensure tables exist immediately on database connection
   try {

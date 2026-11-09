@@ -8,7 +8,24 @@ import { eq } from 'drizzle-orm';
 import { requireAdmin } from '@/lib/security/rbac';
 import { hashPassword } from '@/lib/security/password';
 
-export const PATCH = async (
+function sanitizeTokenLimit(
+  val: unknown,
+  fieldName: string,
+): { valid: true; value: number | null } | { valid: false; error: string } {
+  if (val === null || val === undefined || val === '') {
+    return { valid: true, value: null };
+  }
+  const num = Number(val);
+  if (!Number.isFinite(num) || !Number.isInteger(num) || num < 0) {
+    return {
+      valid: false,
+      error: `Invalid value for ${fieldName}. Must be a non-negative integer or null.`,
+    };
+  }
+  return { valid: true, value: num };
+}
+
+const updateUserHandler = async (
   req: NextRequest,
   props: { params: Promise<{ id: string }> },
 ) => {
@@ -43,10 +60,22 @@ export const PATCH = async (
     }
 
     if (body.role !== undefined) {
+      if (userId === adminCheck.user.id && body.role !== 'admin') {
+        return NextResponse.json(
+          { message: 'You cannot change your own administrator role.' },
+          { status: 400 },
+        );
+      }
       updateValues.role = body.role === 'admin' ? 'admin' : 'member';
     }
 
     if (body.status !== undefined) {
+      if (userId === adminCheck.user.id && body.status === 'disabled') {
+        return NextResponse.json(
+          { message: 'You cannot disable your own administrator account.' },
+          { status: 400 },
+        );
+      }
       updateValues.status = body.status === 'disabled' ? 'disabled' : 'active';
     }
 
@@ -59,28 +88,43 @@ export const PATCH = async (
     }
 
     if (body.tokenLimit5h !== undefined) {
-      updateValues.tokenLimit5h =
-        body.tokenLimit5h === null ? null : Number(body.tokenLimit5h);
+      const parsed = sanitizeTokenLimit(body.tokenLimit5h, 'tokenLimit5h');
+      if (!parsed.valid) {
+        return NextResponse.json({ message: parsed.error }, { status: 400 });
+      }
+      updateValues.tokenLimit5h = parsed.value;
     }
 
     if (body.tokenLimitWeekly !== undefined) {
-      updateValues.tokenLimitWeekly =
-        body.tokenLimitWeekly === null ? null : Number(body.tokenLimitWeekly);
+      const parsed = sanitizeTokenLimit(body.tokenLimitWeekly, 'tokenLimitWeekly');
+      if (!parsed.valid) {
+        return NextResponse.json({ message: parsed.error }, { status: 400 });
+      }
+      updateValues.tokenLimitWeekly = parsed.value;
     }
 
     if (body.tokenLimitPerDay !== undefined) {
-      updateValues.tokenLimitPerDay =
-        body.tokenLimitPerDay === null ? null : Number(body.tokenLimitPerDay);
+      const parsed = sanitizeTokenLimit(body.tokenLimitPerDay, 'tokenLimitPerDay');
+      if (!parsed.valid) {
+        return NextResponse.json({ message: parsed.error }, { status: 400 });
+      }
+      updateValues.tokenLimitPerDay = parsed.value;
     }
 
     if (body.tokenLimitPerMonth !== undefined) {
-      updateValues.tokenLimitPerMonth =
-        body.tokenLimitPerMonth === null ? null : Number(body.tokenLimitPerMonth);
+      const parsed = sanitizeTokenLimit(body.tokenLimitPerMonth, 'tokenLimitPerMonth');
+      if (!parsed.valid) {
+        return NextResponse.json({ message: parsed.error }, { status: 400 });
+      }
+      updateValues.tokenLimitPerMonth = parsed.value;
     }
 
     if (body.maxTokensPerRequest !== undefined) {
-      updateValues.maxTokensPerRequest =
-        body.maxTokensPerRequest === null ? null : Number(body.maxTokensPerRequest);
+      const parsed = sanitizeTokenLimit(body.maxTokensPerRequest, 'maxTokensPerRequest');
+      if (!parsed.valid) {
+        return NextResponse.json({ message: parsed.error }, { status: 400 });
+      }
+      updateValues.maxTokensPerRequest = parsed.value;
     }
 
     if (body.password && typeof body.password === 'string' && body.password.length >= 8) {
@@ -101,6 +145,9 @@ export const PATCH = async (
     );
   }
 };
+
+export const PATCH = updateUserHandler;
+export const PUT = updateUserHandler;
 
 export const DELETE = async (
   req: NextRequest,
