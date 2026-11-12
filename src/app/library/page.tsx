@@ -200,12 +200,12 @@ const LibraryContent = () => {
     }
     setClearingChats(true);
     try {
-      // Delete all chats via API
-      for (const chat of chats) {
-        await fetch(`/api/chats/${chat.id}`, {
-          method: 'DELETE',
-        });
-      }
+      // Delete all chats via the bulk API
+      const res = await fetch('/api/chats/clear-all', {
+        method: 'POST',
+      });
+      if (!res.ok) throw new Error('Failed to clear all chats');
+      const data = await res.json();
       setChats([]);
     } catch (err) {
       console.error('Error clearing all chats:', err);
