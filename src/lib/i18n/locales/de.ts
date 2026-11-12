@@ -321,8 +321,11 @@ export const de: Translations = {
     viewBatchNotes: 'Gespeicherte Batch-Recherchen',
     viewBatchNotesDesc: 'Strukturierte Notizen aus Batch-Abfragen im Notizblock gespeichert.',
     batchNotesCount: 'Batch-Recherchen',
+      clearAllChats: "Alle Chats löschen",
+      clearAllChatsConfirm: "Bist du sicher, dass du alle Chats löschen willst? Diese Aktion kann nicht rückgängig gemacht werden.",
     saveBatchToScratchpad: 'Im Notizblock speichern',
     savingBatchToScratchpad: 'Wird gespeichert...',
+
     exportBatch: 'Exportieren',
     clearBatchSession: 'Sitzung löschen',
     clearBatchSessionConfirm: 'Möchten Sie die aktuelle Stapelsuch-Sitzung wirklich löschen?',

@@ -323,6 +323,8 @@ export const pl: Translations = {
     batchNotesCount: 'badań wsadowych',
     saveBatchToScratchpad: 'Zapisz w Szkicowniku',
     savingBatchToScratchpad: 'Zapisywanie...',
+    clearAllChats: 'Wyczyść wszystkie czaty',
+    clearAllChatsConfirm: 'Czy na pewno chcesz usunąć wszystkie czaty? Tej operacji nie można cofnąć.',
     exportBatch: 'Eksportuj',
     clearBatchSession: 'Wyczyść sesję',
     clearBatchSessionConfirm: 'Czy na pewno chcesz wyczyścić bieżącą sesję wyszukiwania wsadowego?',

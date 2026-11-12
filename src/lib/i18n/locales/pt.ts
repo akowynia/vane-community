@@ -321,6 +321,8 @@ export const pt: Translations = {
     viewBatchNotes: 'Pesquisas em lote guardadas',
     viewBatchNotesDesc: 'Documentos estruturados gerados a partir de pesquisas em lote e guardados no bloco de notas.',
     batchNotesCount: 'pesquisas em lote',
+      clearAllChats: "Limpar todos os chats",
+      clearAllChatsConfirm: "Tens a certeza que queres limpar todos os chats? Esta ação não pode ser desfeita.",
     saveBatchToScratchpad: 'Salvar no Bloco de notas',
     savingBatchToScratchpad: 'Salvando...',
     exportBatch: 'Exportar',

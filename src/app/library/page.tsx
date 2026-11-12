@@ -72,6 +72,10 @@ const LibraryContent = () => {
   const [selectedWaypointFilter, setSelectedWaypointFilter] = useState<string>('all');
   const [isCreateCronOpen, setIsCreateCronOpen] = useState(false);
 
+  // Clear all chats
+  const [showClearAllDialog, setShowClearAllDialog] = useState(false);
+  const [clearingChats, setClearingChats] = useState(false);
+
   // Multi-user & auth
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [instanceMode, setInstanceMode] = useState<string>('single');
@@ -190,6 +194,26 @@ const LibraryContent = () => {
 
   const activeCronsCount = crons.filter((c) => c.enabled).length;
 
+  const handleClearAllChats = async () => {
+    if (!window.confirm(t('library.clearAllChatsConfirm') || 'Are you sure you want to delete all chats? This cannot be undone.')) {
+      return;
+    }
+    setClearingChats(true);
+    try {
+      // Delete all chats via API
+      for (const chat of chats) {
+        await fetch(`/api/chats/${chat.id}`, {
+          method: 'DELETE',
+        });
+      }
+      setChats([]);
+    } catch (err) {
+      console.error('Error clearing all chats:', err);
+    } finally {
+      setClearingChats(false);
+    }
+  };
+
   return (
     <div>
       {/* Header */}
@@ -297,6 +321,22 @@ const LibraryContent = () => {
                 {batchNotes.length}
               </span>
             </button>
+
+            {/* Clear All Chats Button */}
+            {chats.length > 0 && (
+              <button
+                onClick={handleClearAllChats}
+                disabled={clearingChats}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-light-200 dark:border-[#2b231b] bg-light-primary dark:bg-[#14110e] text-xs text-black/60 dark:text-stone-400 hover:text-red-500 dark:hover:text-red-400 hover:border-red-500/40 disabled:opacity-50 transition shrink-0"
+              >
+                {clearingChats ? (
+                  <Loader2 size={15} className="animate-spin" />
+                ) : (
+                  <Trash2 size={15} />
+                )}
+                <span className="hidden sm:inline">{t('library.clearAllChats') || 'Clear All Chats'}</span>
+              </button>
+            )}
           </div>
 
           {/* Action button in header if on crons tab and not guest */}

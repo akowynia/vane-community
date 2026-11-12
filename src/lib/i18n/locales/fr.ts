@@ -321,6 +321,8 @@ export const fr: Translations = {
     viewBatchNotes: 'Recherches par lots enregistrées',
     viewBatchNotesDesc: 'Documents structurés générés à partir de requêtes par lots et enregistrés dans le Bloc-notes.',
     batchNotesCount: 'recherches par lots',
+      clearAllChats: "Supprimer tous les chats",
+      clearAllChatsConfirm: "Es-tu sûr de vouloir supprimer tous les chats ? Cette action est irréversible.",
     saveBatchToScratchpad: 'Enregistrer dans le bloc-notes',
     savingBatchToScratchpad: 'Enregistrement...',
     exportBatch: 'Exporter',

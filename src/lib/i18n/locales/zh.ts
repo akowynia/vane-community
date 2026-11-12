@@ -321,6 +321,8 @@ export const zh: Translations = {
     viewBatchNotes: '已保存的批量研究',
     viewBatchNotesDesc: '从批量查询生成并保存在便签本中的结构化研究文档。',
     batchNotesCount: '批量研究',
+      clearAllChats: "清除所有聊天",
+      clearAllChatsConfirm: "你确定要清除所有聊天吗？此操作无法撤销。",
     saveBatchToScratchpad: '保存至草稿笔记',
     savingBatchToScratchpad: '保存中...',
     exportBatch: '导出',

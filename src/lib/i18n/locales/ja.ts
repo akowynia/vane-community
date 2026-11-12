@@ -321,6 +321,8 @@ export const ja: Translations = {
     viewBatchNotes: '保存されたバッチリサーチ',
     viewBatchNotesDesc: 'バッチ検索から生成されスクラッチパッドに保存された構造化ノート。',
     batchNotesCount: 'バッチリサーチ',
+      clearAllChats: "すべてのチャットを消去",
+      clearAllChatsConfirm: "すべてのチャットを消去してもよろしいですか？この操作は取り消せません。",
     saveBatchToScratchpad: 'スクラッチパッドに保存',
     savingBatchToScratchpad: '保存中...',
     exportBatch: 'エクスポート',

@@ -321,6 +321,8 @@ export const es: Translations = {
     viewBatchNotes: 'Investigaciones por lotes guardadas',
     viewBatchNotesDesc: 'Documentos estructurados generados a partir de búsquedas por lotes y guardados en Scratchpad.',
     batchNotesCount: 'búsquedas por lotes',
+      clearAllChats: "Borrar todos los chats",
+      clearAllChatsConfirm: "¿Estás seguro de que quieres borrar todos los chats? Esta acción no se puede deshacer.",
     saveBatchToScratchpad: 'Guardar en Bloc de notas',
     savingBatchToScratchpad: 'Guardando...',
     exportBatch: 'Exportar',

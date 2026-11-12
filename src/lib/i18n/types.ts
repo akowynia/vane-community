@@ -337,6 +337,8 @@ export interface Translations {
     viewBatchNotes?: string;
     viewBatchNotesDesc?: string;
     batchNotesCount?: string;
+    clearAllChats?: string;
+    clearAllChatsConfirm?: string;
     saveBatchToScratchpad?: string;
     savingBatchToScratchpad?: string;
     exportBatch?: string;

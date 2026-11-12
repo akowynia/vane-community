@@ -321,6 +321,8 @@ export const it: Translations = {
     viewBatchNotes: 'Ricerche batch salvate',
     viewBatchNotesDesc: 'Documenti strutturati generati da query batch e salvati negli appunti.',
     batchNotesCount: 'ricerche batch',
+      clearAllChats: "Elimina tutte le chat",
+      clearAllChatsConfirm: "Sei sicuro di voler eliminare tutte le chat? Questa azione non può essere annullata.",
     saveBatchToScratchpad: 'Salva nel blocco note',
     savingBatchToScratchpad: 'Salvataggio...',
     exportBatch: 'Esporta',

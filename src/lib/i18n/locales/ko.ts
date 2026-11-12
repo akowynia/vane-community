@@ -321,6 +321,8 @@ export const ko: Translations = {
     viewBatchNotes: '저장된 일괄 조사',
     viewBatchNotesDesc: '일괄 검색에서 생성되어 스크래치패드에 저장된 구조화된 노트.',
     batchNotesCount: '일괄 조사',
+      clearAllChats: "모든 채팅 지우기",
+      clearAllChatsConfirm: "모든 채팅을 지우시겠습니까? 이 작업은 되돌릴 수 없습니다.",
     saveBatchToScratchpad: '스크래치패드에 저장',
     savingBatchToScratchpad: '저장 중...',
     exportBatch: '내보내기',

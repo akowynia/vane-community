@@ -321,6 +321,8 @@ export const ru: Translations = {
     viewBatchNotes: 'Сохраненные пакетные исследования',
     viewBatchNotesDesc: 'Структурированные заметки из пакетных запросов, сохраненные в блокноте.',
     batchNotesCount: 'пакетных исследований',
+      clearAllChats: "Очистить все чаты",
+      clearAllChatsConfirm: "Ты уверен, что хочешь очистить все чаты? Это действие нельзя отменить.",
     saveBatchToScratchpad: 'Сохранить в Блокнот',
     savingBatchToScratchpad: 'Сохранение...',
     exportBatch: 'Экспорт',

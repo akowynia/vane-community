@@ -321,6 +321,8 @@ export const en: Translations = {
     viewBatchNotes: 'Saved Batch Research',
     viewBatchNotesDesc: 'Structured research documents generated from batch queries and saved to Scratchpad.',
     batchNotesCount: 'batch research',
+    clearAllChats: 'Clear Chats',
+    clearAllChatsConfirm: 'Are you sure you want to delete all chats? This cannot be undone.',
     saveBatchToScratchpad: 'Save to Scratchpad',
     savingBatchToScratchpad: 'Saving...',
     exportBatch: 'Export',
