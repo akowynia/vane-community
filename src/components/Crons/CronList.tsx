@@ -17,6 +17,7 @@ import {
   Cpu,
   Sparkles,
   Search,
+  Check,
 } from 'lucide-react';
 import {
   Dialog,
@@ -28,10 +29,14 @@ import {
 } from '@headlessui/react';
 import { toast } from 'sonner';
 import { useTranslation } from '@/lib/i18n';
-import { formatTimeDifference } from '@/lib/utils';
+import { formatTimeDifference, cn } from '@/lib/utils';
 import WaypointIcon from '@/components/Waypoints/WaypointIcon';
 import { describeSchedule } from '@/lib/cron/parser';
 import { CronItem, CreateEditCronDialog } from './CreateEditCronDialog';
+import { useBulkSelection } from '@/lib/hooks/useBulkSelection';
+import BulkSelectionToolbar from '@/components/BulkDelete/BulkSelectionToolbar';
+import DeleteConfirmDialog from '@/components/BulkDelete/DeleteConfirmDialog';
+import { executeBulkDelete } from '@/lib/utils/bulkDeleteClient';
 
 interface CronListProps {
   crons: CronItem[];
@@ -62,6 +67,38 @@ export const CronList: React.FC<CronListProps> = ({
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CronItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [bulkDeleteIds, setBulkDeleteIds] = useState<string[] | null>(null);
+  const [bulkDeleteIsAll, setBulkDeleteIsAll] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+  const selection = useBulkSelection({
+    items: crons,
+    getId: (c) => c.id,
+    canSelect: (c) => c.isOwner !== false,
+    disableEscape: Boolean(deleteTarget) || Boolean(bulkDeleteIds) || isEditDialogOpen,
+  });
+
+  const handleConfirmBulkDelete = async () => {
+    if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
+    setIsBulkDeleting(true);
+    const result = await executeBulkDelete({
+      endpoint: '/api/crons',
+      ids: bulkDeleteIds,
+      onUnauthorized: onRequireLogin,
+      t,
+      fallbackError: t('crons.deleteErrorFallback') || 'Failed to delete schedules.',
+    });
+    setIsBulkDeleting(false);
+
+    if (result.deletedIds.length > 0) {
+      const deletedSet = new Set(result.deletedIds);
+      onCronsChange(crons.filter((c) => !deletedSet.has(c.id)));
+      setBulkDeleteIds(null);
+      selection.exitSelectionMode();
+    } else if (result.ok) {
+      setBulkDeleteIds(null);
+    }
+  };
 
   // Toggle active/inactive
   const handleToggleEnabled = async (cron: CronItem) => {
@@ -206,24 +243,79 @@ export const CronList: React.FC<CronListProps> = ({
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-start">
+        <BulkSelectionToolbar
+          isSelectionMode={selection.isSelectionMode}
+          selectedCount={selection.selectedCount}
+          selectableCount={selection.selectableCount}
+          allSelected={selection.allSelected}
+          onToggleSelectionMode={selection.toggleSelectionMode}
+          onSelectAll={selection.selectAll}
+          onDeselectAll={selection.deselectAll}
+          onDeleteSelected={() => {
+            setBulkDeleteIsAll(false);
+            setBulkDeleteIds(selection.selectedIdsList);
+          }}
+          onDeleteAll={() => {
+            setBulkDeleteIsAll(true);
+            setBulkDeleteIds(selection.selectableIds);
+          }}
+          disabled={isBulkDeleting}
+          className={selection.isSelectionMode ? 'w-full' : undefined}
+        />
+      </div>
+
       <div className="grid grid-cols-1 gap-4">
         {crons.map((cron) => {
           const isRunning = runningCronId === cron.id || cron.lastStatus === 'running';
           const humanSchedule = describeSchedule(cron.schedule, locale);
           const safeSources = Array.isArray(cron.sources) ? cron.sources : [];
+          const isSelectable = cron.isOwner !== false;
+          const isSelected = selection.selectedIds.has(cron.id);
 
           return (
             <div
               key={cron.id}
-              className={`p-5 rounded-2xl border transition-all duration-200 ${
-                cron.enabled
-                  ? 'border-light-200 dark:border-[#251f19] bg-light-primary dark:bg-[#14110e] hover:border-[#b8864d]/50'
-                  : 'border-light-200/60 dark:border-[#1e1814] bg-light-secondary/40 dark:bg-[#0e0c0a] opacity-75'
-              }`}
+              onClick={(e) => {
+                if (!selection.isSelectionMode) return;
+                if (!isSelectable) return;
+                selection.toggleItem(cron.id, e.shiftKey);
+              }}
+              className={cn(
+                'p-5 rounded-2xl border transition-all duration-200',
+                selection.isSelectionMode && isSelectable && 'cursor-pointer',
+                isSelected
+                  ? 'border-[#b8864d] bg-[#b8864d]/10 dark:bg-[#1e1711] ring-1 ring-[#b8864d]/40'
+                  : cron.enabled
+                    ? 'border-light-200 dark:border-[#251f19] bg-light-primary dark:bg-[#14110e] hover:border-[#b8864d]/50'
+                    : 'border-light-200/60 dark:border-[#1e1814] bg-light-secondary/40 dark:bg-[#0e0c0a] opacity-75',
+              )}
             >
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                {/* Left side: Icon, Name, Waypoint, Schedule */}
+                {/* Left side: Checkbox (in selection mode), Icon, Name, Waypoint, Schedule */}
                 <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                  {selection.isSelectionMode && (
+                    <button
+                      type="button"
+                      disabled={!isSelectable}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isSelectable) selection.toggleItem(cron.id, e.shiftKey);
+                      }}
+                      title={!isSelectable ? t('bulkDelete.notOwnerTooltip') || 'Only the owner or an administrator can delete this item.' : undefined}
+                      className={cn(
+                        'mt-2 w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition',
+                        !isSelectable
+                          ? 'opacity-35 cursor-not-allowed border-light-300 dark:border-[#30271e]'
+                          : isSelected
+                            ? 'bg-[#b8864d] border-[#b8864d] text-[#0c0a09]'
+                            : 'border-light-300 dark:border-[#3a3026] bg-light-secondary dark:bg-[#1b1612] hover:border-[#b8864d]',
+                      )}
+                    >
+                      {isSelected && <Check size={13} strokeWidth={3} />}
+                    </button>
+                  )}
+
                   <div className="p-3 rounded-xl bg-light-secondary dark:bg-[#1e1915] border border-light-200/80 dark:border-[#30271e] text-[#b8864d] shrink-0 mt-0.5">
                     <Clock size={20} />
                   </div>
@@ -238,6 +330,11 @@ export const CronList: React.FC<CronListProps> = ({
                       {showWaypointBadge && cron.waypointName && (
                         <Link
                           href={`/waypoints/${cron.waypointId}`}
+                          onClick={(e) => {
+                            if (selection.isSelectionMode) {
+                              e.preventDefault();
+                            }
+                          }}
                           className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-[#b8864d]/10 text-[#b8864d] border border-[#b8864d]/25 hover:bg-[#b8864d]/20 transition"
                         >
                           <WaypointIcon name={cron.waypointIcon} size={12} />
@@ -328,6 +425,7 @@ export const CronList: React.FC<CronListProps> = ({
                 </div>
 
                 {/* Right side: Action buttons */}
+                {!selection.isSelectionMode && (
                 <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                   {/* Link to last generated chat */}
                   {cron.lastChatId && (
@@ -396,11 +494,32 @@ export const CronList: React.FC<CronListProps> = ({
                     <Trash2 size={14} />
                   </button>
                 </div>
+                )}
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        isOpen={Boolean(bulkDeleteIds && bulkDeleteIds.length > 0)}
+        onClose={() => setBulkDeleteIds(null)}
+        onConfirm={handleConfirmBulkDelete}
+        isDeleting={isBulkDeleting}
+        title={
+          bulkDeleteIsAll
+            ? t('bulkDelete.confirmAllTitle', { count: bulkDeleteIds?.length || 0 }) ||
+              `Delete all ${bulkDeleteIds?.length || 0} item(s)?`
+            : t('bulkDelete.confirmTitle', { count: bulkDeleteIds?.length || 0 }) ||
+              `Delete ${bulkDeleteIds?.length || 0} selected item(s)?`
+        }
+        description={
+          t('bulkDelete.confirmDescCrons') ||
+          'This action cannot be undone. Selected scheduled tasks will no longer run.'
+        }
+        deletingLabel={t('crons.deletingLabel') || t('bulkDelete.deleting') || 'Deleting...'}
+      />
 
       {/* Edit Cron Dialog */}
       <CreateEditCronDialog

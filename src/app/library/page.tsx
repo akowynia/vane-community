@@ -35,6 +35,12 @@ import CronList from '@/components/Crons/CronList';
 import CreateEditCronDialog, { CronItem } from '@/components/Crons/CreateEditCronDialog';
 import LoginDialog from '@/components/Auth/LoginDialog';
 import { useBatchSearch } from '@/lib/batch-search/context';
+import { useBulkSelection } from '@/lib/hooks/useBulkSelection';
+import BulkSelectionToolbar from '@/components/BulkDelete/BulkSelectionToolbar';
+import DeleteConfirmDialog from '@/components/BulkDelete/DeleteConfirmDialog';
+import SelectionCheckbox from '@/components/BulkDelete/SelectionCheckbox';
+import { executeBulkDelete } from '@/lib/utils/bulkDeleteClient';
+import { toast } from 'sonner';
 
 export interface Chat {
   id: string;
@@ -80,6 +86,100 @@ const LibraryContent = () => {
   const isGuest = instanceMode === 'multi' && !currentUser;
 
   const { t, locale } = useTranslation();
+
+  // Bulk & single delete states
+  const [chatBulkDeleteIds, setChatBulkDeleteIds] = useState<string[] | null>(null);
+  const [chatBulkDeleteIsAll, setChatBulkDeleteIsAll] = useState(false);
+  const [isDeletingChats, setIsDeletingChats] = useState(false);
+
+  const [batchNoteBulkDeleteIds, setBatchNoteBulkDeleteIds] = useState<string[] | null>(null);
+  const [batchNoteBulkDeleteIsAll, setBatchNoteBulkDeleteIsAll] = useState(false);
+  const [singleDeleteBatchNote, setSingleDeleteBatchNote] = useState<any | null>(null);
+  const [isDeletingBatchNotes, setIsDeletingBatchNotes] = useState(false);
+  const [isClearSessionConfirmOpen, setIsClearSessionConfirmOpen] = useState(false);
+
+  const chatSelection = useBulkSelection({
+    items: chats,
+    getId: (c) => c.id,
+    disableEscape: Boolean(chatBulkDeleteIds),
+  });
+
+  const batchNoteSelection = useBulkSelection({
+    items: batchNotes,
+    getId: (n) => n.id,
+    disableEscape:
+      Boolean(batchNoteBulkDeleteIds) ||
+      Boolean(singleDeleteBatchNote) ||
+      isClearSessionConfirmOpen,
+  });
+
+  const handleConfirmBulkDeleteChats = async () => {
+    if (!chatBulkDeleteIds || chatBulkDeleteIds.length === 0) return;
+    setIsDeletingChats(true);
+    const result = await executeBulkDelete({
+      endpoint: '/api/chats',
+      ids: chatBulkDeleteIds,
+      onUnauthorized: () => setIsLoginOpen(true),
+      t,
+    });
+    setIsDeletingChats(false);
+
+    if (result.deletedIds.length > 0) {
+      const deletedSet = new Set(result.deletedIds);
+      setChats((prev) => prev.filter((c) => !deletedSet.has(c.id)));
+      setChatBulkDeleteIds(null);
+      chatSelection.exitSelectionMode();
+    } else if (result.ok) {
+      setChatBulkDeleteIds(null);
+    }
+  };
+
+  const handleConfirmBulkDeleteBatchNotes = async () => {
+    if (!batchNoteBulkDeleteIds || batchNoteBulkDeleteIds.length === 0) return;
+    setIsDeletingBatchNotes(true);
+    const result = await executeBulkDelete({
+      endpoint: '/api/scratchpad',
+      ids: batchNoteBulkDeleteIds,
+      onUnauthorized: () => setIsLoginOpen(true),
+      t,
+    });
+    setIsDeletingBatchNotes(false);
+
+    if (result.deletedIds.length > 0) {
+      const deletedSet = new Set(result.deletedIds);
+      setBatchNotes((prev) => prev.filter((n) => !deletedSet.has(n.id)));
+      setBatchNoteBulkDeleteIds(null);
+      batchNoteSelection.exitSelectionMode();
+    } else if (result.ok) {
+      setBatchNoteBulkDeleteIds(null);
+    }
+  };
+
+  const handleConfirmSingleDeleteBatchNote = async () => {
+    if (!singleDeleteBatchNote) return;
+    setIsDeletingBatchNotes(true);
+    try {
+      const res = await fetch(`/api/scratchpad/${singleDeleteBatchNote.id}`, {
+        method: 'DELETE',
+      });
+      if (res.status === 401) {
+        setIsLoginOpen(true);
+        toast.error(t('crons.loginRequired') || 'Login required.');
+        return;
+      }
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.message || t('bulkDelete.deleteError') || 'Failed to delete item.');
+      }
+      toast.success(t('scratchpad.deleteSuccess') || 'Note was deleted.');
+      setBatchNotes((prev) => prev.filter((n) => n.id !== singleDeleteBatchNote.id));
+      setSingleDeleteBatchNote(null);
+    } catch (err: any) {
+      toast.error(err?.message || t('bulkDelete.deleteError') || 'Failed to delete item.');
+    } finally {
+      setIsDeletingBatchNotes(false);
+    }
+  };
 
   const fetchCurrentUser = async () => {
     try {
@@ -348,11 +448,34 @@ const LibraryContent = () => {
               </p>
             </div>
           ) : (
-            <div className="pt-6 pb-28 px-2">
+            <div className="pt-6 pb-28 px-2 space-y-4">
+              <div className="flex justify-start">
+                <BulkSelectionToolbar
+                  isSelectionMode={chatSelection.isSelectionMode}
+                  selectedCount={chatSelection.selectedCount}
+                  selectableCount={chatSelection.selectableCount}
+                  allSelected={chatSelection.allSelected}
+                  onToggleSelectionMode={chatSelection.toggleSelectionMode}
+                  onSelectAll={chatSelection.selectAll}
+                  onDeselectAll={chatSelection.deselectAll}
+                  onDeleteSelected={() => {
+                    setChatBulkDeleteIsAll(false);
+                    setChatBulkDeleteIds(chatSelection.selectedIdsList);
+                  }}
+                  onDeleteAll={() => {
+                    setChatBulkDeleteIsAll(true);
+                    setChatBulkDeleteIds(chatSelection.selectableIds);
+                  }}
+                  disabled={isDeletingChats}
+                  className={chatSelection.isSelectionMode ? 'w-full' : undefined}
+                />
+              </div>
+
               <div className="rounded-2xl border border-light-200 dark:border-[#251f19] overflow-hidden bg-light-primary dark:bg-[#14110e]">
                 {chats.map((chat, index) => {
                   const safeSources = Array.isArray(chat?.sources) ? chat.sources : [];
                   const safeFiles = Array.isArray(chat?.files) ? chat.files : [];
+                  const isSelected = chatSelection.selectedIds.has(chat.id);
 
                   const sourcesLabel =
                     safeSources.length === 0
@@ -371,28 +494,51 @@ const LibraryContent = () => {
                   return (
                     <div
                       key={chat.id}
-                      className={
-                        'group flex flex-col gap-2 p-4 hover:bg-light-secondary dark:hover:bg-[#1a1612] transition-colors duration-200 ' +
-                        (index !== chats.length - 1
-                          ? 'border-b border-light-200 dark:border-[#221c16]'
-                          : '')
-                      }
+                      onClick={(e) => {
+                        if (!chatSelection.isSelectionMode) return;
+                        chatSelection.toggleItem(chat.id, e.shiftKey);
+                      }}
+                      className={cn(
+                        'group flex flex-col gap-2 p-4 transition-colors duration-200',
+                        chatSelection.isSelectionMode && 'cursor-pointer',
+                        isSelected
+                          ? 'bg-[#b8864d]/12 dark:bg-[#1e1711]'
+                          : 'hover:bg-light-secondary dark:hover:bg-[#1a1612]',
+                        index !== chats.length - 1 &&
+                          'border-b border-light-200 dark:border-[#221c16]',
+                      )}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <Link
-                          href={`/c/${chat.id}`}
-                          className="flex-1 text-black dark:text-stone-100 text-base sm:text-lg font-medium leading-snug line-clamp-2 group-hover:text-[#b8864d] transition duration-200"
-                          title={chat.title || 'Untitled'}
-                        >
-                          {chat.title || 'Untitled'}
-                        </Link>
-                        <div className="pt-0.5 shrink-0">
-                          <DeleteChat
-                            chatId={chat.id}
-                            chats={chats}
-                            setChats={setChats}
-                          />
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          {chatSelection.isSelectionMode && (
+                            <SelectionCheckbox
+                              checked={isSelected}
+                              onToggle={(shiftKey) => chatSelection.toggleItem(chat.id, shiftKey)}
+                              className="mt-1"
+                            />
+                          )}
+                          <Link
+                            href={`/c/${chat.id}`}
+                            onClick={(e) => {
+                              if (chatSelection.isSelectionMode) {
+                                e.preventDefault();
+                              }
+                            }}
+                            className="flex-1 text-black dark:text-stone-100 text-base sm:text-lg font-medium leading-snug line-clamp-2 group-hover:text-[#b8864d] transition duration-200"
+                            title={chat.title || 'Untitled'}
+                          >
+                            {chat.title || 'Untitled'}
+                          </Link>
                         </div>
+                        {!chatSelection.isSelectionMode && (
+                          <div className="pt-0.5 shrink-0">
+                            <DeleteChat
+                              chatId={chat.id}
+                              chats={chats}
+                              setChats={setChats}
+                            />
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2 text-black/60 dark:text-stone-400">
@@ -693,16 +839,7 @@ const LibraryContent = () => {
                   {(batchSearch.completedCount === batchSearch.totalQueries || !batchSearch.isSearching) && (
                     <button
                       type="button"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            t('library.clearBatchSessionConfirm') ||
-                              'Czy na pewno chcesz wyczyścić bieżącą sesję wyszukiwania wsadowego?',
-                          )
-                        ) {
-                          batchSearch.clearBatch();
-                        }
-                      }}
+                      onClick={() => setIsClearSessionConfirmOpen(true)}
                       title={t('library.clearBatchSession') || 'Wyczyść sesję'}
                       className="p-1.5 rounded-xl border border-stone-300 dark:border-[#2a241d] hover:border-red-500/40 text-stone-400 hover:text-red-400 transition cursor-pointer"
                     >
@@ -825,7 +962,7 @@ const LibraryContent = () => {
 
           {/* Saved Batch Research Notes */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-light-200 dark:border-[#221c16]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-light-200 dark:border-[#221c16]">
               <div>
                 <h2 className="text-base font-bold text-black dark:text-stone-100 flex items-center space-x-2">
                   <span>{t('library.viewBatchNotes') || 'Saved Batch Research'}</span>
@@ -838,6 +975,30 @@ const LibraryContent = () => {
                 </p>
               </div>
             </div>
+
+            {batchNotes.length > 0 && (
+              <div className="flex justify-start">
+                <BulkSelectionToolbar
+                  isSelectionMode={batchNoteSelection.isSelectionMode}
+                  selectedCount={batchNoteSelection.selectedCount}
+                  selectableCount={batchNoteSelection.selectableCount}
+                  allSelected={batchNoteSelection.allSelected}
+                  onToggleSelectionMode={batchNoteSelection.toggleSelectionMode}
+                  onSelectAll={batchNoteSelection.selectAll}
+                  onDeselectAll={batchNoteSelection.deselectAll}
+                  onDeleteSelected={() => {
+                    setBatchNoteBulkDeleteIsAll(false);
+                    setBatchNoteBulkDeleteIds(batchNoteSelection.selectedIdsList);
+                  }}
+                  onDeleteAll={() => {
+                    setBatchNoteBulkDeleteIsAll(true);
+                    setBatchNoteBulkDeleteIds(batchNoteSelection.selectableIds);
+                  }}
+                  disabled={isDeletingBatchNotes}
+                  className={batchNoteSelection.isSelectionMode ? 'w-full' : undefined}
+                />
+              </div>
+            )}
 
             {loadingBatchNotes ? (
               <div className="flex flex-row items-center justify-center min-h-[30vh]">
@@ -864,22 +1025,61 @@ const LibraryContent = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {batchNotes.map((note) => (
+                {batchNotes.map((note) => {
+                  const isSelected = batchNoteSelection.selectedIds.has(note.id);
+                  return (
                   <Link
                     key={note.id}
                     href={`/scratchpad/${note.id}`}
-                    className="group flex flex-col justify-between p-5 rounded-2xl bg-light-secondary dark:bg-[#14110e] border border-cyan-500/20 hover:border-cyan-500/60 dark:hover:border-cyan-500/60 transition-all duration-200 shadow-sm hover:shadow-lg hover:shadow-black/20"
+                    onClick={(e) => {
+                      if (batchNoteSelection.isSelectionMode) {
+                        e.preventDefault();
+                        batchNoteSelection.toggleItem(note.id, e.shiftKey);
+                      }
+                    }}
+                    className={cn(
+                      'group flex flex-col justify-between p-5 rounded-2xl bg-light-secondary dark:bg-[#14110e] border transition-all duration-200 shadow-sm hover:shadow-lg hover:shadow-black/20',
+                      isSelected
+                        ? 'border-[#b8864d] bg-[#b8864d]/10 dark:bg-[#1e1711] ring-1 ring-[#b8864d]/40'
+                        : 'border-cyan-500/20 hover:border-cyan-500/60 dark:hover:border-cyan-500/60',
+                    )}
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[10px] font-bold tracking-wider uppercase flex items-center space-x-1 shrink-0">
-                          <Layers className="w-2.5 h-2.5" />
-                          <span>{t('scratchpad.badgeBatch') || 'BATCH RESEARCH'}</span>
-                        </span>
-                        <span className="text-[11px] text-stone-400 flex items-center space-x-1">
-                          <Clock className="w-3 h-3" />
-                          <span>{formatTimeDifference(note.updatedAt, locale)}</span>
-                        </span>
+                      <div className="flex items-center justify-between mb-2 gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {batchNoteSelection.isSelectionMode && (
+                            <SelectionCheckbox
+                              checked={isSelected}
+                              onToggle={(shiftKey) =>
+                                batchNoteSelection.toggleItem(note.id, shiftKey)
+                              }
+                            />
+                          )}
+                          <span className="px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[10px] font-bold tracking-wider uppercase flex items-center space-x-1 shrink-0">
+                            <Layers className="w-2.5 h-2.5" />
+                            <span>{t('scratchpad.badgeBatch') || 'BATCH RESEARCH'}</span>
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[11px] text-stone-400 flex items-center space-x-1">
+                            <Clock className="w-3 h-3" />
+                            <span>{formatTimeDifference(note.updatedAt, locale)}</span>
+                          </span>
+                          {!batchNoteSelection.isSelectionMode && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSingleDeleteBatchNote(note);
+                              }}
+                              title={t('common.delete') || 'Delete'}
+                              className="p-1 rounded-lg text-stone-400 hover:text-red-500 hover:bg-red-500/10 transition cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 group-hover:text-cyan-400 transition line-clamp-1 mb-1.5">
@@ -904,40 +1104,107 @@ const LibraryContent = () => {
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <button
-                          type="button"
-                          disabled={loadingNoteId === note.id}
-                          onClick={async (e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setLoadingNoteId(note.id);
-                            try {
-                              await batchSearch.loadSavedBatchSession(note);
-                            } finally {
-                              setLoadingNoteId(null);
-                            }
-                          }}
-                          title={t('library.loadIntoStudio') || 'Załaduj do studia i regeneruj'}
-                          className="px-2 py-0.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-[10px] font-semibold flex items-center space-x-1 transition cursor-pointer disabled:opacity-50"
-                        >
-                          {loadingNoteId === note.id ? (
-                            <Loader2 className="w-2.5 h-2.5 animate-spin text-cyan-400" />
-                          ) : (
-                            <RotateCcw className="w-2.5 h-2.5" />
-                          )}
-                          <span>{t('library.loadIntoStudio') || 'Regeneruj'}</span>
-                        </button>
-                        <ExternalLink className="w-3.5 h-3.5 text-stone-400 group-hover:text-cyan-400 transition" />
-                      </div>
+                      {!batchNoteSelection.isSelectionMode && (
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            disabled={loadingNoteId === note.id}
+                            onClick={async (e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setLoadingNoteId(note.id);
+                              try {
+                                await batchSearch.loadSavedBatchSession(note);
+                              } finally {
+                                setLoadingNoteId(null);
+                              }
+                            }}
+                            title={t('library.loadIntoStudio') || 'Load into studio and regenerate'}
+                            className="px-2 py-0.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-[10px] font-semibold flex items-center space-x-1 transition cursor-pointer disabled:opacity-50"
+                          >
+                            {loadingNoteId === note.id ? (
+                              <Loader2 className="w-2.5 h-2.5 animate-spin text-cyan-400" />
+                            ) : (
+                              <RotateCcw className="w-2.5 h-2.5" />
+                            )}
+                            <span>{t('library.loadIntoStudio') || 'Regeneruj'}</span>
+                          </button>
+                          <ExternalLink className="w-3.5 h-3.5 text-stone-400 group-hover:text-cyan-400 transition" />
+                        </div>
+                      )}
                     </div>
                   </Link>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialogs */}
+      <DeleteConfirmDialog
+        isOpen={Boolean(chatBulkDeleteIds && chatBulkDeleteIds.length > 0)}
+        onClose={() => setChatBulkDeleteIds(null)}
+        onConfirm={handleConfirmBulkDeleteChats}
+        isDeleting={isDeletingChats}
+        title={
+          chatBulkDeleteIsAll
+            ? t('bulkDelete.confirmAllTitle', { count: chatBulkDeleteIds?.length || 0 }) ||
+              `Delete all ${chatBulkDeleteIds?.length || 0} item(s)?`
+            : t('bulkDelete.confirmTitle', { count: chatBulkDeleteIds?.length || 0 }) ||
+              `Delete ${chatBulkDeleteIds?.length || 0} selected item(s)?`
+        }
+        description={
+          t('bulkDelete.confirmDescChats') ||
+          'This action cannot be undone. All messages in the selected chats will be permanently removed.'
+        }
+      />
+
+      <DeleteConfirmDialog
+        isOpen={Boolean(batchNoteBulkDeleteIds && batchNoteBulkDeleteIds.length > 0)}
+        onClose={() => setBatchNoteBulkDeleteIds(null)}
+        onConfirm={handleConfirmBulkDeleteBatchNotes}
+        isDeleting={isDeletingBatchNotes}
+        title={
+          batchNoteBulkDeleteIsAll
+            ? t('bulkDelete.confirmAllTitle', { count: batchNoteBulkDeleteIds?.length || 0 }) ||
+              `Delete all ${batchNoteBulkDeleteIds?.length || 0} item(s)?`
+            : t('bulkDelete.confirmTitle', { count: batchNoteBulkDeleteIds?.length || 0 }) ||
+              `Delete ${batchNoteBulkDeleteIds?.length || 0} selected item(s)?`
+        }
+        description={
+          t('bulkDelete.confirmDescBatchNotes') ||
+          'This action cannot be undone. Selected saved batch research documents will be permanently removed.'
+        }
+      />
+
+      <DeleteConfirmDialog
+        isOpen={Boolean(singleDeleteBatchNote)}
+        onClose={() => setSingleDeleteBatchNote(null)}
+        onConfirm={handleConfirmSingleDeleteBatchNote}
+        isDeleting={isDeletingBatchNotes}
+        title={t('bulkDelete.singleDeleteBatchNoteTitle') || 'Delete batch research?'}
+        description={
+          t('bulkDelete.singleDeleteBatchNoteDesc') ||
+          'Are you sure you want to permanently delete this saved batch research document?'
+        }
+      />
+
+      <DeleteConfirmDialog
+        isOpen={isClearSessionConfirmOpen}
+        onClose={() => setIsClearSessionConfirmOpen(false)}
+        onConfirm={() => {
+          batchSearch.clearBatch();
+          setIsClearSessionConfirmOpen(false);
+        }}
+        title={t('library.clearBatchSession') || 'Clear batch session'}
+        description={
+          t('library.clearBatchSessionConfirm') ||
+          'Are you sure you want to clear the current batch search session?'
+        }
+        confirmLabel={t('common.clear') || 'Clear'}
+      />
 
       {/* Login Dialog if needed */}
       <LoginDialog

@@ -49,6 +49,11 @@ import { useChat } from '@/lib/hooks/useChat';
 import CronList from '@/components/Crons/CronList';
 import CreateEditCronDialog, { CronItem } from '@/components/Crons/CreateEditCronDialog';
 import { Plus, Calendar } from 'lucide-react';
+import { useBulkSelection } from '@/lib/hooks/useBulkSelection';
+import { BulkSelectionToolbar } from '@/components/BulkDelete/BulkSelectionToolbar';
+import { DeleteConfirmDialog } from '@/components/BulkDelete/DeleteConfirmDialog';
+import { SelectionCheckbox } from '@/components/BulkDelete/SelectionCheckbox';
+import { executeBulkDelete } from '@/lib/utils/bulkDeleteClient';
 
 interface ExtendedWaypointItem extends WaypointItem {
   isPublic?: boolean;
@@ -77,6 +82,8 @@ const WaypointDetailPage = () => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [bulkChatConfirmMode, setBulkChatConfirmMode] = useState<'selected' | 'all' | null>(null);
+  const [isBulkDeletingChats, setIsBulkDeletingChats] = useState(false);
 
   // Multi-user & auth state
   const [currentUser, setCurrentUser] = useState<{
@@ -205,6 +212,57 @@ const WaypointDetailPage = () => {
     if (!q) return true;
     return c.title && c.title.toLowerCase().includes(q);
   });
+
+  const canDeleteChatItem = (chat: any) => {
+    if (instanceMode !== 'multi') return true;
+    if (!currentUser || currentUser.role === 'guest') return false;
+    if (currentUser.role === 'admin') return true;
+    return Boolean(chat?.userId && chat.userId === currentUser.id);
+  };
+
+  const {
+    isSelectionMode: isChatSelectionMode,
+    selectedIds: selectedChatIds,
+    selectedIdsList: selectedChatIdsList,
+    selectedCount: selectedChatCount,
+    selectableIds: selectableChatIds,
+    selectableCount: selectableChatCount,
+    allSelected: allChatsSelected,
+    toggleSelectionMode: toggleChatSelectionMode,
+    exitSelectionMode: exitChatSelectionMode,
+    toggleItem: toggleChatItem,
+    selectAll: selectAllChats,
+    deselectAll: deselectAllChats,
+  } = useBulkSelection({
+    items: filteredChats,
+    getId: (chat) => chat.id,
+    canSelect: canDeleteChatItem,
+    disableEscape: activeTab !== 'chats',
+  });
+
+  const handleBulkDeleteChatsConfirm = async () => {
+    const targetIds = bulkChatConfirmMode === 'all' ? selectableChatIds : selectedChatIdsList;
+    if (targetIds.length === 0) return;
+
+    setIsBulkDeletingChats(true);
+    try {
+      const result = await executeBulkDelete({
+        endpoint: '/api/chats',
+        ids: targetIds,
+        onUnauthorized: () => setIsLoginOpen(true),
+        t,
+      });
+
+      if (result.ok && result.deletedIds.length > 0) {
+        const deletedSet = new Set(result.deletedIds);
+        setChats((prev) => prev.filter((c) => !deletedSet.has(c.id)));
+        exitChatSelectionMode();
+        setBulkChatConfirmMode(null);
+      }
+    } finally {
+      setIsBulkDeletingChats(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -541,6 +599,22 @@ const WaypointDetailPage = () => {
               )}
             </div>
 
+            {/* Bulk Selection Toolbar */}
+            {filteredChats.length > 0 && (
+              <BulkSelectionToolbar
+                isSelectionMode={isChatSelectionMode}
+                selectedCount={selectedChatCount}
+                selectableCount={selectableChatCount}
+                allSelected={allChatsSelected}
+                onToggleSelectionMode={toggleChatSelectionMode}
+                onSelectAll={selectAllChats}
+                onDeselectAll={deselectAllChats}
+                onDeleteSelected={() => setBulkChatConfirmMode('selected')}
+                onDeleteAll={() => setBulkChatConfirmMode('all')}
+                disabled={isBulkDeletingChats}
+              />
+            )}
+
             {/* Chats List */}
             {chats.length === 0 ? (
               <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-light-300 dark:border-[#282018] bg-light-secondary/30 dark:bg-[#110e0c]/40">
@@ -563,65 +637,108 @@ const WaypointDetailPage = () => {
                 {filteredChats.map((chat, index) => {
                   const safeSources = Array.isArray(chat?.sources) ? chat.sources : [];
                   const safeFiles = Array.isArray(chat?.files) ? chat.files : [];
+                  const isSelected = selectedChatIds.has(chat.id);
+                  const canDelete = canDeleteChatItem(chat);
 
                   return (
                     <div
                       key={chat.id}
-                      className={`group flex items-center justify-between gap-4 p-4 hover:bg-light-secondary dark:hover:bg-[#1a1612] transition-colors duration-200 ${
+                      onClick={(e) => {
+                        if (isChatSelectionMode && canDelete) {
+                          toggleChatItem(chat.id, e.shiftKey);
+                        }
+                      }}
+                      className={`group flex items-center justify-between gap-4 p-4 transition-colors duration-200 ${
+                        isSelected
+                          ? 'bg-[#b8864d]/[0.08]'
+                          : 'hover:bg-light-secondary dark:hover:bg-[#1a1612]'
+                      } ${
+                        isChatSelectionMode
+                          ? canDelete
+                            ? 'cursor-pointer'
+                            : 'opacity-65 cursor-not-allowed'
+                          : ''
+                      } ${
                         index !== filteredChats.length - 1 ? 'border-b border-light-200 dark:border-[#221c16]' : ''
                       }`}
                     >
-                      <div className="flex-1 min-w-0">
-                        <Link
-                          href={`/c/${chat.id}`}
-                          className="text-sm sm:text-base font-medium text-black dark:text-stone-100 group-hover:text-[#b8864d] transition line-clamp-1 block"
-                          title={chat.title || t('waypoints.untitledChat') || 'Untitled'}
-                        >
-                          {chat.title || t('waypoints.untitledChat') || 'Untitled'}
-                        </Link>
-
-                        <div className="flex flex-wrap items-center gap-2.5 mt-1 text-[11px] text-black/55 dark:text-stone-400">
-                          <span className="inline-flex items-center gap-1">
-                            <Clock size={12} />
-                            {chat.createdAt ? formatTimeDifference(new Date(), chat.createdAt, locale) : ''}
-                          </span>
-
-                          {safeSources.length > 0 && (
-                            <span className="inline-flex items-center gap-1 border border-light-200 dark:border-[#2c241c] rounded-full px-2 py-0.5">
-                              <Globe2 size={12} />
-                              {safeSources.length}{' '}
-                              {safeSources.length === 1
-                                ? t('waypoints.sourceSingular') || 'source'
-                                : t('waypoints.sourcePlural') || 'sources'}
-                            </span>
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {isChatSelectionMode && (
+                          <SelectionCheckbox
+                            checked={isSelected}
+                            disabled={!canDelete}
+                            disabledTooltip={
+                              t('bulkDelete.notOwnerTooltip') || 'Only the owner or an administrator can delete this item.'
+                            }
+                            onToggle={(shiftKey) => toggleChatItem(chat.id, shiftKey)}
+                            className="shrink-0"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          {isChatSelectionMode ? (
+                            <div
+                              className="text-sm sm:text-base font-medium text-black dark:text-stone-100 line-clamp-1 block"
+                              title={chat.title || t('waypoints.untitledChat') || 'Untitled'}
+                            >
+                              {chat.title || t('waypoints.untitledChat') || 'Untitled'}
+                            </div>
+                          ) : (
+                            <Link
+                              href={`/c/${chat.id}`}
+                              className="text-sm sm:text-base font-medium text-black dark:text-stone-100 group-hover:text-[#b8864d] transition line-clamp-1 block"
+                              title={chat.title || t('waypoints.untitledChat') || 'Untitled'}
+                            >
+                              {chat.title || t('waypoints.untitledChat') || 'Untitled'}
+                            </Link>
                           )}
 
-                          {safeFiles.length > 0 && (
-                            <span className="inline-flex items-center gap-1 border border-light-200 dark:border-[#2c241c] rounded-full px-2 py-0.5">
-                              <FileText size={12} />
-                              {safeFiles.length}{' '}
-                              {safeFiles.length === 1
-                                ? t('waypoints.fileSingular') || 'file'
-                                : t('waypoints.filePlural') || 'files'}
+                          <div className="flex flex-wrap items-center gap-2.5 mt-1 text-[11px] text-black/55 dark:text-stone-400">
+                            <span className="inline-flex items-center gap-1">
+                              <Clock size={12} />
+                              {chat.createdAt ? formatTimeDifference(new Date(), chat.createdAt, locale) : ''}
                             </span>
-                          )}
+
+                            {safeSources.length > 0 && (
+                              <span className="inline-flex items-center gap-1 border border-light-200 dark:border-[#2c241c] rounded-full px-2 py-0.5">
+                                <Globe2 size={12} />
+                                {safeSources.length}{' '}
+                                {safeSources.length === 1
+                                  ? t('waypoints.sourceSingular') || 'source'
+                                  : t('waypoints.sourcePlural') || 'sources'}
+                              </span>
+                            )}
+
+                            {safeFiles.length > 0 && (
+                              <span className="inline-flex items-center gap-1 border border-light-200 dark:border-[#2c241c] rounded-full px-2 py-0.5">
+                                <FileText size={12} />
+                                {safeFiles.length}{' '}
+                                {safeFiles.length === 1
+                                  ? t('waypoints.fileSingular') || 'file'
+                                  : t('waypoints.filePlural') || 'files'}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      <div className="shrink-0 flex items-center gap-2">
-                        <Link
-                          href={`/c/${chat.id}`}
-                          className="p-1.5 rounded-lg text-black/40 dark:text-stone-500 hover:text-[#b8864d] hover:bg-light-200 dark:hover:bg-[#221c16] transition"
-                          title={t('crons.openChatAction') || 'Open chat'}
-                        >
-                          <ArrowRight size={16} />
-                        </Link>
-                        <DeleteChat
-                          chatId={chat.id}
-                          chats={chats}
-                          setChats={setChats}
-                        />
-                      </div>
+                      {!isChatSelectionMode && (
+                        <div className="shrink-0 flex items-center gap-2">
+                          <Link
+                            href={`/c/${chat.id}`}
+                            className="p-1.5 rounded-lg text-black/40 dark:text-stone-500 hover:text-[#b8864d] hover:bg-light-200 dark:hover:bg-[#221c16] transition"
+                            title={t('crons.openChatAction') || 'Open chat'}
+                          >
+                            <ArrowRight size={16} />
+                          </Link>
+                          {canDelete && (
+                            <DeleteChat
+                              chatId={chat.id}
+                              chats={chats}
+                              setChats={setChats}
+                            />
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -731,6 +848,25 @@ const WaypointDetailPage = () => {
           fetchCurrentUser();
           fetchWaypointDetails();
         }}
+      />
+
+      {/* Bulk Delete Chats Confirmation Dialog */}
+      <DeleteConfirmDialog
+        isOpen={Boolean(bulkChatConfirmMode)}
+        onClose={() => setBulkChatConfirmMode(null)}
+        onConfirm={handleBulkDeleteChatsConfirm}
+        isDeleting={isBulkDeletingChats}
+        title={
+          bulkChatConfirmMode === 'all'
+            ? t('bulkDelete.confirmAllTitle', { count: selectableChatCount }) ||
+              `Delete all ${selectableChatCount} visible items?`
+            : t('bulkDelete.confirmTitle', { count: selectedChatCount }) ||
+              `Delete ${selectedChatCount} selected items?`
+        }
+        description={
+          t('bulkDelete.confirmDescChats') ||
+          'Selected chats and their messages will be permanently deleted.'
+        }
       />
 
       {/* Delete Confirmation Dialog */}

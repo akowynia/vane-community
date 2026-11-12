@@ -5,6 +5,12 @@ import { waypointCrons, waypoints } from '@/lib/db/schema';
 import { eq, desc, and, or, inArray } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { resolveRequestUser, canAccessProvider, canAccessModel } from '@/lib/security/rbac';
+import {
+  canDeleteOwnedEntity,
+  chunkIds,
+  parseBulkDeleteIds,
+  requireDeleteActor,
+} from '@/lib/security/bulkDelete';
 import configManager from '@/lib/config';
 import { z } from 'zod';
 import crypto from 'crypto';
@@ -248,6 +254,112 @@ export const POST = async (req: Request) => {
     console.error('Error creating cron:', err);
     return Response.json(
       { message: err?.message || 'Failed to create the cron task.' },
+      { status: 500 },
+    );
+  }
+};
+
+export const DELETE = async (req: Request) => {
+  try {
+    ensureWaypointCronsTable();
+    const user = await resolveRequestUser(req as NextRequest);
+    const instanceMode = configManager.getConfig('instanceMode', 'single');
+
+    const authError = requireDeleteActor(user, instanceMode);
+    if (authError) {
+      return authError;
+    }
+
+    const parsed = await parseBulkDeleteIds(req);
+    if ('errorResponse' in parsed) {
+      return parsed.errorResponse;
+    }
+
+    const { ids } = parsed;
+    const existingCrons: {
+      id: string;
+      userId: string | null;
+      waypointId: string;
+    }[] = [];
+
+    for (const chunk of chunkIds(ids)) {
+      const rows = await db.query.waypointCrons.findMany({
+        where: inArray(waypointCrons.id, chunk),
+        columns: {
+          id: true,
+          userId: true,
+          waypointId: true,
+        },
+      });
+      existingCrons.push(...rows);
+    }
+
+    if (existingCrons.length === 0) {
+      return Response.json(
+        { message: 'No matching cron tasks found.', deletedIds: [], deletedCount: 0 },
+        { status: 404 },
+      );
+    }
+
+    const waypointIds = Array.from(new Set(existingCrons.map((c) => c.waypointId)));
+    const waypointOwnerMap = new Map<string, string | null>();
+    for (const chunk of chunkIds(waypointIds)) {
+      const wpRows = await db.query.waypoints.findMany({
+        where: inArray(waypoints.id, chunk),
+        columns: {
+          id: true,
+          userId: true,
+        },
+      });
+      for (const wp of wpRows) {
+        waypointOwnerMap.set(wp.id, wp.userId);
+      }
+    }
+
+    const deletableIds = existingCrons
+      .filter((cron) =>
+        canDeleteOwnedEntity({
+          user,
+          instanceMode,
+          ownerUserId: cron.userId,
+          parentOwnerUserId: waypointOwnerMap.get(cron.waypointId),
+        }),
+      )
+      .map((cron) => cron.id);
+
+    if (deletableIds.length === 0) {
+      return Response.json(
+        {
+          message: 'You do not have permission to delete the selected cron tasks.',
+          deletedIds: [],
+          deletedCount: 0,
+        },
+        { status: 403 },
+      );
+    }
+
+    db.transaction((tx) => {
+      for (const chunk of chunkIds(deletableIds)) {
+        tx.delete(waypointCrons).where(inArray(waypointCrons.id, chunk)).run();
+      }
+    });
+
+    const deletedSet = new Set(deletableIds);
+    const skippedIds = ids.filter((id) => !deletedSet.has(id));
+
+    return Response.json(
+      {
+        message: 'Cron tasks deleted successfully.',
+        deletedIds: deletableIds,
+        skippedIds,
+        deletedCount: deletableIds.length,
+      },
+      { status: 200 },
+    );
+  } catch (err: any) {
+    console.error('Error bulk deleting crons:', err);
+    return Response.json(
+      { message: err?.message || 'Failed to delete cron tasks.' },
       { status: 500 },
     );
   }

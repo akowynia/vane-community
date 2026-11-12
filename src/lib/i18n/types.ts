@@ -1417,4 +1417,28 @@ export interface Translations {
     clickToDisable?: string;
     clickToEnable?: string;
   };
+  bulkDelete?: {
+    selectMode: string;
+    exitSelectMode: string;
+    selectAll: string;
+    deselectAll: string;
+    selectedCount: string;
+    deleteSelected: string;
+    deleteAll: string;
+    confirmTitle: string;
+    confirmAllTitle: string;
+    confirmDescChats: string;
+    confirmDescCrons: string;
+    confirmDescScratchpad: string;
+    confirmDescBatchNotes: string;
+    confirmDescWaypoints: string;
+    confirmDescGeneric: string;
+    deleting: string;
+    deletedSuccess: string;
+    deletedPartial: string;
+    deleteError: string;
+    notOwnerTooltip: string;
+    singleDeleteBatchNoteTitle: string;
+    singleDeleteBatchNoteDesc: string;
+  };
 }

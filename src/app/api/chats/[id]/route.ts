@@ -3,6 +3,10 @@ import { chats, messages, modelStats, waypoints } from '@/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { resolveRequestUser } from '@/lib/security/rbac';
+import {
+  canDeleteOwnedEntity,
+  requireDeleteActor,
+} from '@/lib/security/bulkDelete';
 import configManager from '@/lib/config';
 
 import SessionManager from '@/lib/session';
@@ -218,17 +222,25 @@ export const DELETE = async (
 
     const user = await resolveRequestUser(req as NextRequest);
     const instanceMode = configManager.getConfig('instanceMode', 'single');
-    if (instanceMode === 'multi') {
-      if (!user) {
-        return Response.json({ message: 'Forbidden' }, { status: 403 });
-      }
-      if (user.role !== 'admin' && chatExists.userId && chatExists.userId !== user.id) {
-        return Response.json({ message: 'Forbidden' }, { status: 403 });
-      }
+    const authError = requireDeleteActor(user, instanceMode);
+    if (authError) {
+      return authError;
     }
 
-    await db.delete(chats).where(eq(chats.id, id)).execute();
-    await db.delete(messages).where(eq(messages.chatId, id)).execute();
+    if (
+      !canDeleteOwnedEntity({
+        user,
+        instanceMode,
+        ownerUserId: chatExists.userId,
+      })
+    ) {
+      return Response.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
+    db.transaction((tx) => {
+      tx.delete(messages).where(eq(messages.chatId, id)).run();
+      tx.delete(chats).where(eq(chats.id, id)).run();
+    });
 
     return Response.json(
       { message: 'Chat deleted successfully' },

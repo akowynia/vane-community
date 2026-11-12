@@ -5,6 +5,10 @@ import { scratchpads, scratchpadVersions, scratchpadMessages, waypoints, scratch
 import { eq, desc } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { resolveRequestUser } from '@/lib/security/rbac';
+import {
+  canDeleteOwnedEntity,
+  requireDeleteActor,
+} from '@/lib/security/bulkDelete';
 import configManager from '@/lib/config';
 import { z } from 'zod';
 import crypto from 'crypto';
@@ -284,19 +288,30 @@ export const DELETE = async (
       return Response.json({ message: 'Scratchpad not found.' }, { status: 404 });
     }
 
-    if (instanceMode === 'multi') {
-      if (!user) {
-        return Response.json({ message: 'Login required.' }, { status: 401 });
-      }
-      if (user.role !== 'admin' && existing.userId && existing.userId !== user.id) {
-        return Response.json({ message: 'You do not have permission to delete this scratchpad.' }, { status: 403 });
-      }
+    const authError = requireDeleteActor(user, instanceMode);
+    if (authError) {
+      return authError;
     }
 
-    // Delete associated versions and messages
-    await db.delete(scratchpadVersions).where(eq(scratchpadVersions.scratchpadId, id));
-    await db.delete(scratchpadMessages).where(eq(scratchpadMessages.scratchpadId, id));
-    await db.delete(scratchpads).where(eq(scratchpads.id, id));
+    if (
+      !canDeleteOwnedEntity({
+        user,
+        instanceMode,
+        ownerUserId: existing.userId,
+      })
+    ) {
+      return Response.json(
+        { message: 'You do not have permission to delete this scratchpad.' },
+        { status: 403 },
+      );
+    }
+
+    // Delete associated versions and messages atomically
+    db.transaction((tx) => {
+      tx.delete(scratchpadVersions).where(eq(scratchpadVersions.scratchpadId, id)).run();
+      tx.delete(scratchpadMessages).where(eq(scratchpadMessages.scratchpadId, id)).run();
+      tx.delete(scratchpads).where(eq(scratchpads.id, id)).run();
+    });
 
     return Response.json({ success: true, message: 'Scratchpad deleted successfully.' });
   } catch (err: any) {

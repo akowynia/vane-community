@@ -5,6 +5,10 @@ import { waypoints, chats } from '@/lib/db/schema';
 import { eq, desc, and, or, isNull } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { resolveRequestUser } from '@/lib/security/rbac';
+import {
+  canDeleteOwnedEntity,
+  requireDeleteActor,
+} from '@/lib/security/bulkDelete';
 import configManager from '@/lib/config';
 import { z } from 'zod';
 
@@ -247,34 +251,37 @@ export const DELETE = async (
       return Response.json({ message: 'Waypoint not found.' }, { status: 404 });
     }
 
-    const isPublic = waypoint.userId === null;
-
-    if (instanceMode === 'multi') {
-      if (!user) {
-        return Response.json({ message: 'Login required.' }, { status: 401 });
-      }
-      if (isPublic && user.role !== 'admin') {
-        return Response.json(
-          { message: 'Only an administrator can delete the shared space.' },
-          { status: 403 },
-        );
-      }
-      if (!isPublic && user.role !== 'admin' && waypoint.userId !== user.id) {
-        return Response.json(
-          { message: 'You do not have permission to delete this waypoint.' },
-          { status: 403 },
-        );
-      }
+    const authError = requireDeleteActor(user, instanceMode);
+    if (authError) {
+      return authError;
     }
 
-    // Unlink chats associated with this waypoint
-    await db
-      .update(chats)
-      .set({ waypointId: null })
-      .where(eq(chats.waypointId, id));
+    const isPublic = waypoint.userId === null;
 
-    // Delete the waypoint itself
-    await db.delete(waypoints).where(eq(waypoints.id, id));
+    if (
+      !canDeleteOwnedEntity({
+        user,
+        instanceMode,
+        ownerUserId: waypoint.userId,
+      })
+    ) {
+      return Response.json(
+        {
+          message: isPublic
+            ? 'Only an administrator can delete the shared space.'
+            : 'You do not have permission to delete this waypoint.',
+        },
+        { status: 403 },
+      );
+    }
+
+    db.transaction((tx) => {
+      tx.update(chats)
+        .set({ waypointId: null })
+        .where(eq(chats.waypointId, id))
+        .run();
+      tx.delete(waypoints).where(eq(waypoints.id, id)).run();
+    });
 
     return Response.json({ message: 'Waypoint deleted successfully.' }, { status: 200 });
   } catch (err: any) {

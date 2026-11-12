@@ -53,6 +53,7 @@ import {
   exportToCsv,
 } from '@/lib/batch-search/parser';
 import { useBatchSearch } from '@/lib/batch-search/context';
+import { DeleteConfirmDialog } from '@/components/BulkDelete/DeleteConfirmDialog';
 
 interface BatchItemRowProps {
   item: BatchQueryItem;
@@ -361,6 +362,9 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [expandedReasoningIdx, setExpandedReasoningIdx] = useState<number | null>(null);
+  const [batchDeleteConfirmMode, setBatchDeleteConfirmMode] = useState<'all' | 'selected' | null>(
+    null,
+  );
 
   const noteMarkdownOverrides: MarkdownToJSX.Options = useMemo(
     () => ({
@@ -600,22 +604,13 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
           {items.length > 0 && (
             <button
               type="button"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    t('batchSearch.confirmClearAll') ||
-                      'Czy na pewno chcesz usunąć wszystkie zapytania i zresetować studio?',
-                  )
-                ) {
-                  clearBatch();
-                }
-              }}
-              title={t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
+              onClick={() => setBatchDeleteConfirmMode('all')}
+              title={t('batchSearch.clearAllBtn') || 'Clear studio'}
               className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition whitespace-nowrap cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">
-                {t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
+                {t('batchSearch.clearAllBtn') || 'Clear studio'}
               </span>
             </button>
           )}
@@ -1117,17 +1112,18 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                     <span className="text-stone-400">•</span>
                     <button
                       type="button"
-                      onClick={handleDeleteSelected}
-                      className="text-red-400 hover:text-red-300 flex items-center space-x-1 font-medium transition cursor-pointer"
+                      disabled={isSearching}
+                      onClick={() => setBatchDeleteConfirmMode('selected')}
+                      className="text-red-400 hover:text-red-300 flex items-center space-x-1 font-medium transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                       title={
                         t('batchSearch.deleteSelected', { count: selectedCount }) ||
-                        `Usuń zaznaczone (${selectedCount})`
+                        `Delete selected (${selectedCount})`
                       }
                     >
                       <Trash2 className="w-3 h-3" />
                       <span>
                         {t('batchSearch.deleteSelected', { count: selectedCount }) ||
-                          `Usuń zaznaczone (${selectedCount})`}
+                          `Delete selected (${selectedCount})`}
                       </span>
                     </button>
                   </>
@@ -1137,21 +1133,12 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                     <span className="text-stone-400">•</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            t('batchSearch.confirmClearAll') ||
-                              'Czy na pewno chcesz usunąć wszystkie zapytania i zresetować studio?',
-                          )
-                        ) {
-                          clearBatch();
-                        }
-                      }}
+                      onClick={() => setBatchDeleteConfirmMode('all')}
                       className="text-stone-400 hover:text-red-400 flex items-center space-x-1 transition cursor-pointer"
-                      title={t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
+                      title={t('batchSearch.clearAllBtn') || 'Clear studio'}
                     >
                       <Trash2 className="w-3 h-3" />
-                      <span>{t('batchSearch.clearAllBtn') || 'Wyczyść studio'}</span>
+                      <span>{t('batchSearch.clearAllBtn') || 'Clear studio'}</span>
                     </button>
                   </>
                 )}
@@ -1406,21 +1393,12 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
               <div className="flex items-center space-x-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        t('batchSearch.confirmClearAll') ||
-                          'Czy na pewno chcesz usunąć wszystkie zapytania i zresetować studio?',
-                      )
-                    ) {
-                      clearBatch();
-                    }
-                  }}
+                  onClick={() => setBatchDeleteConfirmMode('all')}
                   className="px-3 py-1.5 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-medium transition flex items-center space-x-1.5 cursor-pointer"
-                  title={t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
+                  title={t('batchSearch.clearAllBtn') || 'Clear studio'}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>{t('batchSearch.clearAllBtn') || 'Wyczyść studio'}</span>
+                  <span>{t('batchSearch.clearAllBtn') || 'Clear studio'}</span>
                 </button>
                 {completedCount > 0 && (
                   <>
@@ -1860,6 +1838,32 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
           </div>
         )}
       </div>
+
+      <DeleteConfirmDialog
+        isOpen={Boolean(batchDeleteConfirmMode)}
+        onClose={() => setBatchDeleteConfirmMode(null)}
+        onConfirm={() => {
+          if (batchDeleteConfirmMode === 'all') {
+            clearBatch();
+          } else if (batchDeleteConfirmMode === 'selected') {
+            handleDeleteSelected();
+          }
+          setBatchDeleteConfirmMode(null);
+        }}
+        title={
+          batchDeleteConfirmMode === 'all'
+            ? t('batchSearch.clearAllBtn') || 'Clear studio'
+            : t('bulkDelete.confirmTitle', { count: selectedCount }) ||
+              `Delete ${selectedCount} selected items?`
+        }
+        description={
+          batchDeleteConfirmMode === 'all'
+            ? t('batchSearch.confirmClearAll') ||
+              'Are you sure you want to remove all queries and reset the studio?'
+            : t('bulkDelete.confirmDescGeneric') ||
+              'This action cannot be undone. Selected items will be permanently removed.'
+        }
+      />
     </div>
   );
 };

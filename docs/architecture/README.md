@@ -69,4 +69,5 @@ For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation d
 - [Multi-Theme Architecture (Modern & Retro Themes)](UI_THEMES.md)
 - [PDF Export Styles & Branding Customization](PDF_EXPORT_CUSTOMIZATION.md)
 - [Model Reasoning & Thinking Process Isolation](MODEL_REASONING_AND_THINKING_ISOLATION.md)
+- [Bulk & Selective Deletion Mode](BULK_DELETE_MODE.md)
 - [GitHub Pages Continuous Documentation Deployment](GITHUB_PAGES_DEPLOYMENT.md)

@@ -36,6 +36,11 @@ import CreatePresentationDialog, {
 } from '@/components/Presentation/CreatePresentationDialog';
 import LoginDialog from '@/components/Auth/LoginDialog';
 import { getEnablePresentations } from '@/lib/config/clientRegistry';
+import { useBulkSelection } from '@/lib/hooks/useBulkSelection';
+import { BulkSelectionToolbar } from '@/components/BulkDelete/BulkSelectionToolbar';
+import { DeleteConfirmDialog } from '@/components/BulkDelete/DeleteConfirmDialog';
+import { SelectionCheckbox } from '@/components/BulkDelete/SelectionCheckbox';
+import { executeBulkDelete } from '@/lib/utils/bulkDeleteClient';
 
 interface ScratchpadListItem {
   id: string;
@@ -68,6 +73,8 @@ const ScratchpadListPage = () => {
   // Delete modal state
   const [deleteTarget, setDeleteTarget] = useState<ScratchpadListItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [bulkConfirmMode, setBulkConfirmMode] = useState<'selected' | 'all' | null>(null);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   // Multi-user & auth state
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -229,6 +236,48 @@ const ScratchpadListPage = () => {
     });
   }, [items, search, selectedCategory]);
 
+  const {
+    isSelectionMode,
+    selectedIds,
+    selectedIdsList,
+    selectedCount,
+    selectableIds,
+    selectableCount,
+    allSelected,
+    toggleSelectionMode,
+    exitSelectionMode,
+    toggleItem,
+    selectAll,
+    deselectAll,
+  } = useBulkSelection({
+    items: filteredItems,
+    getId: (item) => item.id,
+  });
+
+  const handleBulkDeleteConfirm = async () => {
+    const targetIds = bulkConfirmMode === 'all' ? selectableIds : selectedIdsList;
+    if (targetIds.length === 0) return;
+
+    setIsBulkDeleting(true);
+    try {
+      const result = await executeBulkDelete({
+        endpoint: '/api/scratchpad',
+        ids: targetIds,
+        onUnauthorized: () => setIsLoginOpen(true),
+        t,
+      });
+
+      if (result.ok && result.deletedIds.length > 0) {
+        const deletedSet = new Set(result.deletedIds);
+        setItems((prev) => prev.filter((item) => !deletedSet.has(item.id)));
+        exitSelectionMode();
+        setBulkConfirmMode(null);
+      }
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-light-primary dark:bg-[#0c0a09] text-stone-900 dark:text-stone-100">
       {/* Header Banner */}
@@ -365,6 +414,23 @@ const ScratchpadListPage = () => {
           </div>
         </div>
 
+        {/* Bulk Selection Toolbar */}
+        {!loading && filteredItems.length > 0 && (
+          <BulkSelectionToolbar
+            isSelectionMode={isSelectionMode}
+            selectedCount={selectedCount}
+            selectableCount={selectableCount}
+            allSelected={allSelected}
+            onToggleSelectionMode={toggleSelectionMode}
+            onSelectAll={selectAll}
+            onDeselectAll={deselectAll}
+            onDeleteSelected={() => setBulkConfirmMode('selected')}
+            onDeleteAll={() => setBulkConfirmMode('all')}
+            disabled={isBulkDeleting}
+            className="mb-4"
+          />
+        )}
+
         {/* Content List */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -415,20 +481,38 @@ const ScratchpadListPage = () => {
             {filteredItems.map((item) => {
               const isPres = item.type === 'presentation';
               const isBatch = item.type === 'batch';
+              const isSelected = selectedIds.has(item.id);
               return (
                 <div
                   key={item.id}
-                  onClick={() => router.push(`/scratchpad/${item.id}`)}
+                  onClick={(e) => {
+                    if (isSelectionMode) {
+                      toggleItem(item.id, e.shiftKey);
+                      return;
+                    }
+                    router.push(`/scratchpad/${item.id}`);
+                  }}
                   className={cn(
                     'group relative flex flex-col justify-between p-5 rounded-2xl bg-light-secondary dark:bg-[#16120f] border transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-black/20',
-                    isPres && 'border-amber-500/30 hover:border-amber-500/70 hover:bg-amber-500/[0.02]',
-                    isBatch && 'border-cyan-500/30 hover:border-cyan-500/70 hover:bg-cyan-500/[0.02]',
-                    !isPres && !isBatch && 'border-light-200 dark:border-[#241e18] hover:border-[#b8864d]/60',
+                    isSelected
+                      ? 'border-[#b8864d] ring-1 ring-[#b8864d]/40 bg-[#b8864d]/[0.05]'
+                      : isPres
+                        ? 'border-amber-500/30 hover:border-amber-500/70 hover:bg-amber-500/[0.02]'
+                        : isBatch
+                          ? 'border-cyan-500/30 hover:border-cyan-500/70 hover:bg-cyan-500/[0.02]'
+                          : 'border-light-200 dark:border-[#241e18] hover:border-[#b8864d]/60',
                   )}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-2 gap-1.5">
                       <div className="flex items-center space-x-1.5 min-w-0">
+                        {isSelectionMode && (
+                          <SelectionCheckbox
+                            checked={isSelected}
+                            onToggle={(shiftKey) => toggleItem(item.id, shiftKey)}
+                            className="mr-1 shrink-0"
+                          />
+                        )}
                         {isPres ? (
                           <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-500 text-[10px] font-bold tracking-wider uppercase flex items-center space-x-1 shrink-0">
                             <Presentation className="w-2.5 h-2.5" />
@@ -446,17 +530,19 @@ const ScratchpadListPage = () => {
                         )}
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleteTarget(item);
-                        }}
-                        title={t('scratchpad.deleteSketchTitle') || 'Delete note'}
-                        className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-500 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition shrink-0"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {!isSelectionMode && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteTarget(item);
+                          }}
+                          title={t('scratchpad.deleteSketchTitle') || 'Delete note'}
+                          className="sm:opacity-0 sm:group-hover:opacity-100 text-stone-400 hover:text-red-500 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition shrink-0"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
 
                     <h3 className={cn(
@@ -574,6 +660,24 @@ const ScratchpadListPage = () => {
           </div>
         </Dialog>
       </Transition>
+
+      <DeleteConfirmDialog
+        isOpen={Boolean(bulkConfirmMode)}
+        onClose={() => setBulkConfirmMode(null)}
+        onConfirm={handleBulkDeleteConfirm}
+        isDeleting={isBulkDeleting}
+        title={
+          bulkConfirmMode === 'all'
+            ? t('bulkDelete.confirmAllTitle', { count: selectableCount }) ||
+              `Delete all ${selectableCount} visible items?`
+            : t('bulkDelete.confirmTitle', { count: selectedCount }) ||
+              `Delete ${selectedCount} selected items?`
+        }
+        description={
+          t('bulkDelete.confirmDescScratchpad') ||
+          'Selected scratchpad notes, version histories, and linked note chats will be permanently removed.'
+        }
+      />
 
       <LoginDialog
         isOpen={isLoginOpen}

@@ -25,12 +25,17 @@ import {
 } from '@headlessui/react';
 import { toast } from 'sonner';
 import { useTranslation } from '@/lib/i18n';
-import { formatTimeDifference } from '@/lib/utils';
+import { formatTimeDifference, cn } from '@/lib/utils';
 import WaypointIcon from '@/components/Waypoints/WaypointIcon';
 import CreateEditWaypointDialog, {
   WaypointItem,
 } from '@/components/Waypoints/CreateEditWaypointDialog';
 import LoginDialog from '@/components/Auth/LoginDialog';
+import { useBulkSelection } from '@/lib/hooks/useBulkSelection';
+import { BulkSelectionToolbar } from '@/components/BulkDelete/BulkSelectionToolbar';
+import { DeleteConfirmDialog } from '@/components/BulkDelete/DeleteConfirmDialog';
+import { SelectionCheckbox } from '@/components/BulkDelete/SelectionCheckbox';
+import { executeBulkDelete } from '@/lib/utils/bulkDeleteClient';
 
 const WaypointsPage = () => {
   const { t, locale } = useTranslation();
@@ -53,6 +58,8 @@ const WaypointsPage = () => {
 
   const [deleteTarget, setDeleteTarget] = useState<WaypointItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [bulkConfirmMode, setBulkConfirmMode] = useState<'selected' | 'all' | null>(null);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const fetchCurrentUser = async () => {
     try {
@@ -162,6 +169,49 @@ const WaypointsPage = () => {
     );
   });
 
+  const {
+    isSelectionMode,
+    selectedIds,
+    selectedIdsList,
+    selectedCount,
+    selectableIds,
+    selectableCount,
+    allSelected,
+    toggleSelectionMode,
+    exitSelectionMode,
+    toggleItem,
+    selectAll,
+    deselectAll,
+  } = useBulkSelection({
+    items: filteredWaypoints,
+    getId: (wp) => wp.id,
+    canSelect: (wp) => Boolean(wp.isOwner),
+  });
+
+  const handleBulkDeleteConfirm = async () => {
+    const targetIds = bulkConfirmMode === 'all' ? selectableIds : selectedIdsList;
+    if (targetIds.length === 0) return;
+
+    setIsBulkDeleting(true);
+    try {
+      const result = await executeBulkDelete({
+        endpoint: '/api/waypoints',
+        ids: targetIds,
+        onUnauthorized: () => setIsLoginOpen(true),
+        t,
+      });
+
+      if (result.ok && result.deletedIds.length > 0) {
+        const deletedSet = new Set(result.deletedIds);
+        setWaypoints((prev) => prev.filter((wp) => !deletedSet.has(wp.id)));
+        exitSelectionMode();
+        setBulkConfirmMode(null);
+      }
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Top Header */}
@@ -236,6 +286,22 @@ const WaypointsPage = () => {
         </div>
       )}
 
+      {!loading && filteredWaypoints.length > 0 && (
+        <BulkSelectionToolbar
+          isSelectionMode={isSelectionMode}
+          selectedCount={selectedCount}
+          selectableCount={selectableCount}
+          allSelected={allSelected}
+          onToggleSelectionMode={toggleSelectionMode}
+          onSelectAll={selectAll}
+          onDeselectAll={deselectAll}
+          onDeleteSelected={() => setBulkConfirmMode('selected')}
+          onDeleteAll={() => setBulkConfirmMode('all')}
+          disabled={isBulkDeleting}
+          className="pt-2"
+        />
+      )}
+
       {/* Content Area */}
       {loading ? (
         <div className="flex flex-col items-center justify-center min-h-[50vh]">
@@ -276,12 +342,29 @@ const WaypointsPage = () => {
           {filteredWaypoints.map((wp) => {
             const hasMasterprompt = Boolean(wp.systemInstructions && wp.systemInstructions.trim());
             const promptLength = wp.systemInstructions ? wp.systemInstructions.trim().length : 0;
+            const isSelected = selectedIds.has(wp.id);
+            const canSelectWp = Boolean(wp.isOwner);
 
             return (
               <div
                 key={wp.id}
-                onClick={() => router.push(`/waypoints/${wp.id}`)}
-                className="group relative flex flex-col justify-between p-5 rounded-2xl border border-light-200 dark:border-[#251f19] bg-light-primary dark:bg-[#14110e] hover:border-[#b8864d]/60 dark:hover:border-[#b8864d]/60 hover:shadow-xl hover:shadow-black/20 transition-all duration-200 cursor-pointer overflow-hidden"
+                onClick={(e) => {
+                  if (isSelectionMode) {
+                    if (canSelectWp) {
+                      toggleItem(wp.id, e.shiftKey);
+                    }
+                    return;
+                  }
+                  router.push(`/waypoints/${wp.id}`);
+                }}
+                className={cn(
+                  'group relative flex flex-col justify-between p-5 rounded-2xl border bg-light-primary dark:bg-[#14110e] transition-all duration-200 overflow-hidden',
+                  isSelectionMode && !canSelectWp
+                    ? 'border-light-200 dark:border-[#251f19] opacity-65 cursor-not-allowed'
+                    : isSelected
+                      ? 'border-[#b8864d] ring-1 ring-[#b8864d]/40 bg-[#b8864d]/[0.05] cursor-pointer hover:shadow-xl hover:shadow-black/20'
+                      : 'border-light-200 dark:border-[#251f19] hover:border-[#b8864d]/60 dark:hover:border-[#b8864d]/60 hover:shadow-xl hover:shadow-black/20 cursor-pointer',
+                )}
               >
                 {/* Subtle gradient background on hover */}
                 <div className="absolute inset-0 bg-gradient-to-br from-[#b8864d]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
@@ -290,6 +373,16 @@ const WaypointsPage = () => {
                   {/* Top card bar: icon + badge + actions */}
                   <div className="flex items-start justify-between gap-3 mb-3.5">
                     <div className="flex items-center gap-2.5">
+                      {isSelectionMode && (
+                        <SelectionCheckbox
+                          checked={isSelected}
+                          disabled={!canSelectWp}
+                          disabledTooltip={
+                            t('bulkDelete.notOwnerTooltip') || 'Only the owner or an administrator can delete this item.'
+                          }
+                          onToggle={(shiftKey) => toggleItem(wp.id, shiftKey)}
+                        />
+                      )}
                       <div className="p-2.5 rounded-xl bg-light-secondary dark:bg-[#1e1915] border border-light-200/80 dark:border-[#30271e] text-[#b8864d] group-hover:scale-105 group-hover:border-[#b8864d]/50 transition duration-200">
                         <WaypointIcon name={wp.icon} size={22} />
                       </div>
@@ -304,7 +397,7 @@ const WaypointsPage = () => {
                       )}
                     </div>
 
-                    {wp.isOwner && (
+                    {wp.isOwner && !isSelectionMode && (
                       <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                         <button
                           type="button"
@@ -405,6 +498,25 @@ const WaypointsPage = () => {
           fetchCurrentUser();
           fetchWaypoints();
         }}
+      />
+
+      {/* Bulk Delete Confirmation Dialog */}
+      <DeleteConfirmDialog
+        isOpen={Boolean(bulkConfirmMode)}
+        onClose={() => setBulkConfirmMode(null)}
+        onConfirm={handleBulkDeleteConfirm}
+        isDeleting={isBulkDeleting}
+        title={
+          bulkConfirmMode === 'all'
+            ? t('bulkDelete.confirmAllTitle', { count: selectableCount }) ||
+              `Delete all ${selectableCount} visible items?`
+            : t('bulkDelete.confirmTitle', { count: selectedCount }) ||
+              `Delete ${selectedCount} selected items?`
+        }
+        description={
+          t('bulkDelete.confirmDescWaypoints') ||
+          'Selected waypoints and their schedules will be permanently removed. Linked chats will remain available outside those spaces.'
+        }
       />
 
       {/* Delete Confirmation Dialog */}
