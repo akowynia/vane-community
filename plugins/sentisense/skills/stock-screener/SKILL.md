@@ -1,0 +1,294 @@
+---
+name: stock-screener
+description: "Stock screener for US stocks and ETFs: screen stocks in plain language, such as \"find stocks that are oversold with bullish sentiment\" or \"stocks under $20 the crowd likes\", translated into one valid screen over sentiment, the SentiSense Score and A to F Rating, analyst ratings and upside, technicals, momentum, price and market cap, and end-of-day options readings (IV rank, put/call, unusual premium, expected move), or run 30 ready-made screens like Crowd vs Street, Golden Cross + Bullish and High IV Rank. Use for stock screener, screen stocks, find stocks that, stock scanner, AI stock screener, natural language stock screener, stock screener API, ETF screener, stock screener with sentiment, find stocks by sentiment, screen stocks by rating, A rated stocks, screen stocks by market cap, momentum screener, analyst upgrade screener, oversold stocks, 52-week low screener, unusual social volume, options screener, IV rank screener. Read-only. No trading, no purchases, no write operations, no wallet access."
+homepage: https://sentisense.ai
+primaryEnv: SENTISENSE_API_KEY
+metadata:
+  openclaw:
+    primaryEnv: SENTISENSE_API_KEY
+    envVars:
+      - name: SENTISENSE_API_KEY
+        required: false
+        description: "SentiSense API key, optional to install. Get one free at https://app.sentisense.ai/get-api-key, or with no key follow the No key yet steps in the 0-sentisense-onboarding skill for a temporary free one with no signup. Used only to authenticate read-only data calls; no write or trading scope."
+---
+# Stock Screener (SentiSense)
+
+Filter the tracked US stock and ETF universe in one query. This is the only surface where SentiSense's own signals, the SentiSense Score and social attention, sit in the same `WHERE` clause as analyst consensus, technicals, momentum, end-of-day options readings, and price. A screen on analyst ratings alone is something a dozen free tools already do; a screen on *analyst ratings where the Score disagrees* is not. 30 curated screens ship ready to run, and all 63 screenable fields are available for custom plans; both are enumerated in the appendix at the end of this skill.
+
+This skill's job is translation: turning what the user actually asked ("find me oversold stocks people are turning bullish on") into a valid, honest screen plan, running it, and presenting the results with the plan visible so the user can tighten or loosen it.
+
+Read-only educational data interface. Output is informational context, never a personalized buy or sell recommendation.
+
+## When to Use
+
+- "Find me stocks that..." or "which stocks are..." in any combination of sentiment, analyst, price, momentum, or size conditions
+- "Screen for unusual social volume", "what is oversold but loved", "where do analysts and the crowd disagree"
+- "Run the momentum screen", "what are the curated screens?"
+- "Screen my watchlist": the same plans run against a fixed ticker list
+- "Screen for high IV rank", "bullish names with a big unusual options bet", "stocks with a large expected move" (for one ticker's contracts, walls or max pain use `unusual-options-activity`)
+- ETF questions in the same shape: "low-cost broad funds with bullish holdings"
+
+Not this skill: single-ticker deep dives (`stock-sentiment`, `stocks-analysis`; the latter is `us-stocks-analysis` on ClawHub), contract-level options positioning such as open-interest walls, max pain and the unusual contracts themselves (`unusual-options-activity`), price quotes (the `sentisense` reference). The end-of-day options readings per stock (IV rank, put/call, skew percentile, the options interest score, unusual premium and the 20-day expected move) are screenable fields here. Screener rows read a snapshot refreshed every 20 minutes; it is a research surface, not a quote feed.
+
+## Prerequisites
+
+- A free `SENTISENSE_API_KEY`. Get one at https://app.sentisense.ai/get-api-key. The key is required on every call; anonymous requests return `401 api_key_required`. No key yet? Follow "No key yet" in the `0-sentisense-onboarding` skill: one POST returns a temporary free key the agent can use right away and a link the user opens to keep it.
+- Any HTTP client.
+- Read-only scope: everything here is a `GET` or a filter-only `POST`. Nothing this skill does can place a trade, move money, or modify account state.
+
+| Tier | Quota | Rate |
+|------|-------|------|
+| Free | 1,000 requests/month | 30 requests/min |
+| PRO ($15/mo) | Unlimited | 300 requests/min |
+
+A screen is a single request no matter how many rows it returns, so prefer one broad screen plus client-side slicing over many narrow ones.
+
+## Permissions
+
+- Network: HTTPS to app.sentisense.ai only.
+- Credentials: SENTISENSE_API_KEY from the environment.
+- Shell: none required.
+- Files: none.
+
+## How to Run
+
+The REST recipe in this file is the primary path. A maintained command-line client is available as the separate `sentisense-cli` skill for hosts that prefer one.
+
+**Identify your client.** Send a `User-Agent` naming your agent runtime and this skill, for example `OpenClaw/1.4 (stock-screener)` or `ClaudeCode/2.1 (stock-screener)`. Substitute your own runtime and version if neither matches. You can also volunteer what your agent is called by adding an `agent/<your-agent-name>` token inside the same parentheses, as in `OpenClaw/1.4 (stock-screener; agent/research-desk)`. All of it is optional, and it is what tells us this skill has real integrations behind it, so it gets prioritized and you get notice before it changes.
+
+Use this REST request:
+
+```bash
+curl -X POST https://app.sentisense.ai/api/v1/screener/execute \
+  -H "X-SentiSense-API-Key: $SENTISENSE_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{ "plan": { "filters": [ { "fieldName": "SENTI_SCORE_7D", "op": "GTE", "value": 13 } ], "sort": { "fieldName": "SENTI_SCORE_7D", "dir": "DESC" } }, "limit": 25 }'
+```
+
+**The response is flat and the rows are at `.results[]`, not `.data`.** `execute` answers with exactly three top-level keys, `{ results, matched, limit }`: `results` is the row array, `matched` is the pre-limit total and `limit` echoes what you asked for. There is no `{ isPreview, previewReason, data }` envelope on this endpoint, so an agent carrying the `.data` habit over from the rest of the API reads `undefined` and reports "no matches" on a screen that matched. `results` is an empty array when nothing matched, which is the real no-match signal, and `matched` says how many rows exist behind the `limit`.
+
+Endpoints: `POST /api/v1/screener/execute` (stocks), `POST /api/v1/screener/etfs/execute` (ETFs, same shape), `GET /api/v1/screener/fields` (the catalog), `GET /api/v1/screener/screens` (curated screens with their full plans). `limit` sits next to `plan` (default 100, cap 500); an optional top-level `tickers` array scopes the screen to a watchlist. An unrecognized field name returns HTTP 400 with a message naming the bad field and listing the valid ones, and field names are case-sensitive: take them from `GET /api/v1/screener/fields`, never from guesswork. The catalog lists each field under `name`; in a plan that same string goes in `fieldName`.
+
+One REST shape difference that the numeric example above does not show: **`IN` and `NOT_IN` filters take a `values` array, not `value`**. Sending `"value"` (singular) gets a `400 malformed_request` whose message names `values`, so the fix is quick, but it costs a round trip:
+
+```json
+{ "plan": { "filters": [ { "fieldName": "ISSUER", "op": "IN", "values": ["Vanguard", "iShares"] } ] } }
+```
+
+The shorthand `ISSUER:IN:Vanguard,iShares` means `{ "fieldName": "ISSUER", "op": "IN", "values": ["Vanguard", "iShares"] }`; convert every shorthand filter in this file to that JSON shape before executing it. Four fields are string-typed and take `IN`/`NOT_IN`: `SENTISENSE_RATING` in the stock universe, and `ISSUER`, `ASSET_CLASS`, `TRACKED_INDEX` in the ETF universe. The live values for the three ETF fields come back in the fields catalog at `GET /api/v1/screener/fields`, alongside each field's name, operators, unit, description, and `values` array.
+
+## Translating a fuzzy ask (the procedure)
+
+Most screening requests arrive fuzzy. Translate them honestly:
+
+1. **Check the curated screens first** with `GET /api/v1/screener/screens`. If one matches the intent, post its `plan` unchanged to the stock or ETF execute endpoint and say which one you used; the curated plans are also worked examples of the plan shape, so quote the plan when adapting one. In the names, `+` means both conditions hold and `vs` means the two sides disagree.
+2. **Get the field catalog** with `GET /api/v1/screener/fields` rather than guessing names. The catalog carries units, operators, descriptions, and allowed array values, and grows without notice; a guessed field name is a 400, never a silent wrong answer. The appendix below is a per-release snapshot of the same catalog, good for planning without a call; the live catalog can be ahead of it.
+3. **Map intent words to field groups.** "Loved / bullish / mood improving" is the Score group; "everyone is talking about it" is popularity (`SOCIAL_DOMINANCE`, `MENTION_VELOCITY`); "cheap lately / beaten down" is `PCT_OFF_52W_HIGH` or the moving-average distances; "analysts like it" is the analyst group; "big / liquid" is `MARKET_CAP` and `VOLUME`; "high IV / options are pricey / unusual options activity / a big expected move" is the Options group (`IV_RANK_1Y`, `MAX_UNUSUAL_PREMIUM`, `EXPECTED_MOVE_20D`), which is end of day.
+4. **Add a coverage guard when a ratio can be thin.** `ANALYST_BUY_RATIO_PCT` from one analyst is noise: pair it with `ANALYST_COUNT GTE 5`. If a screen returns fewer rows than expected, check field coverage before loosening thresholds.
+5. **Show the plan with the results.** The user can only correct a translation they can see. State filters, sort, and `matched` count; `matched` is the pre-limit total, so truncation is visible. Say it as three numbers when they differ: "56 matched, showing 50, more exist" (more exist whenever `matched` is greater than the rows returned). Size the count against the universe: at this release the stock universe is about 1,200 names and the ETF universe about 90 funds (an empty `filters` array returns the exact figure in `matched`), so 40 matching ETFs is nearly half the funds, not a selective screen.
+6. **There is no OR.** Filters AND together; for an OR, run two screens and merge client-side, saying so.
+
+## Popular asks, translated
+
+The phrases people actually type, mapped to the screen that answers them. For a curated id, find
+that entry in `GET /api/v1/screener/screens`, then post its returned `plan` unchanged to the stock
+execute endpoint, or the ETF endpoint for an `etf-` id. Custom plans below use compact
+`FIELD:OP:VALUE` shorthand: convert each triple to `{ "fieldName": "FIELD", "op": "OP", "value": VALUE }`, using `values` instead of `value` for `IN` and `NOT_IN`, then put the displayed sort in the plan's `sort` object. Show the executed plan with the results every time, so the user can loosen or tighten it.
+
+| The user says | Run |
+|---|---|
+| "run the momentum screen", "what has momentum right now" | curated `momentum` |
+| "oversold stocks people like", "beaten down but loved" | curated `oversold-with-positive-sentiment` |
+| "where do analysts and the crowd disagree" | curated `crowd-vs-street` |
+| "most bullish stocks right now", "high sentiment stocks" | curated `high-sentiment` |
+| "small caps people are talking about", "small cap buzz" | curated `small-cap-buzz` |
+| "golden cross stocks with bullish sentiment" | curated `golden-cross-bullish` |
+| "stocks under $20 with bullish sentiment", "cheap stocks the crowd likes" | `PRICE:LTE:20`, `SENTIMENT_DIRECTION:EQ:1`, sort `SCORE_CHANGE_7D:DESC` (the count swings with the day's mood, and `PRICE:LTE:10` returns far fewer; quote `matched`, and when a cut returns none say so rather than loosening silently) |
+| "large caps near their 52-week low with analyst upside" | `MARKET_CAP:GTE:10000000000`, `PCT_OFF_52W_LOW:LTE:10`, `ANALYST_TARGET_UPSIDE_PCT:GTE:20`, sort `ANALYST_TARGET_UPSIDE_PCT:DESC` (a plain JSON number such as `10000000000` always works; numeric fields also accept a compact string such as `"10B"`) |
+| "stocks analysts just upgraded", "recent analyst upgrades" | `ANALYST_RATING_MOMENTUM_30D:GTE:1`, sort `ANALYST_RATING_MOMENTUM_30D:DESC` (2 narrows to roughly ten to twenty names) |
+| "strong buy consensus with upside left" | `ANALYST_BUY_RATIO_PCT:GTE:80`, `ANALYST_TARGET_UPSIDE_PCT:GTE:15`, sort `ANALYST_TARGET_UPSIDE_PCT:DESC` |
+| "low volatility stocks the crowd likes", "calm names with bullish sentiment" | `VOLATILITY_30D:LTE:20`, `SENTIMENT_DIRECTION:EQ:1`, sort `SENTI_SCORE_7D:DESC` (this is realized volatility, not options implied; for a relatively high or low implied-volatility regime screen `IV_RANK_1Y` instead, which is a rank inside the stock's own year, not an IV level; 20 for calm and 60 for volatile are adjustable starting thresholds, not percentiles, so for "the calmest N" or "the most volatile N" sort `VOLATILITY_30D:ASC` or `VOLATILITY_30D:DESC` within the requested universe and take N valid values instead) |
+| "high IV stocks the crowd likes", "implied volatility high for the stock, with bullish sentiment" | `IV_RANK_1Y:GTE:75`, `OPTIONS_INTEREST_SCORE:GTE:0`, `SENTI_SCORE_7D:GTE:13`, sort `IV_RANK_1Y:DESC` (the interest-score gate drops thin, unscored option chains, as the curated `high-iv-rank` screen does; end of day: until the evening options board lands these are the previous session's readings, and one result can mix two sessions, so read `optionsAsOf` per row and name the session for each name you quote; IV rank is regime-dependent, so the count swings with the market) |
+| "high IV rank", "where are options expensive" | curated `high-iv-rank` (IV rank of 75 or more among names with enough options activity to be scored) |
+| "unusual options activity on bullish names", "big options bets the crowd likes" | curated `unusual-premium-bullish` (an unusual contract of $1M or more plus a 7-day SentiSense Score of +13 or higher) |
+| "stocks expected to move 20% or more" | `EXPECTED_MOVE_20D:GTE:0.2`, sort `EXPECTED_MOVE_20D:DESC` (a fraction of price: `0.2` is 20%, never `20`; the typical stock already sits near 0.2, so this keeps about half the universe: quote `matched` against the universe, and use `0.4` for a selective list) |
+| "stocks 30% off their highs", "deep pullbacks" | `PCT_OFF_52W_HIGH:LTE:-30`, sort `PCT_OFF_52W_HIGH:ASC` |
+| "mentions spiking", "unusual social volume" | `MENTION_VELOCITY:GTE:100`, sort `MENTION_VELOCITY:DESC`; for share of the whole conversation, curated `rising-share-of-voice` |
+| "best performers this month that analysts still back" | `RETURN_1M:GTE:10`, `ANALYST_BUY_RATIO_PCT:GTE:70`, sort `RETURN_1M:DESC` |
+| "the Magnificent 7", "Mag 7 stocks" | no filter needed: a top-level `tickers` array `["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA"]` with any plan (for example sort `MARKET_CAP:DESC`). The curated `trillion-club` screen ("$1 Trillion+ Club"; the older id `mag-7` still resolves to it) is not this list: its plan is every stock with a market cap of $1 trillion or more, which returns more than seven names and includes non-tech companies, so describe it as "trillion-dollar market caps" when you run it |
+| "top rated stocks", "A rated stocks", "best SentiSense Rating" | `SENTISENSE_RATING:IN:A`, sort `SENTISENSE_RATING:DESC` (only about the top tenth of ranks can reach an A, and far fewer do after risk adjustments; the small-company adjustment already keeps most names under about 10 billion dollars out of A, so a `MARKET_CAP` floor there rarely changes the list, but keep it when the user asked for a size cut) |
+| "highly rated but the street is cold on it" | `SENTISENSE_RATING:IN:A,B`, `ANALYST_BUY_RATIO_PCT:LTE:40`, sort `SENTISENSE_RATING:DESC` |
+| "cheap index funds with bullish holdings", "low-cost ETFs the crowd likes" | ETF endpoint: `EXPENSE_RATIO:LTE:0.1`, `CONSTITUENTS_WEIGHTED_SENTISENSE:GTE:5`, `WEIGHT_COVERED_PCT:GTE:80`, sort `MARKET_CAP:DESC` (the coverage guard keeps a holdings-weighted Score honest; on a bullish day this matched 40 of about 90 funds, led by VTI, VOO and IVV at a 0.03% expense ratio, so say the count against the universe) |
+| "only Vanguard or iShares funds", "ETFs from one issuer" | ETF endpoint: `ISSUER:IN:Vanguard,iShares` (a `values` array) plus any other filter; take the issuer spellings from the `values` list the fields catalog returns for `ISSUER` (`ARK`, `BNY Mellon`, `Invesco`, `iShares`, `Schwab`, `SPDR`, `VanEck`, `Vanguard` at this release) |
+
+Two habits keep these honest: say which window a field measures (the 7-day Score versus its 1-month
+baseline, 3-day mention velocity, 30-day analyst momentum), and treat an empty result as the data,
+not a broken filter; the fix is to loosen one threshold and say so, never to invent a row.
+
+## Field semantics that produce wrong-but-plausible screens
+
+These six are the known traps; getting them wrong yields a screen that runs fine and means nothing:
+
+- **`SENTISENSE_RATING` is a letter, and the letter is a band of a score.** Values `A`, `B`, `C`, `D`, `F`; operators `IN` and `NOT_IN` only, with the letters in a `values` array (`{ "fieldName": "SENTISENSE_RATING", "op": "IN", "values": ["A", "B"] }`). The score runs 0 to 100: the stock's percentile rank on a seven-dimension blend among rated stocks, less its risk adjustments. A is a score of 90 or more, B 70 to 89.9, C 30 to 69.9, D 10 to 29.9, F below 10. The bands are not fixed shares of the market: only about the top tenth of ranks can reach an A, far fewer do after adjustments, and an A never means "a stock to buy". Sorting the field resolves to that score rather than the letter's alphabetical order, so `DESC` puts the highest score first. Rows come back with `ratingLetter`, `ratingScore` and `ratingPercentile`. Report the letter with its score ("B, 85.6 out of 100"). `ratingPercentile` is the rank before the risk adjustments, so a B can sit at the 100th percentile; if you quote it, say it is the rank before adjustments, never as the letter's own number. Stocks with too little data are unrated and match no letter, so `NOT_IN ["F"]` is not the complement of `IN ["F"]`.
+- **`ANALYST_RATING_MEAN` is inverted.** Vendor 1-to-5 scale where **1.0 is strong buy**. Bullish is `LTE 2.5`, not `GTE`. Prefer `ANALYST_BUY_RATIO_PCT`, which runs the intuitive direction.
+- **Score fields are banded, not [-1, 1].** The SentiSense Score is unbounded (most of the universe sits between about -30 and +45, and the strongest names read above that) with bands at 5, 13, and 23 either side of zero: above +5 bullish lean, +13 bullish, +23 strong. Filter on band edges; `GTE:0.5` is a polarity-scale habit that silently means "any positive score". `SENTI_SCORE_7D` and `SENTI_SCORE_1M` are window averages; `SCORE_CHANGE_7D` is the 7-day minus the 1-month baseline, so positive means strengthening.
+- **`EXPECTED_MOVE_20D` is a fraction of price, not a percent.** `0.2` is a 20% move, the same number as `expectedMove20d` on the options endpoints, so a "big expected move" filter is `GTE 0.2`; `GTE 20` returns zero rows with HTTP 200. The fields catalog's placeholder (`20`) and `quickValues` (10, 20, 30) for this field are percent hints for the app's builder: ignore them on the API and send the fraction. All seven options fields are end of day from the nightly options board, and `OPTIONS_INTEREST_SCORE GTE 0` is a liquidity gate on its own (only names with enough options activity are scored).
+- **`IV_RANK_1Y` is a rank, not an implied-volatility level.** It is where today's at-the-money implied volatility sits inside the stock's own one-year low-to-high range (0 is the low, 100 the high). Use it for relative asks ("high IV", "IV near its yearly high", an explicit IV rank). Absolute implied volatility is not a screener field: never turn "IV above 50%" into `IV_RANK_1Y:GTE:50`, because a 50% IV and an IV rank of 50 select different stocks. Tell the user the absolute level cannot be screened, and offer the rank or the per-ticker options endpoints instead.
+- **Nulls never match, in either direction.** `RETURN_1Y >= 0` and `RETURN_1Y < 0` do not partition the universe: a recently listed stock is in neither. Sorting puts nulls last regardless of direction.
+
+Two enum fields are used with `EQ`: `MA_CROSS_STATE` (`1` golden cross, `-1` death cross, `0` neither) and `SENTIMENT_DIRECTION` (`1` above +5, `-1` below -5, `0` the neutral band, where most of the universe sits on a typical day). The catalog lists `EQ` as their operator; stick to it even where other operators happen to evaluate.
+
+**`SCORE_CHANGE_7D` and `SENTI_SCORE_TREND_7D` are different measurements, not aliases**, and mixing them up in an explanation is a common slip. `SCORE_CHANGE_7D` is a level difference: the 7-day Score minus the 1-month baseline, so positive means stronger than the longer window. `SENTI_SCORE_TREND_7D` is a slope: score points per day over the last 7 days, null when the week is too sparse to call. A stock can be positive on one and negative on the other (strong versus last month but fading this week). Use the field's own catalog description when explaining a screen, and name the field you actually filtered on. `ANALYST_COUNT` sums the rating buckets, which deliberately differs from the vendor's own analyst count.
+
+**ETF universe:** `CONSTITUENTS_WEIGHTED_SENTISENSE` is the holdings-weighted Score across what the fund owns (usually the one you want); `DIRECT_SENTISENSE` is chatter about the fund's own ticker, mostly macro noise on an index fund. Check `WEIGHT_COVERED_PCT` before leaning on a weighted number, and use `IN`/`NOT_IN` on the string fields (`ISSUER`, `ASSET_CLASS`, `TRACKED_INDEX`), whose live values come back in the fields catalog.
+
+## Workflows
+
+**1. Run a curated screen.** Fetch `GET /api/v1/screener/screens`, pick an entry by intent, and post that entry's `plan` unchanged to `POST /api/v1/screener/execute`, or to `POST /api/v1/screener/etfs/execute` when its id starts with `etf-`. Wrap the returned plan in the request body's `plan` field, with `limit` alongside it, as in the example above. Do not send a screen id to either execute endpoint. The 19 stock screens and 11 ETF screens are listed with what each finds in the appendix. Screen ids are stable and never reused, but a screen can be retired, so handle a missing id gracefully.
+
+**2. Translate a fuzzy ask.** "Beaten-down names the crowd is warming to" becomes: `PCT_OFF_52W_HIGH:LTE:-30`, `SCORE_CHANGE_7D:GTE:5`, sort by `SCORE_CHANGE_7D:DESC`, with the plan shown alongside the results. Compare with the curated `oversold-with-positive-sentiment` and say if you diverged and why.
+
+**3. Screen a watchlist.** Add a top-level `tickers` array next to `plan` in the execute request to run any plan against the user's own list instead of the universe. It works on the ETF endpoint too: `{ "tickers": ["SPY", "QQQ", "IWM"], "plan": { "filters": [], "sort": { "fieldName": "CONSTITUENTS_WEIGHTED_SENTISENSE", "dir": "DESC" } } }` ranks a fund watchlist by the mood of what each one owns.
+
+**4. Hand off the results.** For "research these candidates", hand off to the `us-stocks-analysis` skill when available. Pass the executed plan, universe, one to three user-selected rows, source dates where available, and the research question. Return per-name thesis evidence and contrary facts for the selected names. Hand off only when the user changes the question; do not automatically route back. If the sibling is unavailable, answer the supported part here using a connected tool or the inline REST workflow, state any remaining gap, and never require an install.
+
+## Reading results
+
+Rows arrive in `results[]` (see How to Run: this endpoint is flat, with no `.data` envelope). Every row carries the stored fields (nulls where uncovered) plus render-ready extras: `week52High`/`week52Low`, `lastUpdated` (epoch seconds), and three small series per ticker (`sentisenseScoreBars7D`, `sentisenseScoreBars30D`, `priceSparkline30D`), so results are chartable without a second call. Prices in rows come from the 20-minute snapshot: fine for screening, not for quoting; say "as of the latest screener snapshot" rather than presenting them as live.
+
+**Row keys are camelCase and do not always mirror the filter name.** `SENTI_SCORE_7D` reads as `sentiSenseScore7D`, `SENTI_SCORE_1M` as `sentiSenseScore1M`, `PRICE` as `currentPrice`, `PCT_OFF_52W_HIGH` as `pctOff52wHigh`, `PCT_OFF_200D_MA` as `pctOff200dMa`, and `SENTISENSE_RATING` as `ratingLetter`, `ratingScore` and `ratingPercentile`; the rest follow the same pattern (`ANALYST_BUY_RATIO_PCT` is `analystBuyRatioPct`, `RETURN_1M` is `return1M`). The options fields read as `ivRank1y`, `pcVol`, `pcVolPctl1y`, `skew25dPctl1y` (from `SKEW_25D_PCTL_1Y`), `optionsInterestScore`, `maxUnusualPremium` and `expectedMove20d`, and every row also carries `optionsAsOf`, the ISO date of the session those options values are from. Read the first row's keys when unsure. ETF rows carry every ETF catalog field in the same style (`CURRENT_PRICE` is `currentPrice`, `CONSTITUENTS_WEIGHTED_SENTISENSE` is `constituentsWeightedSentisense`), plus the fund's `name`, so a fund list can print "VTI, Vanguard Total Stock Market ETF" without a second call.
+
+**Four stock fields filter and sort but are not returned on rows:** `SENTI_SCORE_TREND_7D`, `SENTI_SCORE_TREND_30D`, `SENTI_SCORE_RISING_STREAK_30D` and `PRICE_TREND_30D`. The server derives them at query time from the row's own series (`sentisenseScoreBars7D`, `sentisenseScoreBars30D`, `priceSparkline30D`), so the keys are absent, not null. A row that matched passed the threshold you set: report that ("Score trend above 0 over 7 days") and show the series, rather than printing a trend value the response does not carry.
+
+<!-- screener-appendix:start -->
+## Appendix: every field and every curated screen (snapshot)
+
+Generated from the same catalog the API serves, refreshed with every release of this skill. The live responses from `GET /api/v1/screener/fields` and `GET /api/v1/screener/screens` are authoritative and can be ahead of this table; use this appendix to plan, and the live catalog to execute. Field names are case-sensitive and go into plans verbatim. Numeric fields take GTE/GT/LTE/LT and are sortable; nulls never match a filter and always sort last.
+
+### Stock fields (40)
+
+| Field | Group | Type | Meaning |
+|---|---|---|---|
+| `SENTI_SCORE_7D` | Sentiment | number, Score | 7-day SentiSense score. Above +5 is bullish, +13 strongly so; below -5 is bearish. |
+| `SENTI_SCORE_1M` | Sentiment | number, Score | 1-month SentiSense score. Above +5 is bullish, +13 strongly so; below -5 is bearish. |
+| `SENTISENSE_RATING` | Sentiment | text, IN/NOT_IN | Letter grade A to F, the band of a 0 to 100 score: the stock's percentile rank on a seven-dimension blend among rated stocks, less its risk adjustments. A needs a score of 90 or more, which only about the top tenth of ranks can reach before adjustments, and far fewer do after them. Sorting this field orders by that score, so the order inside a letter is defined. Stocks with too little data are unrated and match no letter. Values: A, B, C, D, F. Sortable, and sorting resolves to the underlying 0 to 100 score. |
+| `SCORE_CHANGE_7D` | Sentiment | number, Score | 7-day SentiSense Score minus the 1-month baseline. Positive means the score is strengthening versus the longer window. |
+| `SENTIMENT_DIRECTION` | Sentiment | enum, EQ only | Which side of the neutral band the 7-day SentiSense Score sits on. Bullish is above +5, bearish below -5, and anything between reads Neutral. Values: 1 = Bullish, 0 = Neutral, -1 = Bearish. |
+| `SENTI_SCORE_TREND_7D` | Sentiment | number, Score | Slope of the daily SentiSense score over the last 7 days, in score points per day. Positive means the score is climbing. Blank when the week is too sparse to call. |
+| `SENTI_SCORE_TREND_30D` | Sentiment | number, Score | Slope of the SentiSense score over the last 30 days, in score points per bucket (each bucket is about 4 days). Positive means the score is climbing. |
+| `SENTI_SCORE_RISING_STREAK_30D` | Sentiment | number, count | How many buckets in a row the SentiSense score has risen, ending with the most recent (each bucket is about 4 days, so 3 is roughly two weeks). Unlike the trend slope, this cannot be satisfied by an old climb that has since stalled. |
+| `SOCIAL_DOMINANCE` | Popularity | number, share of 1 | Share of social chatter across all tracked stocks. |
+| `MENTION_SHARE` | Popularity | number, share of 1 | Share of total mentions across all tracked stocks. |
+| `MENTION_VELOCITY` | Popularity | number, % | Change in mentions, last 3 days versus the prior 3 days, in percent. +100 means mentions doubled. |
+| `DOMINANCE_CHANGE` | Popularity | number, share of 1 | Change in social dominance versus last week (share of voice). |
+| `MARKET_CAP` | Price and size | number, USD (10B, 1.2T) | Company market capitalization. Accepts 500M, 10B, 1.2T. |
+| `PRICE` | Price and size | number, USD | Latest share price in dollars. |
+| `CHANGE_PERCENT` | Price and size | number, % | Price change today, in percent. |
+| `CHANGE` | Price and size | number, USD | Price change today, in dollars. |
+| `VOLUME` | Price and size | number, count | Shares traded today. Accepts 500K, 10M, 1B. |
+| `PCT_OFF_52W_HIGH` | Price and size | number, % | Distance from the 52-week high. Negative below the high, e.g. -20 is 20% below. |
+| `PCT_OFF_52W_LOW` | Price and size | number, % | Distance above the 52-week low. Positive above the low, e.g. 15 is 15% above. |
+| `PRICE_TREND_30D` | Price and size | number, % | Slope of the price over the last 30 days, in percent per trading day. Near zero means a flat chart. Use with Score Trend to find stocks where attention is moving before the price is. |
+| `ANALYST_BUY_RATIO_PCT` | Analyst | number, % | Percent of rating analysts saying buy or strong buy. Analysts skew bullish, so the average stock sits near 60: use 80 or more for a genuinely strong consensus. |
+| `ANALYST_TARGET_UPSIDE_PCT` | Analyst | number, % | Percent from the current price to the mean analyst price target. Negative means the stock trades above the target. |
+| `ANALYST_COUNT` | Analyst | number, count | How many analysts rate the stock. Pair this with a consensus filter: some stocks are covered by a single analyst, and one opinion is not a consensus. |
+| `ANALYST_RATING_MOMENTUM_30D` | Analyst | number, count | Upgrades minus downgrades over the last 30 days. Moves in small numbers, and the drop-off is steep: a representative run of the whole universe returned 92 stocks at GTE 1, 11 at GTE 2, 2 at GTE 3 and 1 at GTE 4. So 1 is the threshold that gives a workable candidate list, 2 narrows to about a dozen, and 3 or higher is a handful of names rather than a screen. An empty result at 3 is the data, not a broken filter. |
+| `PCT_OFF_200D_MA` | Technical | number, % | Percent above or below the 200-day moving average. Negative means trading under it. Blank for stocks with under 200 trading days of history. |
+| `PCT_OFF_50D_MA` | Technical | number, % | Percent above or below the 50-day moving average. |
+| `MA_CROSS_STATE` | Technical | enum, EQ only | Whether the 50-day average sits above or below the 200-day. Values: 1 = Golden cross, 0 = Neither, -1 = Death cross. |
+| `RETURN_1M` | Technical | number, % | Percent price return over roughly the last month of trading. |
+| `RETURN_3M` | Technical | number, % | Percent price return over roughly the last three months of trading. |
+| `RETURN_6M` | Technical | number, % | Percent price return over roughly the last six months of trading. |
+| `RETURN_1Y` | Technical | number, % | Percent price return over roughly the last year of trading. Blank for stocks with under a year of history. |
+| `VOLATILITY_30D` | Technical | number, % | Annualized historical volatility of simple adjusted-close returns, in percent, using up to the latest 31 stored-session returns (roughly a month), scaled by the square root of 252. Returns beyond +/-100% are excluded. A value of 30 corresponds to a historical daily standard deviation of about 1.9%. This is realized volatility, not options implied volatility; levels vary with market conditions. |
+| `ANALYST_RATING_MEAN` | Analyst | number, Score | Broker consensus rating on the standard 1 to 5 scale. THIS SCALE IS INVERTED: 1 is strong buy and 5 is strong sell, so bullish means a LOW value. Analyst Buy Ratio is the easier field for most filters. |
+| `IV_RANK_1Y` | Options | number, % | Where today's at-the-money implied volatility sits in its own trailing one-year range, 0 to 100. 75 or more is a high-IV regime for that stock, 20 or less a low one. End of day from the nightly options board, so until the evening build lands it is the previous session's value; the row's optionsAsOf says which session. Needs 60 observations; absent on thin names. |
+| `PC_VOL` | Options | number, ratio | Put volume divided by call volume in the latest session. Above 1 means more puts traded than calls. End of day from the nightly options board (optionsAsOf). |
+| `PC_VOL_PCTL_1Y` | Options | number, % | Percentile, 0 to 100, of today's put/call volume ratio against the stock's own trailing year. 90 or more is unusually put-heavy for that stock, 10 or less unusually call-heavy. End of day (optionsAsOf). Needs 60 observations. |
+| `SKEW_25D_PCTL_1Y` | Options | number, % | Percentile, 0 to 100, of the 25-delta skew (put IV minus call IV) against the stock's own trailing year. 90 or more means puts are unusually expensive relative to calls for that stock. End of day (optionsAsOf). Needs 60 observations. |
+| `OPTIONS_INTEREST_SCORE` | Options | number, Score | Composite 0 to 100 score of how far today's options readings sit from the stock's own norms. Only stocks with at least $100,000 of premium traded and 60 observations are scored; the rest are unscored and match no filter, so GTE 0 is a liquidity gate on its own. End of day (optionsAsOf). |
+| `MAX_UNUSUAL_PREMIUM` | Options | number, USD (10B, 1.2T) | Estimated premium, in dollars, of the largest unusual contract in the latest session (volume well above open interest). Accepts 500K, 1M, 5M. Absent for most stocks, which have no unusual contract in a given session, so this field screens for activity by itself. End of day (optionsAsOf). |
+| `EXPECTED_MOVE_20D` | Options | number, share of 1 | Options-implied 90% expected move over the next 20 trading sessions, as a fraction of price: 0.2 is 20%. The builder shows and accepts percent; on the API send the fraction, the same number as expectedMove20d on the options endpoints. End of day (optionsAsOf). |
+
+### ETF fields (23)
+
+| Field | Group | Type | Meaning |
+|---|---|---|---|
+| `CONSTITUENTS_WEIGHTED_SENTISENSE` | Sentiment | number, Score | Holdings-weighted SentiSense score across the fund's constituents. Above +5 is bullish. |
+| `DIRECT_SENTISENSE` | Sentiment | number, Score | SentiSense score from chatter about the fund itself. Above +5 is bullish. |
+| `WEIGHTED_ANALYST_UPSIDE` | Analyst | number, % | Holdings-weighted analyst price-target upside, in percent. |
+| `MARKET_CAP` | Price and size | number, USD (10B, 1.2T) | Assets under management. Accepts 500M, 10B, 1.2T. |
+| `EXPENSE_RATIO` | Price and size | number, % | Annual expense ratio in percent, e.g. 0.09 for SPY. Screen <= to find cheap funds. |
+| `CURRENT_PRICE` | Price and size | number, USD | Latest fund price in dollars. |
+| `CHANGE_PERCENT` | Price and size | number, % | Price change today, in percent. |
+| `PRICE_CHANGE` | Price and size | number, USD | Price change today, in dollars. |
+| `VOLUME` | Price and size | number, count | Shares traded today. Accepts 500K, 10M, 1B. |
+| `PCT_OFF_52W_HIGH` | Price and size | number, % | Distance from the 52-week high. Negative below the high, e.g. -20 is 20% below. |
+| `PCT_OFF_52W_LOW` | Price and size | number, % | Distance above the 52-week low. Positive above the low, e.g. 15 is 15% above. |
+| `WEIGHT_COVERED_PCT` | Coverage | number, % | Percent of fund weight covered by SentiSense constituent data. |
+| `HOLDINGS_COUNT` | Coverage | number, count | Number of holdings in the fund. |
+| `ISSUER` | Fund profile | text, IN/NOT_IN | Fund issuer, e.g. Vanguard or iShares. Pick one or more. Live values come from the fields catalog. |
+| `ASSET_CLASS` | Fund profile | text, IN/NOT_IN | Broad asset class: Equity, Bond, Commodity. Live values come from the fields catalog. |
+| `TRACKED_INDEX` | Fund profile | text, IN/NOT_IN | The index the fund tracks. Live values come from the fields catalog. |
+| `IV_RANK_1Y` | Options | number, % | Where today's at-the-money implied volatility sits in its own trailing one-year range, 0 to 100. 75 or more is a high-IV regime for that fund, 20 or less a low one. End of day from the nightly options board, so until the evening build lands it is the previous session's value; the row's optionsAsOf says which session. Needs 60 observations; absent on thin names. |
+| `PC_VOL` | Options | number, ratio | Put volume divided by call volume in the latest session. Above 1 means more puts traded than calls. End of day from the nightly options board (optionsAsOf). |
+| `PC_VOL_PCTL_1Y` | Options | number, % | Percentile, 0 to 100, of today's put/call volume ratio against the fund's own trailing year. 90 or more is unusually put-heavy for that fund, 10 or less unusually call-heavy. End of day (optionsAsOf). Needs 60 observations. |
+| `SKEW_25D_PCTL_1Y` | Options | number, % | Percentile, 0 to 100, of the 25-delta skew (put IV minus call IV) against the fund's own trailing year. 90 or more means puts are unusually expensive relative to calls for that fund. End of day (optionsAsOf). Needs 60 observations. |
+| `OPTIONS_INTEREST_SCORE` | Options | number, Score | Composite 0 to 100 score of how far today's options readings sit from the fund's own norms. Only funds with at least $100,000 of premium traded and 60 observations are scored; the rest are unscored and match no filter, so GTE 0 is a liquidity gate on its own. End of day (optionsAsOf). |
+| `MAX_UNUSUAL_PREMIUM` | Options | number, USD (10B, 1.2T) | Estimated premium, in dollars, of the largest unusual contract in the latest session (volume well above open interest). Accepts 500K, 1M, 5M. Absent for most funds, which have no unusual contract in a given session, so this field screens for activity by itself. End of day (optionsAsOf). |
+| `EXPECTED_MOVE_20D` | Options | number, share of 1 | Options-implied 90% expected move over the next 20 trading sessions, as a fraction of price: 0.2 is 20%. The builder shows and accepts percent; on the API send the fraction, the same number as expectedMove20d on the options endpoints. End of day (optionsAsOf). |
+
+### Curated stock screens (19)
+
+Fetch `GET /api/v1/screener/screens` for the full plans, then post the selected plan to the matching execute endpoint.
+
+| Id | Name | What it finds |
+|---|---|---|
+| `winners` | Winners | Stocks up today |
+| `losers` | Losers | Stocks down today |
+| `high-sentiment` | High Sentiment | 7-day SentiSense Score of +13 or higher, our strongly bullish band |
+| `sentiment-divergence` | Sentiment Divergence | 7-day SentiSense Score has jumped 8 or more points above a 1-month baseline that is still neutral |
+| `rising-share-of-voice` | Top Share of Voice | Largest share of social conversation across the tracked universe |
+| `trillion-club` | $1 Trillion+ Club | Every US-listed stock worth $1 trillion or more, ranked by market cap |
+| `large-caps-positive` | Large Caps Positive | $10B+ market cap with a bullish 7-day SentiSense Score |
+| `high-volume` | High Volume | Stocks trading the most shares today |
+| `small-cap-buzz` | Small-Cap Buzz | Under $2B market cap with a bullish 7-day SentiSense Score |
+| `oversold-with-positive-sentiment` | Oversold + Bullish | Down more than 2% today while the 7-day SentiSense Score stays bullish |
+| `momentum` | Momentum | 7-day SentiSense Score is 8 or more points above its own 1-month baseline |
+| `sentisense-score-vs-price` | Score vs Price | SentiSense Score trending up over 30 days while price is flat or down |
+| `crowd-vs-street` | Crowd vs Street | Bullish 7-day SentiSense Score where 30% or fewer analysts rate it a buy |
+| `analyst-buys-quiet` | Analyst Buys + Quiet | 90% or more analyst buy ratings but almost no social conversation |
+| `upgrades-rising` | Upgrades + Rising Score | More analyst upgrades than downgrades in 30 days, with the SentiSense Score rising |
+| `below-200d-rising` | Below SMA 200 | Trading below its 200-day moving average while its SentiSense Score is rising |
+| `golden-cross-bullish` | Golden Cross + Bullish | 50-day average above the 200-day, with a bullish 7-day SentiSense Score |
+| `high-iv-rank` | High IV Rank | IV rank of 75 or higher in the stock's own one-year range, among names with enough options activity to be scored. End of day. |
+| `unusual-premium-bullish` | Unusual Premium + Bullish | An unusual options contract of $1M or more in the latest session and a 7-day SentiSense Score of +13 or higher. End of day. |
+
+### Curated ETF screens (11)
+
+| Id | Name | What it finds |
+|---|---|---|
+| `etf-winners` | Winners | ETFs up today |
+| `etf-losers` | Losers | ETFs down today |
+| `etf-sentiment-leaders` | Sentiment Leaders | Highest holdings-weighted SentiSense Score across fund constituents |
+| `etf-analyst-upside` | High Analyst Upside | Holdings-weighted analyst upside of 15% or more |
+| `etf-mega-funds` | Mega Funds | $100B+ in assets under management |
+| `etf-high-volume` | High Volume | ETFs trading the most shares today |
+| `etf-near-52w-high` | Near 52w High | Within 5% of the 52-week high |
+| `etf-dip-bullish` | Dip + Bullish | Down more than 1% today while the holdings-weighted SentiSense Score stays bullish |
+| `etf-broad-funds` | Broad Funds | Diversified funds with 500+ holdings |
+| `etf-low-cost-core` | Low-Cost Core | Expense ratio 0.15% or less with $10B+ in assets |
+| `etf-direct-sentiment` | Direct Sentiment | Positive SentiSense Score from chatter about the fund itself, not its holdings |
+<!-- screener-appendix:end -->
+
+## Going further
+
+**PRO ($15/mo)** lifts the monthly request cap (no monthly limit, just a 300/min rate) and unlocks full depth across the SentiSense API: institutional flows, insider detail, full congressional history, and AI insights. Apply coupon `AGENTS` at checkout for a builder launch discount: https://app.sentisense.ai/pricing?coupon=AGENTS
+
+For the full REST reference, install the `sentisense` skill; for the complete CLI command set, install `sentisense-cli`.
+
+**ClawHub Skill:** [clawhub.ai/TheSentiTrader/stock-screener](https://clawhub.ai/TheSentiTrader/stock-screener)
+
+---
+
+*SentiSense is a read-only financial intelligence API. This data is for informational and educational purposes only, not investment advice.*
