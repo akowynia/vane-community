@@ -70,3 +70,4 @@ For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation d
 - [PDF Export Styles & Branding Customization](PDF_EXPORT_CUSTOMIZATION.md)
 - [Model Reasoning & Thinking Process Isolation](MODEL_REASONING_AND_THINKING_ISOLATION.md)
 - [GitHub Pages Continuous Documentation Deployment](GITHUB_PAGES_DEPLOYMENT.md)
+- [Continuous Pull Request & Branch Verification Pipeline](PULL_REQUEST_VERIFICATION_PIPELINE.md)
