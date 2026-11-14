@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, Fragment } from 'react';
+import React, { useEffect, useState, useMemo, Fragment } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -35,6 +35,7 @@ import { useBulkSelection } from '@/lib/hooks/useBulkSelection';
 import { BulkSelectionToolbar } from '@/components/BulkDelete/BulkSelectionToolbar';
 import { DeleteConfirmDialog } from '@/components/BulkDelete/DeleteConfirmDialog';
 import { SelectionCheckbox } from '@/components/BulkDelete/SelectionCheckbox';
+import { BulkExportDialog } from '@/components/BulkExport/BulkExportDialog';
 import { executeBulkDelete } from '@/lib/utils/bulkDeleteClient';
 
 const WaypointsPage = () => {
@@ -60,6 +61,7 @@ const WaypointsPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [bulkConfirmMode, setBulkConfirmMode] = useState<'selected' | 'all' | null>(null);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkExportOpen, setIsBulkExportOpen] = useState(false);
 
   const fetchCurrentUser = async () => {
     try {
@@ -188,6 +190,25 @@ const WaypointsPage = () => {
     canSelect: (wp) => Boolean(wp.isOwner),
   });
 
+  const selectedWaypointItems = useMemo(() => {
+    return waypoints
+      .filter((wp) => selectedIds.has(wp.id))
+      .map((wp) => ({
+        id: wp.id,
+        title: wp.name || 'Waypoint Space',
+        date: wp.createdAt ? new Date(wp.createdAt).toLocaleString() : undefined,
+        subtitle: wp.description || undefined,
+        content: [
+          wp.description ? `**Description**:\n${wp.description}\n` : '',
+          wp.systemInstructions
+            ? `**System Instructions / Masterprompt**:\n\`\`\`\n${wp.systemInstructions}\n\`\`\`\n`
+            : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n') || '*(No description provided)*',
+      }));
+  }, [waypoints, selectedIds]);
+
   const handleBulkDeleteConfirm = async () => {
     const targetIds = bulkConfirmMode === 'all' ? selectableIds : selectedIdsList;
     if (targetIds.length === 0) return;
@@ -297,6 +318,7 @@ const WaypointsPage = () => {
           onDeselectAll={deselectAll}
           onDeleteSelected={() => setBulkConfirmMode('selected')}
           onDeleteAll={() => setBulkConfirmMode('all')}
+          onExportSelected={() => setIsBulkExportOpen(true)}
           disabled={isBulkDeleting}
           className="pt-2"
         />
@@ -517,6 +539,16 @@ const WaypointsPage = () => {
           t('bulkDelete.confirmDescWaypoints') ||
           'Selected waypoints and their schedules will be permanently removed. Linked chats will remain available outside those spaces.'
         }
+      />
+
+      {/* Bulk Export Dialog */}
+      <BulkExportDialog
+        isOpen={isBulkExportOpen}
+        onClose={() => setIsBulkExportOpen(false)}
+        selectedCount={selectedCount}
+        itemType="waypoints"
+        items={selectedWaypointItems}
+        title="Waypoint Spaces"
       />
 
       {/* Delete Confirmation Dialog */}

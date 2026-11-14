@@ -53,6 +53,7 @@ import { useBulkSelection } from '@/lib/hooks/useBulkSelection';
 import { BulkSelectionToolbar } from '@/components/BulkDelete/BulkSelectionToolbar';
 import { DeleteConfirmDialog } from '@/components/BulkDelete/DeleteConfirmDialog';
 import { SelectionCheckbox } from '@/components/BulkDelete/SelectionCheckbox';
+import { BulkExportDialog } from '@/components/BulkExport/BulkExportDialog';
 import { executeBulkDelete } from '@/lib/utils/bulkDeleteClient';
 
 interface ExtendedWaypointItem extends WaypointItem {
@@ -84,6 +85,7 @@ const WaypointDetailPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [bulkChatConfirmMode, setBulkChatConfirmMode] = useState<'selected' | 'all' | null>(null);
   const [isBulkDeletingChats, setIsBulkDeletingChats] = useState(false);
+  const [isChatExportOpen, setIsChatExportOpen] = useState(false);
 
   // Multi-user & auth state
   const [currentUser, setCurrentUser] = useState<{
@@ -611,6 +613,7 @@ const WaypointDetailPage = () => {
                 onDeselectAll={deselectAllChats}
                 onDeleteSelected={() => setBulkChatConfirmMode('selected')}
                 onDeleteAll={() => setBulkChatConfirmMode('all')}
+                onExportSelected={() => setIsChatExportOpen(true)}
                 disabled={isBulkDeletingChats}
               />
             )}
@@ -867,6 +870,16 @@ const WaypointDetailPage = () => {
           t('bulkDelete.confirmDescChats') ||
           'Selected chats and their messages will be permanently deleted.'
         }
+      />
+
+      {/* Bulk Export Chats Dialog */}
+      <BulkExportDialog
+        isOpen={isChatExportOpen}
+        onClose={() => setIsChatExportOpen(false)}
+        selectedCount={selectedChatCount}
+        itemType="chats"
+        selectedIds={selectedChatIdsList}
+        title={`${waypoint?.name || 'Waypoint'} - Chats`}
       />
 
       {/* Delete Confirmation Dialog */}

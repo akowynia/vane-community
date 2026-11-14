@@ -39,6 +39,7 @@ import { useBulkSelection } from '@/lib/hooks/useBulkSelection';
 import BulkSelectionToolbar from '@/components/BulkDelete/BulkSelectionToolbar';
 import DeleteConfirmDialog from '@/components/BulkDelete/DeleteConfirmDialog';
 import SelectionCheckbox from '@/components/BulkDelete/SelectionCheckbox';
+import BulkExportDialog from '@/components/BulkExport/BulkExportDialog';
 import { executeBulkDelete } from '@/lib/utils/bulkDeleteClient';
 import { toast } from 'sonner';
 
@@ -91,11 +92,13 @@ const LibraryContent = () => {
   const [chatBulkDeleteIds, setChatBulkDeleteIds] = useState<string[] | null>(null);
   const [chatBulkDeleteIsAll, setChatBulkDeleteIsAll] = useState(false);
   const [isDeletingChats, setIsDeletingChats] = useState(false);
+  const [isChatExportOpen, setIsChatExportOpen] = useState(false);
 
   const [batchNoteBulkDeleteIds, setBatchNoteBulkDeleteIds] = useState<string[] | null>(null);
   const [batchNoteBulkDeleteIsAll, setBatchNoteBulkDeleteIsAll] = useState(false);
   const [singleDeleteBatchNote, setSingleDeleteBatchNote] = useState<any | null>(null);
   const [isDeletingBatchNotes, setIsDeletingBatchNotes] = useState(false);
+  const [isBatchNoteExportOpen, setIsBatchNoteExportOpen] = useState(false);
   const [isClearSessionConfirmOpen, setIsClearSessionConfirmOpen] = useState(false);
 
   const chatSelection = useBulkSelection({
@@ -180,6 +183,25 @@ const LibraryContent = () => {
       setIsDeletingBatchNotes(false);
     }
   };
+
+  const selectedBatchNotesItems = useMemo(() => {
+    return batchNotes
+      .filter((n) => batchNoteSelection.selectedIds.has(n.id))
+      .map((n) => {
+        const rawSources = Array.isArray(n.sources) ? n.sources : [];
+        return {
+          id: n.id,
+          title: n.title || 'Batch Research Note',
+          date: n.updatedAt ? new Date(n.updatedAt).toLocaleString() : undefined,
+          content: n.content || '',
+          sources: rawSources.map((s: any, idx: number) => ({
+            title: s?.metadata?.title || s?.title || s?.metadata?.fileName || `Source ${idx + 1}`,
+            url: s?.metadata?.url || s?.url || '',
+            snippet: s?.pageContent || s?.metadata?.snippet || s?.snippet || '',
+          })),
+        };
+      });
+  }, [batchNotes, batchNoteSelection.selectedIds]);
 
   const fetchCurrentUser = async () => {
     try {
@@ -466,6 +488,7 @@ const LibraryContent = () => {
                     setChatBulkDeleteIsAll(true);
                     setChatBulkDeleteIds(chatSelection.selectableIds);
                   }}
+                  onExportSelected={() => setIsChatExportOpen(true)}
                   disabled={isDeletingChats}
                   className={chatSelection.isSelectionMode ? 'w-full' : undefined}
                 />
@@ -994,6 +1017,7 @@ const LibraryContent = () => {
                     setBatchNoteBulkDeleteIsAll(true);
                     setBatchNoteBulkDeleteIds(batchNoteSelection.selectableIds);
                   }}
+                  onExportSelected={() => setIsBatchNoteExportOpen(true)}
                   disabled={isDeletingBatchNotes}
                   className={batchNoteSelection.isSelectionMode ? 'w-full' : undefined}
                 />
@@ -1204,6 +1228,23 @@ const LibraryContent = () => {
           'Are you sure you want to clear the current batch search session?'
         }
         confirmLabel={t('common.clear') || 'Clear'}
+      />
+
+      {/* Bulk Export Dialogs */}
+      <BulkExportDialog
+        isOpen={isChatExportOpen}
+        onClose={() => setIsChatExportOpen(false)}
+        selectedCount={chatSelection.selectedCount}
+        itemType="chats"
+        selectedIds={chatSelection.selectedIdsList}
+      />
+
+      <BulkExportDialog
+        isOpen={isBatchNoteExportOpen}
+        onClose={() => setIsBatchNoteExportOpen(false)}
+        selectedCount={batchNoteSelection.selectedCount}
+        itemType="batch"
+        items={selectedBatchNotesItems}
       />
 
       {/* Login Dialog if needed */}

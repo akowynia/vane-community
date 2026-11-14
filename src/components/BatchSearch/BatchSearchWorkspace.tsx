@@ -54,6 +54,8 @@ import {
 } from '@/lib/batch-search/parser';
 import { useBatchSearch } from '@/lib/batch-search/context';
 import { DeleteConfirmDialog } from '@/components/BulkDelete/DeleteConfirmDialog';
+import { BulkExportDialog } from '@/components/BulkExport/BulkExportDialog';
+import { cleanExportText } from '@/lib/export/bulkExportHelper';
 
 interface BatchItemRowProps {
   item: BatchQueryItem;
@@ -365,6 +367,24 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
   const [batchDeleteConfirmMode, setBatchDeleteConfirmMode] = useState<'all' | 'selected' | null>(
     null,
   );
+  const [isBatchExportOpen, setIsBatchExportOpen] = useState(false);
+
+  const selectedBatchItems = useMemo(() => {
+    return items
+      .filter((item) => item.selected)
+      .map((item, idx) => ({
+        id: String(item.number || idx + 1),
+        title: item.query || `Query #${item.number || idx + 1}`,
+        subtitle: `Status: ${item.status || 'pending'}`,
+        content: cleanExportText(item.response || '*(No response recorded)*'),
+        sources: Array.isArray(item.sourcesList)
+          ? item.sourcesList.map((s, sIdx) => ({
+              title: s.title || s.url || `Source ${sIdx + 1}`,
+              url: s.url || '',
+            }))
+          : [],
+      }));
+  }, [items]);
 
   const noteMarkdownOverrides: MarkdownToJSX.Options = useMemo(
     () => ({
@@ -1107,6 +1127,26 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
                 >
                   {t('batchSearch.deselectAll') || 'Deselect all'}
                 </button>
+                {selectedCount > 0 && (
+                  <>
+                    <span className="text-stone-400">•</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsBatchExportOpen(true)}
+                      className="text-[#b8864d] hover:text-[#a6743b] flex items-center space-x-1 font-semibold transition cursor-pointer"
+                      title={
+                        t('bulkExport.exportSelected', { count: selectedCount }) ||
+                        `Export (${selectedCount})`
+                      }
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>
+                        {t('bulkExport.exportSelected', { count: selectedCount }) ||
+                          `Export (${selectedCount})`}
+                      </span>
+                    </button>
+                  </>
+                )}
                 {selectedCount > 0 && (
                   <>
                     <span className="text-stone-400">•</span>
@@ -1863,6 +1903,15 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
             : t('bulkDelete.confirmDescGeneric') ||
               'This action cannot be undone. Selected items will be permanently removed.'
         }
+      />
+
+      <BulkExportDialog
+        isOpen={isBatchExportOpen}
+        onClose={() => setIsBatchExportOpen(false)}
+        selectedCount={selectedCount}
+        itemType="batch"
+        items={selectedBatchItems}
+        title="Batch Search Results"
       />
     </div>
   );

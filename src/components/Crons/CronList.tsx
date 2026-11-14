@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, Fragment } from 'react';
+import React, { useState, useMemo, Fragment } from 'react';
 import Link from 'next/link';
 import {
   Clock,
@@ -36,6 +36,7 @@ import { CronItem, CreateEditCronDialog } from './CreateEditCronDialog';
 import { useBulkSelection } from '@/lib/hooks/useBulkSelection';
 import BulkSelectionToolbar from '@/components/BulkDelete/BulkSelectionToolbar';
 import DeleteConfirmDialog from '@/components/BulkDelete/DeleteConfirmDialog';
+import BulkExportDialog from '@/components/BulkExport/BulkExportDialog';
 import { executeBulkDelete } from '@/lib/utils/bulkDeleteClient';
 
 interface CronListProps {
@@ -70,6 +71,7 @@ export const CronList: React.FC<CronListProps> = ({
   const [bulkDeleteIds, setBulkDeleteIds] = useState<string[] | null>(null);
   const [bulkDeleteIsAll, setBulkDeleteIsAll] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkExportOpen, setIsBulkExportOpen] = useState(false);
 
   const selection = useBulkSelection({
     items: crons,
@@ -77,6 +79,30 @@ export const CronList: React.FC<CronListProps> = ({
     canSelect: (c) => c.isOwner !== false,
     disableEscape: Boolean(deleteTarget) || Boolean(bulkDeleteIds) || isEditDialogOpen,
   });
+
+  const selectedCronItems = useMemo(() => {
+    return crons
+      .filter((c) => selection.selectedIds.has(c.id))
+      .map((c) => ({
+        id: c.id,
+        title: c.name || 'Scheduled Task',
+        subtitle: `Schedule: ${c.schedule} • Model: ${c.chatModelKey || 'default'} • Status: ${c.enabled ? 'Active' : 'Paused'}`,
+        content: [
+          `**Prompt / Query**:\n${c.prompt || ''}`,
+          `**Schedule Expression**:\n\`${c.schedule}\``,
+          c.waypointName ? `**Waypoint Space**:\n${c.waypointName}` : '',
+          c.lastRunAt ? `**Last Run**:\n${new Date(c.lastRunAt).toLocaleString()}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+        sources: Array.isArray(c.sources)
+          ? c.sources.map((s, idx) => ({
+              title: typeof s === 'string' ? s : `Source ${idx + 1}`,
+              url: typeof s === 'string' && s.startsWith('http') ? s : undefined,
+            }))
+          : [],
+      }));
+  }, [crons, selection.selectedIds]);
 
   const handleConfirmBulkDelete = async () => {
     if (!bulkDeleteIds || bulkDeleteIds.length === 0) return;
@@ -260,6 +286,7 @@ export const CronList: React.FC<CronListProps> = ({
             setBulkDeleteIsAll(true);
             setBulkDeleteIds(selection.selectableIds);
           }}
+          onExportSelected={() => setIsBulkExportOpen(true)}
           disabled={isBulkDeleting}
           className={selection.isSelectionMode ? 'w-full' : undefined}
         />
@@ -519,6 +546,16 @@ export const CronList: React.FC<CronListProps> = ({
           'This action cannot be undone. Selected scheduled tasks will no longer run.'
         }
         deletingLabel={t('crons.deletingLabel') || t('bulkDelete.deleting') || 'Deleting...'}
+      />
+
+      {/* Bulk Export Dialog */}
+      <BulkExportDialog
+        isOpen={isBulkExportOpen}
+        onClose={() => setIsBulkExportOpen(false)}
+        selectedCount={selection.selectedCount}
+        itemType="crons"
+        items={selectedCronItems}
+        title="Scheduled Tasks"
       />
 
       {/* Edit Cron Dialog */}

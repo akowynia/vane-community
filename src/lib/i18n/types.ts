@@ -1441,4 +1441,37 @@ export interface Translations {
     singleDeleteBatchNoteTitle: string;
     singleDeleteBatchNoteDesc: string;
   };
+  bulkExport?: {
+    export: string;
+    exportSelected: string;
+    exportTooltip: string;
+    exportSelectedTooltip: string;
+    dialogTitle: string;
+    itemsSelectedCount: string;
+    selectFormat: string;
+    docxDesc: string;
+    pdfDesc: string;
+    mdDesc: string;
+    htmlDesc: string;
+    txtDesc: string;
+    jsonDesc: string;
+    optionsHeading: string;
+    includeSources: string;
+    includeSourcesDesc: string;
+    includeMetadata: string;
+    includeMetadataDesc: string;
+    packageAsZip: string;
+    zipDescIndividual: string;
+    zipDescConsolidated: string;
+    pdfStyleLabel: string;
+    preparingData: string;
+    fetchingChats: string;
+    fetchingNotes: string;
+    generatingFile: string;
+    exporting: string;
+    exportCount: string;
+    exportSuccess: string;
+    exportError: string;
+    noDataToExport: string;
+  };
 }

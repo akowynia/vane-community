@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { CheckSquare, Square, Trash2, X } from 'lucide-react';
+import { CheckSquare, Download, Square, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/lib/i18n';
 
@@ -15,12 +15,13 @@ interface BulkSelectionToolbarProps {
   onDeselectAll: () => void;
   onDeleteSelected: () => void;
   onDeleteAll?: () => void;
+  onExportSelected?: () => void;
   disabled?: boolean;
   className?: string;
 }
 
 /**
- * Reusable toolbar for toggling selection mode and triggering single/bulk deletes.
+ * Reusable toolbar for toggling selection mode, triggering bulk deletes, and bulk exports.
  */
 export const BulkSelectionToolbar: React.FC<BulkSelectionToolbarProps> = ({
   isSelectionMode,
@@ -32,6 +33,7 @@ export const BulkSelectionToolbar: React.FC<BulkSelectionToolbarProps> = ({
   onDeselectAll,
   onDeleteSelected,
   onDeleteAll,
+  onExportSelected,
   disabled = false,
   className,
 }) => {
@@ -53,6 +55,19 @@ export const BulkSelectionToolbar: React.FC<BulkSelectionToolbarProps> = ({
           <CheckSquare size={14} className="text-[#b8864d]" />
           <span>{t('bulkDelete.selectMode') || 'Select'}</span>
         </button>
+
+        {onExportSelected && (
+          <button
+            type="button"
+            disabled={disabled || selectableCount === 0}
+            onClick={onToggleSelectionMode}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#181411] hover:border-[#b8864d]/60 text-xs font-medium text-black/75 dark:text-stone-300 hover:text-black dark:hover:text-stone-100 transition disabled:opacity-40 cursor-pointer"
+            title={t('bulkExport.export') || 'Export'}
+          >
+            <Download size={14} className="text-[#b8864d]" />
+            <span>{t('bulkExport.export') || 'Export'}</span>
+          </button>
+        )}
       </div>
     );
   }
@@ -99,6 +114,30 @@ export const BulkSelectionToolbar: React.FC<BulkSelectionToolbarProps> = ({
             {t('bulkDelete.deselectAll') || 'Deselect all'}
           </button>
         )}
+
+        {/* Bulk Export action placed right next to deselect all */}
+        {onExportSelected && (
+          <button
+            type="button"
+            disabled={disabled || selectedCount === 0}
+            onClick={onExportSelected}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-[#b8864d]/40 bg-[#b8864d]/15 hover:bg-[#b8864d]/25 text-[#b8864d] font-semibold transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title={
+              selectedCount > 0
+                ? t('bulkExport.exportSelected', { count: selectedCount }) ||
+                  `Export (${selectedCount})`
+                : t('bulkExport.export') || 'Export'
+            }
+          >
+            <Download size={13} />
+            <span>
+              {selectedCount > 0
+                ? t('bulkExport.exportSelected', { count: selectedCount }) ||
+                  `Export (${selectedCount})`
+                : t('bulkExport.export') || 'Export'}
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -142,4 +181,3 @@ export const BulkSelectionToolbar: React.FC<BulkSelectionToolbarProps> = ({
 };
 
 export default BulkSelectionToolbar;
-

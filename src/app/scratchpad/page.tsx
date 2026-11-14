@@ -40,6 +40,7 @@ import { useBulkSelection } from '@/lib/hooks/useBulkSelection';
 import { BulkSelectionToolbar } from '@/components/BulkDelete/BulkSelectionToolbar';
 import { DeleteConfirmDialog } from '@/components/BulkDelete/DeleteConfirmDialog';
 import { SelectionCheckbox } from '@/components/BulkDelete/SelectionCheckbox';
+import { BulkExportDialog } from '@/components/BulkExport/BulkExportDialog';
 import { executeBulkDelete } from '@/lib/utils/bulkDeleteClient';
 
 interface ScratchpadListItem {
@@ -75,6 +76,7 @@ const ScratchpadListPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [bulkConfirmMode, setBulkConfirmMode] = useState<'selected' | 'all' | null>(null);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [isBulkExportOpen, setIsBulkExportOpen] = useState(false);
 
   // Multi-user & auth state
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -426,6 +428,7 @@ const ScratchpadListPage = () => {
             onDeselectAll={deselectAll}
             onDeleteSelected={() => setBulkConfirmMode('selected')}
             onDeleteAll={() => setBulkConfirmMode('all')}
+            onExportSelected={() => setIsBulkExportOpen(true)}
             disabled={isBulkDeleting}
             className="mb-4"
           />
@@ -677,6 +680,14 @@ const ScratchpadListPage = () => {
           t('bulkDelete.confirmDescScratchpad') ||
           'Selected scratchpad notes, version histories, and linked note chats will be permanently removed.'
         }
+      />
+
+      <BulkExportDialog
+        isOpen={isBulkExportOpen}
+        onClose={() => setIsBulkExportOpen(false)}
+        selectedCount={selectedCount}
+        itemType="notes"
+        selectedIds={selectedIdsList}
       />
 
       <LoginDialog
