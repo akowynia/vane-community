@@ -1,6 +1,13 @@
 import db from '@/lib/db';
 import { chats, messages } from '@/lib/db/schema';
 import { and, eq, gte } from 'drizzle-orm';
+import { NextRequest } from 'next/server';
+import { resolveRequestUser } from '@/lib/security/rbac';
+import {
+  canDeleteOwnedEntity,
+  requireDeleteActor,
+} from '@/lib/security/bulkDelete';
+import configManager from '@/lib/config';
 
 export const DELETE = async (
   req: Request,
@@ -8,6 +15,31 @@ export const DELETE = async (
 ) => {
   try {
     const { id, messageId } = await params;
+
+    const chatExists = await db.query.chats.findFirst({
+      where: eq(chats.id, id),
+    });
+
+    if (!chatExists) {
+      return Response.json({ message: 'Chat not found' }, { status: 404 });
+    }
+
+    const user = await resolveRequestUser(req as NextRequest);
+    const instanceMode = configManager.getConfig('instanceMode', 'single');
+    const authError = requireDeleteActor(user, instanceMode);
+    if (authError) {
+      return authError;
+    }
+
+    if (
+      !canDeleteOwnedEntity({
+        user,
+        instanceMode,
+        ownerUserId: chatExists.userId,
+      })
+    ) {
+      return Response.json({ message: 'Forbidden' }, { status: 403 });
+    }
 
     const targetMessage = await db.query.messages.findFirst({
       where: and(eq(messages.chatId, id), eq(messages.messageId, messageId)),
@@ -18,21 +50,23 @@ export const DELETE = async (
     }
 
     // Delete this message and any later messages in this thread
-    await db
-      .delete(messages)
-      .where(
-        and(eq(messages.chatId, id), gte(messages.id, targetMessage.id)),
-      )
-      .execute();
+    db.transaction((tx) => {
+      tx.delete(messages)
+        .where(
+          and(eq(messages.chatId, id), gte(messages.id, targetMessage.id)),
+        )
+        .run();
 
-    // If the chat no longer has any messages, delete the chat record as well
-    const remainingMessages = await db.query.messages.findMany({
-      where: eq(messages.chatId, id),
+      const remainingMessages = tx
+        .select({ id: messages.id })
+        .from(messages)
+        .where(eq(messages.chatId, id))
+        .all();
+
+      if (remainingMessages.length === 0) {
+        tx.delete(chats).where(eq(chats.id, id)).run();
+      }
     });
-
-    if (remainingMessages.length === 0) {
-      await db.delete(chats).where(eq(chats.id, id)).execute();
-    }
 
     return Response.json(
       { message: 'Message deleted successfully' },

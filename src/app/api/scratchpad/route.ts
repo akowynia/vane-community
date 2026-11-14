@@ -2,9 +2,15 @@ export const dynamic = 'force-dynamic';
 
 import db, { ensureScratchpadTables } from '@/lib/db';
 import { scratchpads, scratchpadVersions, scratchpadMessages, scratchpadTemplates } from '@/lib/db/schema';
-import { eq, or, isNull, desc, like } from 'drizzle-orm';
+import { eq, or, isNull, desc, like, inArray } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { resolveRequestUser } from '@/lib/security/rbac';
+import {
+  canDeleteOwnedEntity,
+  chunkIds,
+  parseBulkDeleteIds,
+  requireDeleteActor,
+} from '@/lib/security/bulkDelete';
 import configManager from '@/lib/config';
 import { z } from 'zod';
 import crypto from 'crypto';
@@ -252,6 +258,98 @@ export const POST = async (req: Request) => {
     console.error('Error creating scratchpad:', err);
     return Response.json(
       { message: err?.message || 'Failed to create a new scratchpad.' },
+      { status: 500 },
+    );
+  }
+};
+
+export const DELETE = async (req: Request) => {
+  try {
+    ensureScratchpadTables();
+    const user = await resolveRequestUser(req as NextRequest);
+    const instanceMode = configManager.getConfig('instanceMode', 'single');
+
+    const authError = requireDeleteActor(user, instanceMode);
+    if (authError) {
+      return authError;
+    }
+
+    const parsed = await parseBulkDeleteIds(req);
+    if ('errorResponse' in parsed) {
+      return parsed.errorResponse;
+    }
+
+    const { ids } = parsed;
+    const existingItems: { id: string; userId: string | null }[] = [];
+
+    for (const chunk of chunkIds(ids)) {
+      const rows = await db.query.scratchpads.findMany({
+        where: inArray(scratchpads.id, chunk),
+        columns: {
+          id: true,
+          userId: true,
+        },
+      });
+      existingItems.push(...rows);
+    }
+
+    if (existingItems.length === 0) {
+      return Response.json(
+        { message: 'No matching scratchpads found.', deletedIds: [], deletedCount: 0 },
+        { status: 404 },
+      );
+    }
+
+    const deletableIds = existingItems
+      .filter((item) =>
+        canDeleteOwnedEntity({
+          user,
+          instanceMode,
+          ownerUserId: item.userId,
+        }),
+      )
+      .map((item) => item.id);
+
+    if (deletableIds.length === 0) {
+      return Response.json(
+        {
+          message: 'You do not have permission to delete the selected scratchpads.',
+          deletedIds: [],
+          deletedCount: 0,
+        },
+        { status: 403 },
+      );
+    }
+
+    db.transaction((tx) => {
+      for (const chunk of chunkIds(deletableIds)) {
+        tx.delete(scratchpadVersions)
+          .where(inArray(scratchpadVersions.scratchpadId, chunk))
+          .run();
+        tx.delete(scratchpadMessages)
+          .where(inArray(scratchpadMessages.scratchpadId, chunk))
+          .run();
+        tx.delete(scratchpads).where(inArray(scratchpads.id, chunk)).run();
+      }
+    });
+
+    const deletedSet = new Set(deletableIds);
+    const skippedIds = ids.filter((id) => !deletedSet.has(id));
+
+    return Response.json(
+      {
+        success: true,
+        message: 'Scratchpads deleted successfully.',
+        deletedIds: deletableIds,
+        skippedIds,
+        deletedCount: deletableIds.length,
+      },
+      { status: 200 },
+    );
+  } catch (err: any) {
+    console.error('Error bulk deleting scratchpads:', err);
+    return Response.json(
+      { message: err?.message || 'Failed to delete scratchpads.' },
       { status: 500 },
     );
   }

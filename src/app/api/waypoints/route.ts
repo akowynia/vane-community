@@ -2,9 +2,15 @@ export const dynamic = 'force-dynamic';
 
 import db, { ensureWaypointsTable } from '@/lib/db';
 import { waypoints, chats } from '@/lib/db/schema';
-import { eq, or, isNull, desc } from 'drizzle-orm';
+import { eq, or, isNull, desc, inArray } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { resolveRequestUser } from '@/lib/security/rbac';
+import {
+  canDeleteOwnedEntity,
+  chunkIds,
+  parseBulkDeleteIds,
+  requireDeleteActor,
+} from '@/lib/security/bulkDelete';
 import configManager from '@/lib/config';
 import { z } from 'zod';
 import crypto from 'crypto';
@@ -164,6 +170,95 @@ export const POST = async (req: Request) => {
     console.error('Error creating waypoint:', err);
     return Response.json(
       { message: err?.message || 'Failed to create the waypoint.' },
+      { status: 500 },
+    );
+  }
+};
+
+export const DELETE = async (req: Request) => {
+  try {
+    ensureWaypointsTable();
+    const user = await resolveRequestUser(req as NextRequest);
+    const instanceMode = configManager.getConfig('instanceMode', 'single');
+
+    const authError = requireDeleteActor(user, instanceMode);
+    if (authError) {
+      return authError;
+    }
+
+    const parsed = await parseBulkDeleteIds(req);
+    if ('errorResponse' in parsed) {
+      return parsed.errorResponse;
+    }
+
+    const { ids } = parsed;
+    const existingWaypoints: { id: string; userId: string | null }[] = [];
+
+    for (const chunk of chunkIds(ids)) {
+      const rows = await db.query.waypoints.findMany({
+        where: inArray(waypoints.id, chunk),
+        columns: {
+          id: true,
+          userId: true,
+        },
+      });
+      existingWaypoints.push(...rows);
+    }
+
+    if (existingWaypoints.length === 0) {
+      return Response.json(
+        { message: 'No matching waypoints found.', deletedIds: [], deletedCount: 0 },
+        { status: 404 },
+      );
+    }
+
+    const deletableIds = existingWaypoints
+      .filter((wp) =>
+        canDeleteOwnedEntity({
+          user,
+          instanceMode,
+          ownerUserId: wp.userId,
+        }),
+      )
+      .map((wp) => wp.id);
+
+    if (deletableIds.length === 0) {
+      return Response.json(
+        {
+          message: 'You do not have permission to delete the selected waypoints.',
+          deletedIds: [],
+          deletedCount: 0,
+        },
+        { status: 403 },
+      );
+    }
+
+    db.transaction((tx) => {
+      for (const chunk of chunkIds(deletableIds)) {
+        tx.update(chats)
+          .set({ waypointId: null })
+          .where(inArray(chats.waypointId, chunk))
+          .run();
+        tx.delete(waypoints).where(inArray(waypoints.id, chunk)).run();
+      }
+    });
+
+    const deletedSet = new Set(deletableIds);
+    const skippedIds = ids.filter((id) => !deletedSet.has(id));
+
+    return Response.json(
+      {
+        message: 'Waypoints deleted successfully.',
+        deletedIds: deletableIds,
+        skippedIds,
+        deletedCount: deletableIds.length,
+      },
+      { status: 200 },
+    );
+  } catch (err: any) {
+    console.error('Error bulk deleting waypoints:', err);
+    return Response.json(
+      { message: err?.message || 'Failed to delete waypoints.' },
       { status: 500 },
     );
   }
