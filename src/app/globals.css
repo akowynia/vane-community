@@ -493,3 +493,12 @@ html[data-theme='synthwave'] [class*="text-[#f3d5ab]"],
 html[data-theme='matrix'] [class*="text-[#f3d5ab]"] {
   color: rgb(var(--color-accent-primary)) !important;
 }
+
+/* Fail-safe: prevent orphaned Mermaid error SVGs and temporary measurement nodes from leaking into body */
+body > [id^="dmermaid"],
+body > [id^="mermaid"],
+body > #error-svg,
+body > svg[id*="mermaid"] {
+  display: none !important;
+}
+

@@ -9,6 +9,42 @@ interface MermaidBlockProps {
   chart: string;
 }
 
+const cleanupStrayMermaidElements = (diagramId?: string) => {
+  if (typeof document === 'undefined') return;
+  try {
+    const selectors = [
+      '#error-svg',
+      '[id^="dmermaid"]',
+      diagramId ? `[id*="${diagramId}"]` : null,
+    ].filter(Boolean) as string[];
+
+    const stray = document.querySelectorAll(selectors.join(', '));
+    stray.forEach((el) => {
+      if (
+        el.parentElement === document.body ||
+        el.closest?.('body > [id^="dmermaid"]') ||
+        el.closest?.('body > #error-svg')
+      ) {
+        el.remove();
+      }
+    });
+
+    // Remove any direct child in document.body injected by Mermaid error handling
+    document.body.querySelectorAll(':scope > svg, :scope > div').forEach((el) => {
+      if (
+        el.id?.startsWith('dmermaid') ||
+        el.id?.startsWith('mermaid-') ||
+        el.id === 'error-svg' ||
+        el.textContent?.includes('Syntax error in text')
+      ) {
+        el.remove();
+      }
+    });
+  } catch (err) {
+    console.warn('[MermaidBlock] Error cleaning up stray DOM elements:', err);
+  }
+};
+
 const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
   const { resolvedTheme } = useTheme();
   const rawId = useId();
@@ -32,8 +68,8 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
     cleaned = cleaned.trim();
 
     // Auto-repair common LLM Mermaid syntax issues
-    // 1. Replace non-breaking hyphens (U+2011) with standard hyphens
-    cleaned = cleaned.replace(/\u2011/g, '-');
+    // 1. Replace non-breaking spaces and hyphens with standard characters
+    cleaned = cleaned.replace(/\u00A0/g, ' ').replace(/\u2011/g, '-');
 
     // 2. Quote unquoted subgraph titles: subgraph ID[Title] -> subgraph ID["Title"]
     cleaned = cleaned.replace(
@@ -42,29 +78,84 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
         const trimmed = label.trim();
         return trimmed.startsWith('"') && trimmed.endsWith('"')
           ? match
-          : `${id}["${trimmed}"]`;
+          : `${id}["${trimmed.replace(/"/g, "'")}"]`;
       },
     );
 
-    // 3. Quote unquoted node labels in [...] containing parentheses, slashes, backslashes, colons or dashes
+    // 3. Subroutine shapes [[...]] containing special characters
     cleaned = cleaned.replace(
-      /(\b[a-zA-Z0-9_-]+)\[([^"\]\r\n]*[\(\)\/\\–—][^"\]\r\n]*)\]/g,
+      /(\b[a-zA-Z0-9_-]+)\[\[([^"\[\]\r\n]*[\(\)\/\\:–—\?,&%@][^"\[\]\r\n]*)\]\]/g,
       (match, id, label) => {
         const trimmed = label.trim();
         return trimmed.startsWith('"') && trimmed.endsWith('"')
           ? match
-          : `${id}["${trimmed}"]`;
+          : `${id}[["${trimmed.replace(/"/g, "'")}"]]`;
       },
     );
 
-    // 4. Quote unquoted node labels in {...} containing parentheses, question marks, slashes, or dashes
+    // 4. Stadium shapes ([...]) containing special characters
     cleaned = cleaned.replace(
-      /(\b[a-zA-Z0-9_-]+)\{([^"\}\r\n]*[\(\)\/\\–—\?][^"\}\r\n]*)\}/g,
+      /(\b[a-zA-Z0-9_-]+)\(\[([^"\[\]\(\)\r\n]*[\/\\:–—\?,&%@][^"\[\]\(\)\r\n]*)\]\)/g,
       (match, id, label) => {
         const trimmed = label.trim();
         return trimmed.startsWith('"') && trimmed.endsWith('"')
           ? match
-          : `${id}{"${trimmed}"}`;
+          : `${id}(["${trimmed.replace(/"/g, "'")}"])`;
+      },
+    );
+
+    // 5. Cylinder shapes [(...)] containing special characters
+    cleaned = cleaned.replace(
+      /(\b[a-zA-Z0-9_-]+)\[\(([^"\[\]\(\)\r\n]*[\/\\:–—\?,&%@][^"\[\]\(\)\r\n]*)\)\]/g,
+      (match, id, label) => {
+        const trimmed = label.trim();
+        return trimmed.startsWith('"') && trimmed.endsWith('"')
+          ? match
+          : `${id}[("${trimmed.replace(/"/g, "'")}")]`;
+      },
+    );
+
+    // 6. Circle shapes ((...)) containing special characters
+    cleaned = cleaned.replace(
+      /(\b[a-zA-Z0-9_-]+)\(\(([^"\(\)\r\n]*[\/\\:–—\?,&%@][^"\(\)\r\n]*)\)\)/g,
+      (match, id, label) => {
+        const trimmed = label.trim();
+        return trimmed.startsWith('"') && trimmed.endsWith('"')
+          ? match
+          : `${id}(("${trimmed.replace(/"/g, "'")}"))`;
+      },
+    );
+
+    // 7. Node labels in [...] containing parentheses, colons, slashes, backslashes, dashes, question marks, commas
+    cleaned = cleaned.replace(
+      /(\b[a-zA-Z0-9_-]+)\[([^"\[\]\r\n]*[\(\)\/\\:–—\?,&%@][^"\[\]\r\n]*)\]/g,
+      (match, id, label) => {
+        const trimmed = label.trim();
+        return trimmed.startsWith('"') && trimmed.endsWith('"')
+          ? match
+          : `${id}["${trimmed.replace(/"/g, "'")}"]`;
+      },
+    );
+
+    // 8. Node labels in {...} containing special characters
+    cleaned = cleaned.replace(
+      /(\b[a-zA-Z0-9_-]+)\{([^"\{\}\r\n]*[\(\)\/\\:–—\?,&%@][^"\{\}\r\n]*)\}/g,
+      (match, id, label) => {
+        const trimmed = label.trim();
+        return trimmed.startsWith('"') && trimmed.endsWith('"')
+          ? match
+          : `${id}{"${trimmed.replace(/"/g, "'")}"}`;
+      },
+    );
+
+    // 9. Edge labels containing special characters: -->|label with info| -> -->|"label with info"|
+    cleaned = cleaned.replace(
+      /(-->|---\>|==>|-.->|\.->)\|([^"\|\r\n]*[\(\)\/\\:–—\?,&%@][^"\|\r\n]*)\|/g,
+      (match, arrow, label) => {
+        const trimmed = label.trim();
+        return trimmed.startsWith('"') && trimmed.endsWith('"')
+          ? match
+          : `${arrow}|"${trimmed.replace(/"/g, "'")}"|`;
       },
     );
 
@@ -73,15 +164,19 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
 
   useEffect(() => {
     let isMounted = true;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    if (!cleanChart) {
+      setIsLoading(false);
+      setSvg('');
+      setError(null);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
-    const renderDiagram = async () => {
-      if (!cleanChart) {
-        setIsLoading(false);
-        return;
-      }
-
+    const executeRender = async () => {
       try {
         const mermaidModule = await import('mermaid');
         const mermaid = mermaidModule.default;
@@ -89,17 +184,46 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
         mermaid.initialize({
           startOnLoad: false,
           theme: isThemeDark(resolvedTheme) ? 'dark' : 'default',
-          securityLevel: 'loose',
+          securityLevel: 'strict',
           fontFamily: 'inherit',
           suppressErrorRendering: true,
         });
 
-        // Use unique container ID to avoid colliding with other diagrams
-        const uniqueRenderId = `${cleanId}-${Date.now()}`;
+        // 1. In-memory syntax validation without DOM side effects
+        let isValid = false;
+        try {
+          const parseResult = await mermaid.parse(cleanChart, {
+            suppressErrors: true,
+          });
+          isValid = Boolean(parseResult);
+        } catch {
+          isValid = false;
+        }
+
+        if (!isValid) {
+          if (isMounted) {
+            cleanupStrayMermaidElements(cleanId);
+            setError('Diagram syntax is incomplete or invalid');
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        // 2. Perform DOM render with an isolated unique identifier
+        const uniqueRenderId = `${cleanId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         const { svg: renderedSvg } = await mermaid.render(
           uniqueRenderId,
           cleanChart,
         );
+
+        if (
+          !renderedSvg ||
+          renderedSvg.includes('Syntax error in text') ||
+          renderedSvg.includes('id="error-svg"') ||
+          renderedSvg.includes('class="error-icon"')
+        ) {
+          throw new Error('Mermaid returned syntax error SVG');
+        }
 
         if (isMounted) {
           setSvg(renderedSvg);
@@ -107,27 +231,27 @@ const MermaidBlock: React.FC<MermaidBlockProps> = ({ chart }) => {
           setIsLoading(false);
         }
       } catch (err: any) {
+        console.warn('[MermaidBlock] Failed to render mermaid chart:', err);
         if (isMounted) {
-          try {
-            const stray = document.querySelectorAll(`[id*="${cleanId}"]`);
-            stray.forEach((el) => {
-              if (el.parentElement === document.body) {
-                el.remove();
-              }
-            });
-          } catch {}
-
-          console.warn('[MermaidBlock] Failed to render mermaid chart:', err);
           setError(err?.message || 'Failed to render Mermaid diagram');
           setIsLoading(false);
         }
+      } finally {
+        cleanupStrayMermaidElements(cleanId);
       }
     };
 
-    renderDiagram();
+    // Debounce rendering to avoid concurrent race conditions during LLM streaming
+    debounceTimer = setTimeout(() => {
+      executeRender();
+    }, 250);
 
     return () => {
       isMounted = false;
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+      cleanupStrayMermaidElements(cleanId);
     };
   }, [cleanChart, cleanId, resolvedTheme]);
 

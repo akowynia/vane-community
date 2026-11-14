@@ -232,21 +232,38 @@ export const convertMarkdownToPrintHtml = async (
     if (lang === 'mermaid') {
       let renderedSvg = '';
       if (typeof window !== 'undefined' && code) {
+        const renderId = `print-mermaid-${idx}-${Date.now()}`;
         try {
           const mermaidModule = await import('mermaid');
           const mermaid = mermaidModule.default;
           mermaid.initialize({
             startOnLoad: false,
             theme: 'default',
-            securityLevel: 'loose',
+            securityLevel: 'strict',
             fontFamily: 'inherit',
+            suppressErrorRendering: true,
           });
-          const renderId = `print-mermaid-${idx}-${Date.now()}`;
-          const renderResult = await mermaid.render(renderId, code);
-          renderedSvg = renderResult.svg;
+          const isValid = await mermaid.parse(code, { suppressErrors: true });
+          if (isValid) {
+            const renderResult = await mermaid.render(renderId, code);
+            if (
+              renderResult.svg &&
+              !renderResult.svg.includes('Syntax error in text')
+            ) {
+              renderedSvg = renderResult.svg;
+            }
+          }
         } catch {
           // Graceful fallback on mermaid syntax failure
           renderedSvg = '';
+        } finally {
+          try {
+            document
+              .querySelectorAll(`#error-svg, #d${renderId}, [id^="dprint-mermaid"]`)
+              .forEach((el) => {
+                if (el.parentElement === document.body) el.remove();
+              });
+          } catch {}
         }
       }
 
