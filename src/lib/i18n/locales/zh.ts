@@ -1143,6 +1143,11 @@ export const zh: Translations = {
     searchQueryPlaceholder: '搜索问题 / 主题...',
     queryPagination: '第 {current} 个查询，共 {total} 个',
     applyQueryEditToFull: '更改会自动同步到汇总文档',
+    clearConversation: '清空对话',
+    clearConversationConfirmTitle: '清空对话记录？',
+    clearConversationConfirmDesc: '这将永久删除此便签中的所有聊天消息。便签内容与版本历史记录不受影响。',
+    clearConversationSuccess: '对话记录已成功清空。',
+    clearConversationError: '清空对话记录失败。',
   },
   presentation: {
     newPresentation: '新建演示文稿',

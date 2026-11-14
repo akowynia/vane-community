@@ -1143,6 +1143,11 @@ export const ru: Translations = {
     searchQueryPlaceholder: 'Поиск вопросов / тем...',
     queryPagination: 'Запрос {current} из {total}',
     applyQueryEditToFull: 'Изменения автоматически синхронизируются с документом',
+    clearConversation: 'Очистить беседу',
+    clearConversationConfirmTitle: 'Очистить историю беседы?',
+    clearConversationConfirmDesc: 'Все сообщения чата в этой заметке будут удалены безвозвратно. Содержимое заметки и история версий останутся без изменений.',
+    clearConversationSuccess: 'История беседы успешно очищена.',
+    clearConversationError: 'Не удалось очистить историю беседы.',
   },
   presentation: {
     newPresentation: 'Новая презентация',

@@ -1143,6 +1143,11 @@ export const it: Translations = {
     searchQueryPlaceholder: 'Cerca domande / argomenti...',
     queryPagination: 'Query {current} di {total}',
     applyQueryEditToFull: 'Le modifiche si sincronizzano automaticamente con il documento',
+    clearConversation: 'Cancella conversazione',
+    clearConversationConfirmTitle: 'Cancellare la cronologia della conversazione?',
+    clearConversationConfirmDesc: 'Tutti i messaggi di chat in questa nota verranno eliminati definitivamente. Il contenuto della nota e la cronologia delle versioni non saranno modificati.',
+    clearConversationSuccess: 'Cronologia della conversazione cancellata con successo.',
+    clearConversationError: 'Impossibile cancellare la cronologia della conversazione.',
   },
   presentation: {
     newPresentation: 'Nuova presentazione',

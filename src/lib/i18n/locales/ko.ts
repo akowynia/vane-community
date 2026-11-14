@@ -1143,6 +1143,11 @@ export const ko: Translations = {
     searchQueryPlaceholder: '질문 / 주제 검색...',
     queryPagination: '질문 {current} / {total}',
     applyQueryEditToFull: '변경 사항이 전체 문서에 자동으로 동기화됩니다',
+    clearConversation: '대화 지우기',
+    clearConversationConfirmTitle: '대화 기록을 지우시겠습니까?',
+    clearConversationConfirmDesc: '이 메모의 모든 채팅 메시지가 영구적으로 삭제됩니다. 메모 내용과 버전 기록에는 영향을 주지 않습니다.',
+    clearConversationSuccess: '대화 기록이 성공적으로 삭제되었습니다.',
+    clearConversationError: '대화 기록을 지우지 못했습니다.',
   },
   presentation: {
     newPresentation: '새 프레젠테이션',

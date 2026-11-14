@@ -111,9 +111,10 @@ export const scratchpadTemplates = sqliteTable('scratchpad_templates', {
 6. `GET /api/scratchpad/[id]/versions` – fetch the list of all versions of the note.
 7. `POST /api/scratchpad/[id]/versions/[versionId]/revert` – restore the document to the indicated version.
 8. `POST /api/scratchpad/[id]/chat` – the streaming AI assistant that performs web research, drafts the note, and applies selective edits.
-9. `GET /api/scratchpad/templates` – fetch the list of built-in and user templates.
-10. `POST /api/scratchpad/templates` – save a new user template.
-11. `PUT / DELETE /api/scratchpad/templates/[id]` – modify or delete a user's own template.
+9. `DELETE /api/scratchpad/[id]/chat` – atomically clear all chat messages in the scratchpad conversation while preserving note content and versions.
+10. `GET /api/scratchpad/templates` – fetch the list of built-in and user templates.
+11. `POST /api/scratchpad/templates` – save a new user template.
+12. `PUT / DELETE /api/scratchpad/templates/[id]` – modify or delete a user's own template.
 
 ---
 
@@ -260,4 +261,20 @@ export const scratchpadTemplates = sqliteTable('scratchpad_templates', {
         - Clicking a heading or "Ask AI about section" in the dynamic Table of Contents immediately switches the workspace to that query in Query Studio, setting it as active chat context.
       - **Multi-language Support**:
         - All Query Studio labels, switchers, search placeholders, and telemetry badges are fully internationalized across all 12 supported languages.
+
+18. **Conversation Clearing in Scratchpad Copilot**:
+    - **Purpose & User Control**:
+      - Provides users with the ability to clear their conversation history with the AI Copilot inside a scratchpad workspace without losing document text, version history, or active templates.
+    - **UI/UX & Dedicated Header**:
+      - Integrated an ergonomic header bar at the top of the AI Copilot pane featuring the assistant badge, current message count indicator, and a clear conversation action.
+      - The clear action is disabled when no messages exist, preventing redundant operations.
+    - **Accidental Deletion Prevention**:
+      - Triggering the action displays an accessible confirmation dialog explaining that chat messages will be cleared while the note content and version history remain intact.
+    - **Generation Concurrency Safety**:
+      - The clear action is blocked while the assistant is actively streaming tokens (`loading === true`), protecting against race conditions and concurrent stream writes.
+    - **Security & Authorization**:
+      - Protected by role-based access control (RBAC). In multi-user setups, non-admin users can only clear conversations belonging to their own notes.
+      - Message deletion executes inside an atomic database transaction.
+    - **Multi-language Support**:
+      - All button labels, confirmation titles, descriptions, and toast notifications are localized across all 12 supported languages.
 

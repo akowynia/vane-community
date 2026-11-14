@@ -1148,6 +1148,11 @@ export interface Translations {
     searchQueryPlaceholder?: string;
     queryPagination?: string;
     applyQueryEditToFull?: string;
+    clearConversation?: string;
+    clearConversationConfirmTitle?: string;
+    clearConversationConfirmDesc?: string;
+    clearConversationSuccess?: string;
+    clearConversationError?: string;
   };
   presentation?: {
     newPresentation?: string;

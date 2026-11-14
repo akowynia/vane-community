@@ -1143,6 +1143,11 @@ export const pt: Translations = {
     searchQueryPlaceholder: 'Pesquisar perguntas / tópicos...',
     queryPagination: 'Consulta {current} de {total}',
     applyQueryEditToFull: 'As alterações sincronizam automaticamente com o documento',
+    clearConversation: 'Limpar conversa',
+    clearConversationConfirmTitle: 'Limpar histórico de conversa?',
+    clearConversationConfirmDesc: 'Isso removerá permanentemente todas as mensagens de chat desta nota. O conteúdo e o histórico de versões não serão afetados.',
+    clearConversationSuccess: 'Histórico de conversa limpo com sucesso.',
+    clearConversationError: 'Falha ao limpar o histórico de conversa.',
   },
   presentation: {
     newPresentation: 'Nova apresentação',

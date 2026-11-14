@@ -601,6 +601,48 @@ const ScratchpadWorkspacePage = () => {
     }
   };
 
+  const [isClearingChat, setIsClearingChat] = useState(false);
+
+  const handleClearChat = async () => {
+    if (isClearingChat) return;
+    setIsClearingChat(true);
+
+    try {
+      if (isAiGenerating && abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        setIsAiGenerating(false);
+      }
+
+      const res = await fetch(`/api/scratchpad/${id}/chat`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(
+          data.message ||
+            t('scratchpad.clearConversationError') ||
+            'Failed to clear conversation history.',
+        );
+      }
+
+      setMessages([]);
+      toast.success(
+        t('scratchpad.clearConversationSuccess') ||
+          'Conversation history cleared successfully.',
+      );
+    } catch (err: any) {
+      console.error('Failed to clear scratchpad chat history:', err);
+      toast.error(
+        err?.message ||
+          t('scratchpad.clearConversationError') ||
+          'Failed to clear conversation history.',
+      );
+    } finally {
+      setIsClearingChat(false);
+    }
+  };
+
   const handleRevertVersion = async (version: ScratchpadVersion) => {
     try {
       const res = await fetch(`/api/scratchpad/${id}/versions/${version.id}/revert`, {
@@ -798,6 +840,8 @@ const ScratchpadWorkspacePage = () => {
             isPresentation={sketchType === 'presentation'}
             onAcceptPlan={handleAcceptPlan}
             activeQueryScope={activeQueryScope}
+            onClearChat={handleClearChat}
+            isClearingChat={isClearingChat}
             onSelectQueryScope={(idx) => {
               if (idx === null) {
                 setBatchViewMode('full');

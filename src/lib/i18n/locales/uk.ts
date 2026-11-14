@@ -1143,6 +1143,11 @@ export const uk: Translations = {
     searchQueryPlaceholder: 'Пошук питань / тем...',
     queryPagination: 'Запит {current} з {total}',
     applyQueryEditToFull: 'Зміни автоматично синхронізуються з документом',
+    clearConversation: 'Очистити бесіду',
+    clearConversationConfirmTitle: 'Очистити історію бесіди?',
+    clearConversationConfirmDesc: 'Усі повідомлення чату в цій нотатці будуть назавжди видалені. Вміст нотатки та історія версій залишаться без змін.',
+    clearConversationSuccess: 'Історію бесіди успішно очищено.',
+    clearConversationError: 'Не вдалося очистити історію бесіди.',
   },
   presentation: {
     newPresentation: 'Нова презентація',

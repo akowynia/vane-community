@@ -1143,6 +1143,11 @@ export const ja: Translations = {
     searchQueryPlaceholder: '質問・トピックを検索...',
     queryPagination: 'クエリ {current} / {total}',
     applyQueryEditToFull: '変更はドキュメント全体に自動的に同期されます',
+    clearConversation: '会話をクリア',
+    clearConversationConfirmTitle: '会話履歴をクリアしますか？',
+    clearConversationConfirmDesc: 'このノート内のすべてのチャットメッセージが完全に削除されます。ノートの内容とバージョン履歴には影響しません。',
+    clearConversationSuccess: '会話履歴が正常にクリアされました。',
+    clearConversationError: '会話履歴のクリアに失敗しました。',
   },
   presentation: {
     newPresentation: '新規プレゼンテーション',

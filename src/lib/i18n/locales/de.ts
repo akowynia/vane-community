@@ -1143,6 +1143,11 @@ export const de: Translations = {
     searchQueryPlaceholder: 'Fragen / Themen suchen...',
     queryPagination: 'Frage {current} von {total}',
     applyQueryEditToFull: 'Änderungen werden automatisch mit dem Dokument synchronisiert',
+    clearConversation: 'Unterhaltung leeren',
+    clearConversationConfirmTitle: 'Unterhaltungsverlauf leeren?',
+    clearConversationConfirmDesc: 'Dadurch werden alle Chat-Nachrichten in dieser Notiz dauerhaft gelöscht. Der Notizinhalt und der Versionsverlauf bleiben unberührt.',
+    clearConversationSuccess: 'Unterhaltungsverlauf erfolgreich gelöscht.',
+    clearConversationError: 'Fehler beim Löschen des Unterhaltungsverlaufs.',
   },
   presentation: {
     newPresentation: 'Neue Präsentation',

@@ -1361,3 +1361,50 @@ ${waypointInstructions}`
     );
   }
 };
+
+export const DELETE = async (
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) => {
+  try {
+    ensureScratchpadTables();
+    const { id } = await params;
+    const user = await resolveRequestUser(req as NextRequest);
+    const instanceMode = configManager.getConfig('instanceMode', 'single');
+
+    const sketch = await db.query.scratchpads.findFirst({
+      where: eq(scratchpads.id, id),
+    });
+
+    if (!sketch) {
+      return Response.json({ message: 'Scratchpad not found.' }, { status: 404 });
+    }
+
+    if (instanceMode === 'multi') {
+      if (!user) {
+        return Response.json({ message: 'Login required.' }, { status: 401 });
+      }
+      if (user.role !== 'admin' && sketch.userId && sketch.userId !== user.id) {
+        return Response.json(
+          { message: 'You do not have permission to modify this scratchpad.' },
+          { status: 403 },
+        );
+      }
+    }
+
+    db.transaction((tx) => {
+      tx.delete(scratchpadMessages).where(eq(scratchpadMessages.scratchpadId, id)).run();
+    });
+
+    return Response.json({
+      success: true,
+      message: 'Scratchpad chat history cleared successfully.',
+    });
+  } catch (err: any) {
+    console.error('Error clearing scratchpad chat:', err);
+    return Response.json(
+      { message: err?.message || 'Failed to clear chat history.' },
+      { status: 500 },
+    );
+  }
+};

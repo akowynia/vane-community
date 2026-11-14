@@ -1143,6 +1143,11 @@ export const pl: Translations = {
     searchQueryPlaceholder: 'Szukaj pytań / tematów...',
     queryPagination: 'Pytanie {current} z {total}',
     applyQueryEditToFull: 'Zmiany są automatycznie scalane z całym dokumentem',
+    clearConversation: 'Wyczyść rozmowę',
+    clearConversationConfirmTitle: 'Wyczyścić historię rozmowy?',
+    clearConversationConfirmDesc: 'Wszystkie wiadomości na czacie w tej notatce zostaną trwale usunięte. Treść notatki oraz historia wersji pozostaną nienaruszone.',
+    clearConversationSuccess: 'Historia rozmowy została pomyślnie wyczyszczona.',
+    clearConversationError: 'Nie udało się wyczyścić historii rozmowy.',
   },
   presentation: {
     newPresentation: 'Nowa prezentacja',
