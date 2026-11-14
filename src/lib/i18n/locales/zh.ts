@@ -12,6 +12,7 @@ export const zh: Translations = {
     search: '搜索',
     back: '返回',
     close: '关闭',
+    undo: '撤销',
     version: '版本',
     basedOnVane: '基于 Vane v{version}',
     error: '错误',
@@ -1349,6 +1350,9 @@ export const zh: Translations = {
     regenerateQuery: '重新生成',
     regenerateNote: '重新生成',
     newBatchSearch: '新建批量搜索',
+    hideFloating: '隐藏悬浮状态栏',
+    showFloating: '显示悬浮状态栏',
+    floatingHiddenToast: '批量搜索状态面板已隐藏',
   },
   mcp: {
     nameRequired: '服务器名称为必填项',

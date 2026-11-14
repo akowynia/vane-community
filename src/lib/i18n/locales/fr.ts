@@ -12,6 +12,7 @@ export const fr: Translations = {
     search: 'Rechercher',
     back: 'Retour',
     close: 'Fermer',
+    undo: 'Annuler',
     version: 'Version',
     basedOnVane: 'Basé sur Vane v{version}',
     error: 'Erreur',
@@ -1349,6 +1350,9 @@ export const fr: Translations = {
     regenerateQuery: 'Régénérer',
     regenerateNote: 'Régénérer',
     newBatchSearch: 'Nouvelle recherche par lots',
+    hideFloating: 'Masquer le statut flottant',
+    showFloating: 'Afficher le statut flottant',
+    floatingHiddenToast: 'Panneau de statut de recherche par lot masqué',
   },
   mcp: {
     nameRequired: 'Le nom du serveur est requis',

@@ -12,6 +12,7 @@ export const uk: Translations = {
     search: 'Пошук',
     back: 'Назад',
     close: 'Закрити',
+    undo: 'Скасувати',
     version: 'Версія',
     basedOnVane: 'На основі Vane v{version}',
     error: 'Помилка',
@@ -1349,6 +1350,9 @@ export const uk: Translations = {
     regenerateQuery: 'Перегенерувати',
     regenerateNote: 'Перегенерувати',
     newBatchSearch: 'Новий пакетний пошук',
+    hideFloating: 'Приховати плаваючий статус',
+    showFloating: 'Показати плаваючий статус',
+    floatingHiddenToast: 'Панель пакетного пошуку приховано',
   },
   mcp: {
     nameRequired: 'Назва сервера обов’язкова',

@@ -31,6 +31,7 @@ export interface Translations {
     search: string;
     back: string;
     close: string;
+    undo?: string;
     version: string;
     basedOnVane: string;
     error: string;
@@ -1356,6 +1357,9 @@ export interface Translations {
     newBatchSearch?: string;
     mergedMissingToast?: string;
     allQueriesAlreadyPresentToast?: string;
+    hideFloating?: string;
+    showFloating?: string;
+    floatingHiddenToast?: string;
   };
   mcp?: {
     nameRequired?: string;

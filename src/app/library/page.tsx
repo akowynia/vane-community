@@ -690,6 +690,18 @@ const LibraryContent = () => {
                     <ExternalLink className="w-3.5 h-3.5" />
                   </button>
 
+                  {batchSearch.isFloatingHidden && (
+                    <button
+                      type="button"
+                      onClick={() => batchSearch.setIsFloatingHidden(false)}
+                      className="px-3.5 py-1.5 rounded-xl bg-light-secondary dark:bg-[#1a140f] hover:bg-[#b8864d]/20 text-stone-700 dark:text-stone-300 hover:text-[#b8864d] border border-stone-300 dark:border-[#2a241d] text-xs font-semibold flex items-center space-x-1.5 transition cursor-pointer"
+                      title={t('batchSearch.showFloating') || 'Pokaż widżet pływający'}
+                    >
+                      <Eye className="w-3.5 h-3.5 text-[#b8864d]" />
+                      <span>{t('batchSearch.showFloating') || 'Pokaż widżet'}</span>
+                    </button>
+                  )}
+
                   {(batchSearch.completedCount === batchSearch.totalQueries || !batchSearch.isSearching) && (
                     <button
                       type="button"

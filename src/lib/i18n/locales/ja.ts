@@ -12,6 +12,7 @@ export const ja: Translations = {
     search: '検索',
     back: '戻る',
     close: '閉じる',
+    undo: '元に戻す',
     version: 'バージョン',
     basedOnVane: 'Vane v{version} をベース',
     error: 'エラー',
@@ -1349,6 +1350,9 @@ export const ja: Translations = {
     regenerateQuery: '再生成',
     regenerateNote: '再生成',
     newBatchSearch: '新しいバッチ検索',
+    hideFloating: 'フローティングステータスを非表示',
+    showFloating: 'フローティングステータスを表示',
+    floatingHiddenToast: '一括検索ステータスパネルを非表示にしました',
   },
   mcp: {
     nameRequired: 'サーバー名は必須です',

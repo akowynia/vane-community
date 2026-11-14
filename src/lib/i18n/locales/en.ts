@@ -12,6 +12,7 @@ export const en: Translations = {
     search: 'Search',
     back: 'Back',
     close: 'Close',
+    undo: 'Undo',
     version: 'Version',
     basedOnVane: 'Based on Vane v{version}',
     error: 'Error',
@@ -1351,6 +1352,9 @@ export const en: Translations = {
     newBatchSearch: 'New Batch Search',
     mergedMissingToast: 'Imported: added {added} missing queries, preserved {preserved} completed results.',
     allQueriesAlreadyPresentToast: 'All queries are already in the queue. Existing results were preserved.',
+    hideFloating: 'Hide floating status',
+    showFloating: 'Show floating status',
+    floatingHiddenToast: 'Batch search status panel hidden',
   },
   mcp: {
     nameRequired: 'Server name is required',

@@ -12,6 +12,7 @@ export const pt: Translations = {
     search: 'Buscar',
     back: 'Voltar',
     close: 'Fechar',
+    undo: 'Desfazer',
     version: 'Versão',
     basedOnVane: 'Baseado em Vane v{version}',
     error: 'Erro',
@@ -1349,6 +1350,9 @@ export const pt: Translations = {
     regenerateQuery: 'Regenerar',
     regenerateNote: 'Regenerar',
     newBatchSearch: 'Nova pesquisa em lote',
+    hideFloating: 'Ocultar status flutuante',
+    showFloating: 'Mostrar status flutuante',
+    floatingHiddenToast: 'Painel de status da pesquisa em lote oculto',
   },
   mcp: {
     nameRequired: 'O nome do servidor é obrigatório',

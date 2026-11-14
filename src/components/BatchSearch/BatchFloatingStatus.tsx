@@ -15,6 +15,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/lib/i18n';
 import { useBatchSearch } from '@/lib/batch-search/context';
@@ -39,10 +40,12 @@ export const BatchFloatingStatus: React.FC = () => {
     stopBatchSearch,
     saveToScratchpad,
     isSavingToScratchpad,
+    isFloatingHidden,
+    setIsFloatingHidden,
   } = useBatchSearch();
 
-  // Hide if no items, or if modal is open, or on the dedicated batch search page
-  if (items.length === 0 || isModalOpen || pathname === '/batch-search') {
+  // Hide if no items, or if modal is open, or on the dedicated batch search page, or explicitly hidden
+  if (items.length === 0 || isModalOpen || pathname === '/batch-search' || isFloatingHidden) {
     return null;
   }
 
@@ -201,6 +204,25 @@ export const BatchFloatingStatus: React.FC = () => {
               </span>
             </button>
           )}
+
+          {/* Hide / Dismiss button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsFloatingHidden(true);
+              toast(t('batchSearch.floatingHiddenToast') || 'Batch search status panel hidden', {
+                action: {
+                  label: t('common.undo') || 'Undo',
+                  onClick: () => setIsFloatingHidden(false),
+                },
+              });
+            }}
+            title={t('batchSearch.hideFloating') || 'Hide floating status'}
+            className="p-1.5 rounded-lg bg-light-200/80 dark:bg-[#221a14] hover:bg-stone-300 dark:hover:bg-[#2e231b] text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition text-xs flex items-center justify-center cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </div>

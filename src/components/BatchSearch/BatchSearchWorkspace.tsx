@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Edit3,
   Eye,
+  EyeOff,
   Sliders,
   Globe,
   GraduationCap,
@@ -356,6 +357,8 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
     exportAsCsv,
     exportAsTxt,
     copyToClipboard,
+    isFloatingHidden,
+    setIsFloatingHidden,
   } = useBatchSearch();
 
   const [isDragging, setIsDragging] = useState(false);
@@ -598,26 +601,50 @@ export const BatchSearchWorkspace: React.FC<BatchSearchWorkspaceProps> = ({
 
         <div className="flex items-center space-x-2">
           {items.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    t('batchSearch.confirmClearAll') ||
-                      'Czy na pewno chcesz usunąć wszystkie zapytania i zresetować studio?',
-                  )
-                ) {
-                  clearBatch();
+            <>
+              <button
+                type="button"
+                onClick={() => setIsFloatingHidden(!isFloatingHidden)}
+                title={
+                  isFloatingHidden
+                    ? t('batchSearch.showFloating') || 'Pokaż widżet pływający'
+                    : t('batchSearch.hideFloating') || 'Ukryj widżet pływający'
                 }
-              }}
-              title={t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
-              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition whitespace-nowrap cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">
-                {t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
-              </span>
-            </button>
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 hover:bg-light-200 dark:hover:bg-[#241c15] border border-light-300/60 dark:border-[#2a2119] transition whitespace-nowrap cursor-pointer"
+              >
+                {isFloatingHidden ? (
+                  <Eye className="w-3.5 h-3.5 text-[#b8864d]" />
+                ) : (
+                  <EyeOff className="w-3.5 h-3.5" />
+                )}
+                <span className="hidden sm:inline">
+                  {isFloatingHidden
+                    ? t('batchSearch.showFloating') || 'Pokaż widżet'
+                    : t('batchSearch.hideFloating') || 'Ukryj widżet'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      t('batchSearch.confirmClearAll') ||
+                        'Czy na pewno chcesz usunąć wszystkie zapytania i zresetować studio?',
+                    )
+                  ) {
+                    clearBatch();
+                  }
+                }}
+                title={t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
+                className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-stone-500 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition whitespace-nowrap cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">
+                  {t('batchSearch.clearAllBtn') || 'Wyczyść studio'}
+                </span>
+              </button>
+            </>
           )}
 
           {isModal && onClose && (

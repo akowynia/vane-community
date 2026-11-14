@@ -12,6 +12,7 @@ export const it: Translations = {
     search: 'Cerca',
     back: 'Indietro',
     close: 'Chiudi',
+    undo: 'Annulla',
     version: 'Versione',
     basedOnVane: 'Basato su Vane v{version}',
     error: 'Errore',
@@ -1349,6 +1350,9 @@ export const it: Translations = {
     regenerateQuery: 'Rigenera',
     regenerateNote: 'Rigenera',
     newBatchSearch: 'Nuova ricerca batch',
+    hideFloating: 'Nascondi stato mobile',
+    showFloating: 'Mostra stato mobile',
+    floatingHiddenToast: 'Pannello di stato ricerca batch nascosto',
   },
   mcp: {
     nameRequired: 'Il nome del server è obbligatorio',

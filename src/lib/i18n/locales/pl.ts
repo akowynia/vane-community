@@ -12,6 +12,7 @@ export const pl: Translations = {
     search: 'Szukaj',
     back: 'Wstecz',
     close: 'Zamknij',
+    undo: 'Cofnij',
     version: 'Wersja',
     basedOnVane: 'Bazowane na Vane v{version}',
     error: 'Błąd',
@@ -1351,6 +1352,9 @@ export const pl: Translations = {
     newBatchSearch: 'Nowe wyszukiwanie',
     mergedMissingToast: 'Zaimportowano: dodano {added} brakujących zapytań, zachowano {preserved} wykonanych wyników.',
     allQueriesAlreadyPresentToast: 'Wszystkie zapytania są już w kolejce. Zachowano dotychczasowe wyniki.',
+    hideFloating: 'Ukryj widżet pływający',
+    showFloating: 'Pokaż widżet pływający',
+    floatingHiddenToast: 'Panel wyszukiwania batchowego został ukryty',
   },
   mcp: {
     nameRequired: 'Nazwa serwera jest wymagana',

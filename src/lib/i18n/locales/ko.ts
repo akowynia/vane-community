@@ -12,6 +12,7 @@ export const ko: Translations = {
     search: '검색',
     back: '뒤로',
     close: '닫기',
+    undo: '실행 취소',
     version: '버전',
     basedOnVane: 'Vane v{version} 기반',
     error: '오류',
@@ -1349,6 +1350,9 @@ export const ko: Translations = {
     regenerateQuery: '다시 생성',
     regenerateNote: '다시 생성',
     newBatchSearch: '새 일괄 검색',
+    hideFloating: '플로팅 상태 표시줄 숨기기',
+    showFloating: '플로팅 상태 표시줄 표시',
+    floatingHiddenToast: '일괄 검색 상태 패널이 숨겨졌습니다',
   },
   mcp: {
     nameRequired: '서버 이름은 필수입니다',

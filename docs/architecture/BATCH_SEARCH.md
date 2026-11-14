@@ -50,6 +50,7 @@ The **Batch Search** module introduces an asynchronous, high-throughput research
      - **Continue / Resume**: Resumes execution if interrupted or paused.
      - **Pause**: Suspends batch execution cleanly after the active query.
      - **Stop / Abort**: Immediately aborts ongoing searches.
+     - **Hide / Dismiss**: Quick action to dismiss the floating status with an undo toast notification. Can be restored from the workspace header or active session banner.
 
 5. **Interactive Review & Note Editing**:
    - Users can inspect synthesized findings before final document compilation.

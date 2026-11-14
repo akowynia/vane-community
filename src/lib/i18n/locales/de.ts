@@ -12,6 +12,7 @@ export const de: Translations = {
     search: 'Suchen',
     back: 'Zurück',
     close: 'Schließen',
+    undo: 'Rückgängig',
     version: 'Version',
     basedOnVane: 'Basiert auf Vane v{version}',
     error: 'Fehler',
@@ -1349,6 +1350,9 @@ export const de: Translations = {
     regenerateQuery: 'Neu generieren',
     regenerateNote: 'Neu generieren',
     newBatchSearch: 'Neue Batch-Suche',
+    hideFloating: 'Schwebenden Status ausblenden',
+    showFloating: 'Schwebenden Status anzeigen',
+    floatingHiddenToast: 'Batch-Suchstatus-Panel ausgeblendet',
   },
   mcp: {
     nameRequired: 'Servername ist erforderlich',

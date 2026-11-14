@@ -45,6 +45,8 @@ interface BatchSearchContextType {
   isModalOpen: boolean;
   openModal: () => void;
   closeModal: () => void;
+  isFloatingHidden: boolean;
+  setIsFloatingHidden: (hidden: boolean) => void;
 
   // Configurations
   defaultSources: string[];
@@ -142,6 +144,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
 
   // Modal open state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isFloatingHidden, setIsFloatingHidden] = useState(false);
 
   // Execution states
   const [isSearching, setIsSearching] = useState(false);
@@ -214,6 +217,8 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
           if (parsed.headerFormat) setHeaderFormat(parsed.headerFormat);
           if (typeof parsed.includeSources === 'boolean')
             setIncludeSources(parsed.includeSources);
+          if (typeof parsed.isFloatingHidden === 'boolean')
+            setIsFloatingHidden(parsed.isFloatingHidden);
         }
       }
     } catch {
@@ -237,6 +242,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
         defaultProviderId,
         headerFormat,
         includeSources,
+        isFloatingHidden,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
     } catch {
@@ -252,6 +258,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
     defaultProviderId,
     headerFormat,
     includeSources,
+    isFloatingHidden,
   ]);
 
   const availableModelsList = useMemo(() => {
@@ -376,6 +383,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
           return mergedList;
         });
 
+        setIsFloatingHidden(false);
         setActiveTab('queue');
       } catch {
         toast.error(
@@ -557,6 +565,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
     setIsSearching(false);
     setIsPaused(false);
     setCurrentRunningIndex(null);
+    setIsFloatingHidden(false);
     setItems([]);
     setRawCsvText('');
     localStorage.removeItem(STORAGE_KEY);
@@ -660,6 +669,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
 
       setIsSearching(true);
       setIsPaused(false);
+      setIsFloatingHidden(false);
       isPausedRef.current = false;
       abortControllerRef.current = new AbortController();
 
@@ -853,6 +863,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
   const resumeBatchSearch = useCallback(() => {
     setIsPaused(false);
     isPausedRef.current = false;
+    setIsFloatingHidden(false);
     toast.info(t('batchSearch.resumeSearch') || 'Resumed batch search.');
     if (!isSearching) {
       startBatchSearch(false);
@@ -1162,6 +1173,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
 
       if (noteItems.length > 0) {
         setItems(noteItems);
+        setIsFloatingHidden(false);
         setActiveTab('results');
         openModal();
         toast.success(
@@ -1196,6 +1208,8 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
         isModalOpen,
         openModal,
         closeModal,
+        isFloatingHidden,
+        setIsFloatingHidden,
         defaultSources,
         setDefaultSources,
         defaultOptimization,
