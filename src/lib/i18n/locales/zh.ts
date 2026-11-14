@@ -1135,6 +1135,13 @@ export const zh: Translations = {
     categoryBatch: '批量研究',
     badgeBatch: '批量研究',
     queries: '条查询',
+    queryStudio: '查询工作室',
+    fullDocument: '完整文档',
+    editingQueryScope: '当前查询：#{number} "{title}"',
+    switchQuery: '切换查询',
+    searchQueryPlaceholder: '搜索问题 / 主题...',
+    queryPagination: '第 {current} 个查询，共 {total} 个',
+    applyQueryEditToFull: '更改会自动同步到汇总文档',
   },
   presentation: {
     newPresentation: '新建演示文稿',

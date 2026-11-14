@@ -1135,6 +1135,13 @@ export const en: Translations = {
     categoryBatch: 'Batch Research',
     badgeBatch: 'BATCH RESEARCH',
     queries: 'queries',
+    queryStudio: 'Query Studio',
+    fullDocument: 'Full Document',
+    editingQueryScope: 'Editing Query: #{number} "{title}"',
+    switchQuery: 'Switch query',
+    searchQueryPlaceholder: 'Search questions / topics...',
+    queryPagination: 'Query {current} of {total}',
+    applyQueryEditToFull: 'Changes automatically sync to compiled document',
   },
   presentation: {
     newPresentation: 'New Presentation',

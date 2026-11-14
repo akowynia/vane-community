@@ -1135,6 +1135,13 @@ export const ko: Translations = {
     categoryBatch: '일괄 조사',
     badgeBatch: '일괄 조사',
     queries: '개 질문',
+    queryStudio: '질문 스튜디오',
+    fullDocument: '전체 문서',
+    editingQueryScope: '활성 질문: #{number} "{title}"',
+    switchQuery: '질문 전환',
+    searchQueryPlaceholder: '질문 / 주제 검색...',
+    queryPagination: '질문 {current} / {total}',
+    applyQueryEditToFull: '변경 사항이 전체 문서에 자동으로 동기화됩니다',
   },
   presentation: {
     newPresentation: '새 프레젠테이션',

@@ -1135,6 +1135,13 @@ export const pt: Translations = {
     categoryBatch: 'Pesquisa em lote',
     badgeBatch: 'PESQUISA EM LOTE',
     queries: 'consultas',
+    queryStudio: 'Estúdio de consultas',
+    fullDocument: 'Documento completo',
+    editingQueryScope: 'Consulta ativa: #{number} "{title}"',
+    switchQuery: 'Mudar consulta',
+    searchQueryPlaceholder: 'Pesquisar perguntas / tópicos...',
+    queryPagination: 'Consulta {current} de {total}',
+    applyQueryEditToFull: 'As alterações sincronizam automaticamente com o documento',
   },
   presentation: {
     newPresentation: 'Nova apresentação',

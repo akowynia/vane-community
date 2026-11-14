@@ -1135,6 +1135,13 @@ export const fr: Translations = {
     categoryBatch: 'Recherche par lots',
     badgeBatch: 'RECHERCHE PAR LOTS',
     queries: 'requêtes',
+    queryStudio: 'Studio de requêtes',
+    fullDocument: 'Document complet',
+    editingQueryScope: 'Requête active : #{number} "{title}"',
+    switchQuery: 'Changer de requête',
+    searchQueryPlaceholder: 'Rechercher des questions / sujets...',
+    queryPagination: 'Requête {current} sur {total}',
+    applyQueryEditToFull: 'Les modifications se synchronisent automatiquement avec le document',
   },
   presentation: {
     newPresentation: 'Nouvelle présentation',

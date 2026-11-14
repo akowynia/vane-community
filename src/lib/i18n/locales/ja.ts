@@ -1135,6 +1135,13 @@ export const ja: Translations = {
     categoryBatch: 'バッチリサーチ',
     badgeBatch: 'バッチリサーチ',
     queries: '件のクエリ',
+    queryStudio: 'クエカスタジオ',
+    fullDocument: '完全なドキュメント',
+    editingQueryScope: 'アクティブなクエリ: #{number} "{title}"',
+    switchQuery: 'クエリを切り替え',
+    searchQueryPlaceholder: '質問・トピックを検索...',
+    queryPagination: 'クエリ {current} / {total}',
+    applyQueryEditToFull: '変更はドキュメント全体に自動的に同期されます',
   },
   presentation: {
     newPresentation: '新規プレゼンテーション',

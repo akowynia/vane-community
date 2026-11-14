@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -36,6 +36,12 @@ import ScratchpadExportDialog from '@/components/Scratchpad/ScratchpadExportDial
 import LoginDialog from '@/components/Auth/LoginDialog';
 import { applyPatch } from 'rfc6902';
 import { useBatchSearch } from '@/lib/batch-search/context';
+import {
+  parseBatchSections,
+  replaceBatchSection,
+  findSectionIndexBySnippet,
+  BatchSection,
+} from '@/lib/scratchpad/batchSections';
 
 const ScratchpadWorkspacePage = () => {
   const params = useParams();
@@ -55,6 +61,10 @@ const ScratchpadWorkspacePage = () => {
   const [versions, setVersions] = useState<ScratchpadVersion[]>([]);
   const [waypointInfo, setWaypointInfo] = useState<any>(null);
   const [templateInfo, setTemplateInfo] = useState<any>(null);
+
+  // Batch Query Studio state
+  const [activeQueryIndex, setActiveQueryIndex] = useState<number | null>(0);
+  const [batchViewMode, setBatchViewMode] = useState<'queries' | 'full'>('queries');
 
   // Selection & AI context
   const [selectedText, setSelectedText] = useState<string | null>(null);
@@ -166,6 +176,30 @@ const ScratchpadWorkspacePage = () => {
     [id],
   );
 
+  // Parse batch research sections
+  const parsedSections = useMemo(() => {
+    return parseBatchSections(content);
+  }, [content]);
+
+  const isBatchDocument = Boolean(
+    sketchType === 'batch' || metadata?.isBatchExport || parsedSections.length >= 2,
+  );
+
+  const activeQueryScope = useMemo(() => {
+    if (!isBatchDocument || batchViewMode !== 'queries' || parsedSections.length === 0) {
+      return null;
+    }
+    const idx = Math.max(0, Math.min(parsedSections.length - 1, activeQueryIndex ?? 0));
+    const sec = parsedSections[idx];
+    if (!sec) return null;
+    return {
+      index: idx,
+      number: sec.number,
+      title: sec.title,
+      total: parsedSections.length,
+    };
+  }, [isBatchDocument, batchViewMode, parsedSections, activeQueryIndex]);
+
   const handleContentChange = (newContent: string) => {
     setContent(newContent);
     triggerAutoSave(title, newContent);
@@ -260,6 +294,15 @@ const ScratchpadWorkspacePage = () => {
 
     try {
       const isPres = options?.isPresentation ?? sketchType === 'presentation';
+      const effectiveCurrentContent =
+        activeQueryScope && parsedSections[activeQueryScope.index]
+          ? parsedSections[activeQueryScope.index].content
+          : content;
+      const effectiveTitle =
+        activeQueryScope && parsedSections[activeQueryScope.index]
+          ? parsedSections[activeQueryScope.index].title
+          : title;
+
       const res = await fetch(`/api/scratchpad/${id}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -280,8 +323,13 @@ const ScratchpadWorkspacePage = () => {
           optimizationMode,
           sources: activeSources,
           selectedText: activeSelectedText,
-          currentContent: content,
-          currentTitle: title,
+          currentContent: effectiveCurrentContent,
+          currentTitle: effectiveTitle,
+          activeQueryIndex: activeQueryScope?.index ?? null,
+          activeQueryNumber: activeQueryScope?.number ?? null,
+          activeQueryTitle: activeQueryScope?.title ?? null,
+          isBatchScoped: Boolean(activeQueryScope),
+          fullDocumentContent: content,
           waypointId: waypointInfo?.id || null,
           clarificationResponse: options?.clarificationResponse,
           skipClarification: options?.skipClarification ?? false,
@@ -452,14 +500,23 @@ const ScratchpadWorkspacePage = () => {
                       } else {
                         const liveMatch = textBlock.data.match(/<note_update(?:\s+title="[^"]*")?>([\s\S]*?)(?:<note_suggestions>|<\/note_update>|$)/i);
                         if (liveMatch && liveMatch[1] !== undefined && liveMatch[1].trim()) {
-                          setContent(liveMatch[1].trim());
+                          const updatedSection = liveMatch[1].trim();
+                          if (activeQueryScope) {
+                            setContent((prev) => replaceBatchSection(prev, activeQueryScope.index, updatedSection));
+                          } else {
+                            setContent(updatedSection);
+                          }
                         } else if (textBlock.data.includes('---') && textBlock.data.includes('# ')) {
                           const cleaned = textBlock.data
                             .replace(/<presentation_suggestions[\s\S]*?(?:<\/presentation_suggestions>|$)/gi, '')
                             .replace(/<note_suggestions[\s\S]*?(?:<\/note_suggestions>|$)/gi, '')
                             .trim();
                           if (cleaned.length > 20) {
-                            setContent(cleaned);
+                            if (activeQueryScope) {
+                              setContent((prev) => replaceBatchSection(prev, activeQueryScope.index, cleaned));
+                            } else {
+                              setContent(cleaned);
+                            }
                           }
                         }
                       }
@@ -740,6 +797,15 @@ const ScratchpadWorkspacePage = () => {
             templateInfo={templateInfo}
             isPresentation={sketchType === 'presentation'}
             onAcceptPlan={handleAcceptPlan}
+            activeQueryScope={activeQueryScope}
+            onSelectQueryScope={(idx) => {
+              if (idx === null) {
+                setBatchViewMode('full');
+              } else {
+                setActiveQueryIndex(idx);
+                setBatchViewMode('queries');
+              }
+            }}
           />
         </section>
 
@@ -763,14 +829,36 @@ const ScratchpadWorkspacePage = () => {
                 content={content}
                 onChange={handleContentChange}
                 selectedText={selectedText}
-                onSelectText={setSelectedText}
+                onSelectText={(text) => {
+                  setSelectedText(text);
+                  if (text && isBatchDocument && parsedSections.length > 0) {
+                    const snippetIdx = findSectionIndexBySnippet(parsedSections, text);
+                    if (snippetIdx !== -1 && snippetIdx !== activeQueryIndex) {
+                      setActiveQueryIndex(snippetIdx);
+                    }
+                  }
+                }}
                 hoveredSourceIndex={hoveredSourceIndex}
                 onHoverCitation={setHoveredSourceIndex}
                 readOnly={isAiGenerating}
                 isGenerating={isAiGenerating}
                 templateInfo={templateInfo}
+                isBatch={isBatchDocument}
+                activeQueryIndex={activeQueryIndex ?? 0}
+                onSelectQueryIndex={(idx) => {
+                  setActiveQueryIndex(idx);
+                  setBatchViewMode('queries');
+                }}
+                batchViewMode={batchViewMode}
+                onChangeBatchViewMode={setBatchViewMode}
                 onAskAiAboutSelection={(text) => {
                   setSelectedText(text);
+                  if (text && isBatchDocument && parsedSections.length > 0) {
+                    const snippetIdx = findSectionIndexBySnippet(parsedSections, text);
+                    if (snippetIdx !== -1) {
+                      setActiveQueryIndex(snippetIdx);
+                    }
+                  }
                 }}
               />
             )}
@@ -828,10 +916,28 @@ const ScratchpadWorkspacePage = () => {
                   <ScratchpadTOC
                     content={content}
                     onSelectHeading={(heading) => {
+                      if (isBatchDocument && parsedSections.length > 0) {
+                        const matchedIdx = parsedSections.findIndex(
+                          (s) => s.header.includes(heading) || s.title.includes(heading),
+                        );
+                        if (matchedIdx !== -1) {
+                          setActiveQueryIndex(matchedIdx);
+                          setBatchViewMode('queries');
+                        }
+                      }
                       toast.info(t('scratchpad.navigatedToSectionToast', { heading }) || `Navigated to section: "${heading}"`);
                     }}
                     onAskAiForHeading={(heading) => {
                       setSelectedText(heading);
+                      if (isBatchDocument && parsedSections.length > 0) {
+                        const matchedIdx = parsedSections.findIndex(
+                          (s) => s.header.includes(heading) || s.title.includes(heading),
+                        );
+                        if (matchedIdx !== -1) {
+                          setActiveQueryIndex(matchedIdx);
+                          setBatchViewMode('queries');
+                        }
+                      }
                       toast.info(t('scratchpad.sectionContextSetToast', { heading }) || `Set section "${heading}" as chat context.`);
                     }}
                   />

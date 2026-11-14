@@ -1135,6 +1135,13 @@ export const pl: Translations = {
     categoryBatch: 'Badania wsadowe',
     badgeBatch: 'BADANIA WSADOWE',
     queries: 'zapytań',
+    queryStudio: 'Widok pytań',
+    fullDocument: 'Pełny dokument',
+    editingQueryScope: 'Edycja pytania: #{number} "{title}"',
+    switchQuery: 'Zmień pytanie',
+    searchQueryPlaceholder: 'Szukaj pytań / tematów...',
+    queryPagination: 'Pytanie {current} z {total}',
+    applyQueryEditToFull: 'Zmiany są automatycznie scalane z całym dokumentem',
   },
   presentation: {
     newPresentation: 'Nowa prezentacja',

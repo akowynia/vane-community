@@ -1135,6 +1135,13 @@ export const it: Translations = {
     categoryBatch: 'Ricerca batch',
     badgeBatch: 'RICERCA BATCH',
     queries: 'query',
+    queryStudio: 'Studio delle query',
+    fullDocument: 'Documento completo',
+    editingQueryScope: 'Query attiva: #{number} "{title}"',
+    switchQuery: 'Cambia query',
+    searchQueryPlaceholder: 'Cerca domande / argomenti...',
+    queryPagination: 'Query {current} di {total}',
+    applyQueryEditToFull: 'Le modifiche si sincronizzano automaticamente con il documento',
   },
   presentation: {
     newPresentation: 'Nuova presentazione',

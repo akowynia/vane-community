@@ -80,6 +80,13 @@ export interface SendMessageOptions {
   approvedPlan?: any;
 }
 
+export interface ActiveQueryScope {
+  index: number;
+  number: string;
+  title: string;
+  total: number;
+}
+
 interface ScratchpadChatProps {
   messages: ScratchpadChatMessage[];
   onSendMessage: (text: string, options?: SendMessageOptions) => Promise<void>;
@@ -92,6 +99,8 @@ interface ScratchpadChatProps {
   templateInfo?: { id?: string; name?: string; icon?: string; isBuiltin?: boolean } | null;
   isPresentation?: boolean;
   onAcceptPlan?: (plan: any) => Promise<void>;
+  activeQueryScope?: ActiveQueryScope | null;
+  onSelectQueryScope?: (index: number | null) => void;
 }
 
 const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
@@ -106,6 +115,8 @@ const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
   templateInfo = null,
   isPresentation = false,
   onAcceptPlan,
+  activeQueryScope = null,
+  onSelectQueryScope,
 }) => {
   const { t } = useTranslation();
   const [input, setInput] = useState('');
@@ -582,6 +593,31 @@ const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
 
       {/* Input Area */}
       <div className="p-3 border-t border-light-200 dark:border-[#221c16] bg-light-secondary/80 dark:bg-[#181411]/80 backdrop-blur-md">
+        {/* Active Query Scope Indicator */}
+        {activeQueryScope && (
+          <div className="flex items-center justify-between mb-2 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs text-stone-800 dark:text-stone-200 animate-fadeIn">
+            <div className="flex items-center space-x-2 truncate min-w-0">
+              <Layers className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="font-semibold text-cyan-400 shrink-0">
+                #{activeQueryScope.number} ({activeQueryScope.index + 1}/{activeQueryScope.total})
+              </span>
+              <span className="truncate italic text-stone-600 dark:text-stone-300">
+                "{activeQueryScope.title}"
+              </span>
+            </div>
+            {onSelectQueryScope && (
+              <button
+                type="button"
+                onClick={() => onSelectQueryScope(null)}
+                title={t('scratchpad.fullDocument') || 'Switch to full document context'}
+                className="text-[10px] text-stone-400 hover:text-stone-200 px-1.5 py-0.5 rounded hover:bg-white/5 transition shrink-0 ml-2"
+              >
+                {t('common.clear') || 'Clear'}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Selected Context Banner */}
         {selectedText && (
           <div className="flex items-center justify-between mb-2 px-3 py-1.5 rounded-xl bg-[#b8864d]/15 border border-[#b8864d]/30 text-xs text-stone-800 dark:text-stone-200 animate-fadeIn">
@@ -620,7 +656,9 @@ const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
               placeholder={
                 selectedText
                   ? t('scratchpad.refineSelectionPlaceholder') || 'Describe how to modify the selected fragment...'
-                  : t('scratchpad.promptPlaceholder') || 'Ask a question, request drafting, or edit a specific section...'
+                  : activeQueryScope
+                    ? `Ask a question, request drafting, or edit Query #${activeQueryScope.number}...`
+                    : t('scratchpad.promptPlaceholder') || 'Ask a question, request drafting, or edit a specific section...'
               }
               className="w-full bg-transparent text-xs text-stone-900 dark:text-stone-100 placeholder:text-stone-400 resize-none focus:outline-none"
             />

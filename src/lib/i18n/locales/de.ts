@@ -1135,6 +1135,13 @@ export const de: Translations = {
     categoryBatch: 'Batch-Recherche',
     badgeBatch: 'BATCH-RECHERCHE',
     queries: 'Abfragen',
+    queryStudio: 'Fragen-Studio',
+    fullDocument: 'Vollständiges Dokument',
+    editingQueryScope: 'Aktive Frage: #{number} "{title}"',
+    switchQuery: 'Frage wechseln',
+    searchQueryPlaceholder: 'Fragen / Themen suchen...',
+    queryPagination: 'Frage {current} von {total}',
+    applyQueryEditToFull: 'Änderungen werden automatisch mit dem Dokument synchronisiert',
   },
   presentation: {
     newPresentation: 'Neue Präsentation',

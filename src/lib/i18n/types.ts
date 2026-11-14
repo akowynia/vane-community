@@ -1140,6 +1140,13 @@ export interface Translations {
     categoryBatch?: string;
     badgeBatch?: string;
     queries?: string;
+    queryStudio?: string;
+    fullDocument?: string;
+    editingQueryScope?: string;
+    switchQuery?: string;
+    searchQueryPlaceholder?: string;
+    queryPagination?: string;
+    applyQueryEditToFull?: string;
   };
   presentation?: {
     newPresentation?: string;

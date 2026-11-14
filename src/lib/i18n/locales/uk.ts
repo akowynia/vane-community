@@ -1135,6 +1135,13 @@ export const uk: Translations = {
     categoryBatch: 'Пакетні дослідження',
     badgeBatch: 'ПАКЕТНИЙ ПОШУК',
     queries: 'запитів',
+    queryStudio: 'Студія запитів',
+    fullDocument: 'Повний документ',
+    editingQueryScope: 'Активний запит: #{number} "{title}"',
+    switchQuery: 'Перемкнути запит',
+    searchQueryPlaceholder: 'Пошук питань / тем...',
+    queryPagination: 'Запит {current} з {total}',
+    applyQueryEditToFull: 'Зміни автоматично синхронізуються з документом',
   },
   presentation: {
     newPresentation: 'Нова презентація',

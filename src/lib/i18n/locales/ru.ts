@@ -1135,6 +1135,13 @@ export const ru: Translations = {
     categoryBatch: 'Пакетные исследования',
     badgeBatch: 'ПАКЕТНЫЙ ПОИСК',
     queries: 'запросов',
+    queryStudio: 'Студия запросов',
+    fullDocument: 'Полный документ',
+    editingQueryScope: 'Активный запрос: #{number} "{title}"',
+    switchQuery: 'Переключить запрос',
+    searchQueryPlaceholder: 'Поиск вопросов / тем...',
+    queryPagination: 'Запрос {current} из {total}',
+    applyQueryEditToFull: 'Изменения автоматически синхронизируются с документом',
   },
   presentation: {
     newPresentation: 'Новая презентация',
