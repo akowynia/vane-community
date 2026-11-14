@@ -351,6 +351,11 @@ export interface Translations {
     regeneratingQuery?: string;
     loadIntoStudio?: string;
     loadedIntoStudio?: string;
+    showingAllChats?: string;
+    clearAllChats?: string;
+    confirmClearAllChats?: string;
+    chatsCleared?: string;
+    clearChatsError?: string;
   };
   discover: {
     title: string;

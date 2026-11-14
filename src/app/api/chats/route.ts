@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import db from '@/lib/db';
 import { chats } from '@/lib/db/schema';
-import { eq, or, isNull, and } from 'drizzle-orm';
+import { eq, or, isNull, and, not } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { resolveRequestUser } from '@/lib/security/rbac';
 import configManager from '@/lib/config';
@@ -65,6 +65,38 @@ export const GET = async (req: Request) => {
     console.error('Error in getting chats: ', err);
     return Response.json(
       { message: err?.message || 'An error has occurred.', chats: [] },
+      { status: 500 },
+    );
+  }
+};
+
+export const DELETE = async (req: Request) => {
+  try {
+    const user = await resolveRequestUser(req as NextRequest);
+    const instanceMode = configManager.getConfig('instanceMode', 'single');
+
+    if (instanceMode === 'multi') {
+      if (!user) {
+        return Response.json({ message: 'Not authenticated' }, { status: 401 });
+      }
+
+      if (user.role === 'admin') {
+        await db.delete(chats);
+      } else {
+        // Keep chats that don't belong to this user
+        await db
+          .delete(chats)
+          .where(eq(chats.userId, user.id));
+      }
+    } else {
+      await db.delete(chats);
+    }
+
+    return Response.json({ success: true }, { status: 200 });
+  } catch (err: any) {
+    console.error('Error clearing chats: ', err);
+    return Response.json(
+      { message: err?.message || 'Failed to clear chats' },
       { status: 500 },
     );
   }

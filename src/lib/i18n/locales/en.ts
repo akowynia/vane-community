@@ -335,6 +335,11 @@ export const en: Translations = {
     regeneratingQuery: 'Regenerating...',
     loadIntoStudio: 'Load into studio & regenerate',
     loadedIntoStudio: 'Loaded batch research into Studio!',
+    showingAllChats: 'Showing all conversations',
+    clearAllChats: 'Clear all chats',
+    confirmClearAllChats: 'Are you sure you want to delete all chats? This cannot be undone.',
+    chatsCleared: 'All chats cleared',
+    clearChatsError: 'Failed to clear chats',
   },
   discover: {
     title: 'Discover',

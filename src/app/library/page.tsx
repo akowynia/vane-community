@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import React, { Suspense, useEffect, useState, useMemo } from 'react';
 import DeleteChat from '@/components/DeleteChat';
 import { formatTimeDifference, cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import {
   BookOpenText,
   ClockIcon,
@@ -152,6 +153,27 @@ const LibraryContent = () => {
       setBatchNotes([]);
     } finally {
       setLoadingBatchNotes(false);
+    }
+  };
+
+  const clearChats = async () => {
+    if (!confirm(t('library.confirmClearAllChats') || 'Are you sure you want to delete all chats?')) {
+      return;
+    }
+    try {
+      const res = await fetch('/api/chats', {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setChats([]);
+        toast.success(t('library.chatsCleared') || 'All chats cleared');
+      } else {
+        const data = await res.json();
+        toast.error(data.message || t('library.clearChatsError') || 'Failed to clear chats');
+      }
+    } catch (err) {
+      console.error('Error clearing chats:', err);
+      toast.error(t('library.clearChatsError') || 'Failed to clear chats');
     }
   };
 
@@ -349,6 +371,19 @@ const LibraryContent = () => {
             </div>
           ) : (
             <div className="pt-6 pb-28 px-2">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-black/50 dark:text-stone-400">
+                  {t('library.showingAllChats') || 'Showing all conversations'}
+                </p>
+                <button
+                  type="button"
+                  onClick={clearChats}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs text-black/70 dark:text-stone-300 hover:border-red-500/40 hover:text-red-400 transition cursor-pointer"
+                >
+                  <Trash2 size={14} />
+                  <span>{t('library.clearAllChats') || 'Clear all chats'}</span>
+                </button>
+              </div>
               <div className="rounded-2xl border border-light-200 dark:border-[#251f19] overflow-hidden bg-light-primary dark:bg-[#14110e]">
                 {chats.map((chat, index) => {
                   const safeSources = Array.isArray(chat?.sources) ? chat.sources : [];
