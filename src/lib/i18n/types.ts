@@ -573,6 +573,20 @@ export interface Translations {
     confirmPassword?: string;
     passwordsDoNotMatch?: string;
     setupAdminAndSwitch?: string;
+    modelAccessScopeGlobal?: string;
+    modelAccessScopeUser?: string;
+    modelAccessSave?: string;
+    modelAccessSaveSuccess?: string;
+    modelActive?: string;
+    modelDisabled?: string;
+    modelLimitsTitle?: string;
+    modelLimit5hLabel?: string;
+    modelLimitDailyLabel?: string;
+    modelLimitPlaceholder?: string;
+    allowAllInProvider?: string;
+    blockAllInProvider?: string;
+    globalDisabledModelsDesc?: string;
+    userModelAccessDesc?: string;
   };
   modelUsage?: {
     usage5h: string;

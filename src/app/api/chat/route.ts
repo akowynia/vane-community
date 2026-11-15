@@ -103,11 +103,11 @@ const ensureChatExists = async (input: {
         title: input.query,
         files: Array.isArray(input.fileIds)
           ? input.fileIds.map((id) => {
-              return {
-                fileId: id,
-                name: UploadManager.getFile(id)?.name || 'Uploaded File',
-              };
-            })
+            return {
+              fileId: id,
+              name: UploadManager.getFile(id)?.name || 'Uploaded File',
+            };
+          })
           : [],
       });
     } else if (input.waypointId !== undefined && exists.waypointId !== input.waypointId) {
@@ -148,6 +148,14 @@ export const POST = async (req: Request) => {
       );
     }
 
+    const disabledModels: string[] = configManager.getConfig('disabledModels', []) || [];
+    if (body.chatModel?.key && disabledModels.includes(body.chatModel.key)) {
+      return Response.json(
+        { message: 'This AI model has been disabled by the administrator.' },
+        { status: 403 },
+      );
+    }
+
     if (user && user.role !== 'admin') {
       if (!canAccessProvider(user, body.chatModel?.providerId)) {
         return Response.json(
@@ -162,8 +170,8 @@ export const POST = async (req: Request) => {
         );
       }
 
-      // Check rolling window limits (5h, weekly, daily, monthly)
-      const usage = await checkTokenUsage(user);
+      // Check rolling window limits (5h, weekly, daily, monthly) and model quotas
+      const usage = await checkTokenUsage(user, body.chatModel?.key);
       if (usage.limit5hExceeded) {
         return Response.json(
           {
@@ -184,6 +192,30 @@ export const POST = async (req: Request) => {
         return Response.json(
           {
             message: `Daily token limit exceeded (${usage.tokensLast24h.toLocaleString()} / ${user.tokenLimitPerDay?.toLocaleString()}).`,
+          },
+          { status: 429 },
+        );
+      }
+      if (usage.modelLimit5hExceeded) {
+        return Response.json(
+          {
+            message: `5-hour token limit for model "${body.chatModel?.key}" exceeded (${usage.modelTokensLast5h?.toLocaleString()} / ${usage.effectiveModelLimit5h?.toLocaleString()}). Please try again later.`,
+          },
+          { status: 429 },
+        );
+      }
+      if (usage.modelLimitWeeklyExceeded) {
+        return Response.json(
+          {
+            message: `Weekly token limit for model "${body.chatModel?.key}" exceeded (${usage.modelTokensWeekly?.toLocaleString()} / ${usage.effectiveModelLimitWeekly?.toLocaleString()}).`,
+          },
+          { status: 429 },
+        );
+      }
+      if (usage.modelLimitDayExceeded) {
+        return Response.json(
+          {
+            message: `Daily token limit for model "${body.chatModel?.key}" exceeded (${usage.modelTokensLast24h?.toLocaleString()} / ${usage.effectiveModelLimitPerDay?.toLocaleString()}).`,
           },
           { status: 429 },
         );
@@ -278,7 +310,7 @@ export const POST = async (req: Request) => {
       isClosed = true;
       try {
         await writer.close();
-      } catch {}
+      } catch { }
     };
 
     // Heartbeat every 15 seconds to keep the SSE connection alive during long tasks (proxy, cloudflare, docker)
@@ -462,7 +494,7 @@ export const POST = async (req: Request) => {
           session.emit('error', {
             data: err?.message || 'An unexpected error occurred during search.',
           });
-        } catch {}
+        } catch { }
       }
     })();
 

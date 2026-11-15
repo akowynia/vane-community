@@ -82,6 +82,15 @@ type Config = {
     qualityModeMaxTokens?: number | null;
     allowedProviders?: string[];
     allowedModels?: string[];
+    modelLimits?: Record<
+      string,
+      {
+        tokenLimit5h?: number | null;
+        tokenLimitWeekly?: number | null;
+        tokenLimitPerDay?: number | null;
+        maxTokensPerRequest?: number | null;
+      }
+    >;
   };
   globalLimits?: {
     tokenLimit5h?: number | null;
@@ -90,7 +99,17 @@ type Config = {
     tokenLimitPerMonth?: number | null;
     maxTokensPerRequest?: number | null;
     qualityModeMaxTokens?: number | null;
+    modelLimits?: Record<
+      string,
+      {
+        tokenLimit5h?: number | null;
+        tokenLimitWeekly?: number | null;
+        tokenLimitPerDay?: number | null;
+        maxTokensPerRequest?: number | null;
+      }
+    >;
   };
+  disabledModels?: string[];
   preferences: {
     [key: string]: any;
   };

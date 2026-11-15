@@ -23,6 +23,17 @@ export const GET = async (req: Request) => {
       );
     });
 
+    const disabledModels: string[] = configManager.getConfig('disabledModels', []) || [];
+    if (disabledModels.length > 0) {
+      filteredProviders = filteredProviders
+        .map((p) => ({
+          ...p,
+          chatModels: (p.chatModels || []).filter((m) => !disabledModels.includes(m.key)),
+          embeddingModels: (p.embeddingModels || []).filter((m) => !disabledModels.includes(m.key)),
+        }))
+        .filter((p) => p.chatModels.length > 0 || p.embeddingModels.length > 0);
+    }
+
     // If user has restricted permissions, filter providers and models
     if (user && user.role !== 'admin') {
       filteredProviders = filteredProviders

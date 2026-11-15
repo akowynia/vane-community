@@ -13,6 +13,15 @@ export interface AuthUser {
   role: 'admin' | 'member' | 'guest';
   allowedProviders?: string[];
   allowedModels?: string[];
+  modelLimits?: Record<
+    string,
+    {
+      tokenLimit5h?: number | null;
+      tokenLimitWeekly?: number | null;
+      tokenLimitPerDay?: number | null;
+      maxTokensPerRequest?: number | null;
+    }
+  >;
   tokenLimit5h?: number | null;
   tokenLimitWeekly?: number | null;
   tokenLimitPerDay?: number | null;
@@ -43,6 +52,7 @@ export async function resolveRequestUser(req: NextRequest | Request): Promise<Au
         role: (u.role as any) || 'member',
         allowedProviders: k.allowedProviders || u.allowedProviders || ['*'],
         allowedModels: k.allowedModels || u.allowedModels || ['*'],
+        modelLimits: (u as any).modelLimits || {},
         tokenLimit5h: u.tokenLimit5h,
         tokenLimitWeekly: u.tokenLimitWeekly,
         tokenLimitPerDay: k.tokenLimitPerDay ?? u.tokenLimitPerDay,
@@ -63,6 +73,7 @@ export async function resolveRequestUser(req: NextRequest | Request): Promise<Au
       role: 'admin',
       allowedProviders: ['*'],
       allowedModels: ['*'],
+      modelLimits: configManager.getConfig('globalLimits.modelLimits', {}),
       tokenLimit5h: null,
       tokenLimitWeekly: null,
       tokenLimitPerDay: null,
@@ -103,6 +114,7 @@ export async function resolveRequestUser(req: NextRequest | Request): Promise<Au
           role: 'admin',
           allowedProviders: ['*'],
           allowedModels: ['*'],
+          modelLimits: configManager.getConfig('globalLimits.modelLimits', {}),
           tokenLimit5h: null,
           tokenLimitWeekly: null,
           tokenLimitPerDay: null,
@@ -124,6 +136,7 @@ export async function resolveRequestUser(req: NextRequest | Request): Promise<Au
           role: dbUser.role as 'admin' | 'member' | 'guest',
           allowedProviders: dbUser.allowedProviders || ['*'],
           allowedModels: dbUser.allowedModels || ['*'],
+          modelLimits: dbUser.modelLimits || {},
           tokenLimit5h: dbUser.tokenLimit5h,
           tokenLimitWeekly: dbUser.tokenLimitWeekly,
           tokenLimitPerDay: dbUser.tokenLimitPerDay,
@@ -145,6 +158,7 @@ export async function resolveRequestUser(req: NextRequest | Request): Promise<Au
     const guestQualityLimit = configManager.getConfig('guestSettings.qualityModeMaxTokens', 35000);
     const guestProviders = configManager.getConfig('guestSettings.allowedProviders', ['*']);
     const guestModels = configManager.getConfig('guestSettings.allowedModels', ['*']);
+    const guestModelLimits = configManager.getConfig('guestSettings.modelLimits', {});
 
     return {
       id: 'guest',
@@ -153,6 +167,7 @@ export async function resolveRequestUser(req: NextRequest | Request): Promise<Au
       role: 'guest',
       allowedProviders: guestProviders,
       allowedModels: guestModels,
+      modelLimits: guestModelLimits,
       tokenLimit5h: guestLimit5h,
       tokenLimitWeekly: guestLimitWeekly,
       tokenLimitPerDay: guestLimitDay,
@@ -217,6 +232,12 @@ export function canAccessProvider(user: AuthUser, providerId?: string): boolean 
  */
 export function canAccessModel(user: AuthUser, modelKey?: string): boolean {
   if (!modelKey) return false;
+
+  const disabledModels: string[] = configManager.getConfig('disabledModels', []) || [];
+  if (Array.isArray(disabledModels) && disabledModels.includes(modelKey)) {
+    return false;
+  }
+
   if (user.role === 'admin') return true;
   if (!user.allowedModels || user.allowedModels.length === 0) return false;
   return (
@@ -227,8 +248,12 @@ export function canAccessModel(user: AuthUser, modelKey?: string): boolean {
 
 /**
  * Calculate token usage for user across multiple rolling windows: 5h, 7d (weekly), 24h, 30d
+ * Optionally computes model-specific token usage and checks model quotas.
  */
-export async function checkTokenUsage(user: AuthUser): Promise<{
+export async function checkTokenUsage(
+  user: AuthUser,
+  modelKey?: string,
+): Promise<{
   tokensLast5h: number;
   tokensWeekly: number;
   tokensLast24h: number;
@@ -237,6 +262,16 @@ export async function checkTokenUsage(user: AuthUser): Promise<{
   limitWeeklyExceeded: boolean;
   dayLimitExceeded: boolean;
   monthLimitExceeded: boolean;
+  modelTokensLast5h?: number;
+  modelTokensWeekly?: number;
+  modelTokensLast24h?: number;
+  modelTokensThisMonth?: number;
+  modelLimit5hExceeded?: boolean;
+  modelLimitWeeklyExceeded?: boolean;
+  modelLimitDayExceeded?: boolean;
+  effectiveModelLimit5h?: number | null;
+  effectiveModelLimitWeekly?: number | null;
+  effectiveModelLimitPerDay?: number | null;
 }> {
   const now = new Date();
   const fiveHoursAgo = new Date(now.getTime() - 5 * 60 * 60 * 1000).toISOString();
@@ -248,6 +283,11 @@ export async function checkTokenUsage(user: AuthUser): Promise<{
   let tokensWeekly = 0;
   let tokensLast24h = 0;
   let tokensThisMonth = 0;
+
+  let modelTokensLast5h = 0;
+  let modelTokensWeekly = 0;
+  let modelTokensLast24h = 0;
+  let modelTokensThisMonth = 0;
 
   try {
     const isSingleUserOrAdmin = user.role === 'admin' || user.id === 'admin';
@@ -261,6 +301,7 @@ export async function checkTokenUsage(user: AuthUser): Promise<{
     const records = await db.query.modelStats.findMany({
       where: whereClause,
       columns: {
+        modelKey: true,
         totalTokens: true,
         createdAt: true,
       },
@@ -269,17 +310,22 @@ export async function checkTokenUsage(user: AuthUser): Promise<{
     for (const record of records) {
       const tokens = record.totalTokens || 0;
       const createdAt = record.createdAt;
+      const isTargetModel = Boolean(modelKey && record.modelKey === modelKey);
 
       if (createdAt >= fiveHoursAgo) {
         tokensLast5h += tokens;
+        if (isTargetModel) modelTokensLast5h += tokens;
       }
       if (createdAt >= sevenDaysAgo) {
         tokensWeekly += tokens;
+        if (isTargetModel) modelTokensWeekly += tokens;
       }
       if (createdAt >= twentyFourHoursAgo) {
         tokensLast24h += tokens;
+        if (isTargetModel) modelTokensLast24h += tokens;
       }
       tokensThisMonth += tokens;
+      if (isTargetModel) modelTokensThisMonth += tokens;
     }
   } catch (err) {
     console.error('Error calculating token usage:', err);
@@ -306,6 +352,25 @@ export async function checkTokenUsage(user: AuthUser): Promise<{
     !isAdmin && effectiveLimitPerMonth && tokensThisMonth >= effectiveLimitPerMonth,
   );
 
+  // Model-specific quota resolution
+  const globalModelLimits = (configManager.getConfig('globalLimits.modelLimits', {}) || {}) as Record<string, any>;
+  const userModelLimit = modelKey && user.modelLimits ? user.modelLimits[modelKey] : null;
+  const globalModelLimit = modelKey ? globalModelLimits[modelKey] : null;
+
+  const effectiveModelLimit5h = userModelLimit?.tokenLimit5h ?? (isAdmin ? null : globalModelLimit?.tokenLimit5h);
+  const effectiveModelLimitWeekly = userModelLimit?.tokenLimitWeekly ?? (isAdmin ? null : globalModelLimit?.tokenLimitWeekly);
+  const effectiveModelLimitPerDay = userModelLimit?.tokenLimitPerDay ?? (isAdmin ? null : globalModelLimit?.tokenLimitPerDay);
+
+  const modelLimit5hExceeded = Boolean(
+    !isAdmin && effectiveModelLimit5h && modelTokensLast5h >= effectiveModelLimit5h,
+  );
+  const modelLimitWeeklyExceeded = Boolean(
+    !isAdmin && effectiveModelLimitWeekly && modelTokensWeekly >= effectiveModelLimitWeekly,
+  );
+  const modelLimitDayExceeded = Boolean(
+    !isAdmin && effectiveModelLimitPerDay && modelTokensLast24h >= effectiveModelLimitPerDay,
+  );
+
   return {
     tokensLast5h,
     tokensWeekly,
@@ -315,5 +380,15 @@ export async function checkTokenUsage(user: AuthUser): Promise<{
     limitWeeklyExceeded,
     dayLimitExceeded,
     monthLimitExceeded,
+    modelTokensLast5h,
+    modelTokensWeekly,
+    modelTokensLast24h,
+    modelTokensThisMonth,
+    modelLimit5hExceeded,
+    modelLimitWeeklyExceeded,
+    modelLimitDayExceeded,
+    effectiveModelLimit5h: effectiveModelLimit5h ?? null,
+    effectiveModelLimitWeekly: effectiveModelLimitWeekly ?? null,
+    effectiveModelLimitPerDay: effectiveModelLimitPerDay ?? null,
   };
 }

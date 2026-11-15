@@ -25,6 +25,7 @@ export const GET = async (req: NextRequest) => {
         status: true,
         allowedProviders: true,
         allowedModels: true,
+        modelLimits: true,
         tokenLimit5h: true,
         tokenLimitWeekly: true,
         tokenLimitPerDay: true,
@@ -60,6 +61,7 @@ export const POST = async (req: NextRequest) => {
       role = 'member',
       allowedProviders = ['*'],
       allowedModels = ['*'],
+      modelLimits = {},
       tokenLimit5h,
       tokenLimitWeekly,
       tokenLimitPerDay,
@@ -108,6 +110,7 @@ export const POST = async (req: NextRequest) => {
       status: 'active',
       allowedProviders,
       allowedModels,
+      modelLimits: typeof modelLimits === 'object' && modelLimits !== null && !Array.isArray(modelLimits) ? modelLimits : {},
       tokenLimit5h:
         tokenLimit5h !== undefined && tokenLimit5h !== null
           ? Number(tokenLimit5h)

@@ -74,6 +74,9 @@ if (!isBuildPhase) {
   try {
     sqlite.exec('ALTER TABLE users ADD COLUMN max_tokens_per_request INTEGER;');
   } catch {}
+  try {
+    sqlite.exec("ALTER TABLE users ADD COLUMN model_limits TEXT DEFAULT '{}';");
+  } catch {}
 
   // Ensure tables exist immediately on database connection
   try {

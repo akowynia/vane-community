@@ -73,3 +73,4 @@ For a high level flow, see [WORKING.md](WORKING.md). For deeper implementation d
 - [Bulk Selection & Multi-Format Export Mode](BULK_EXPORT_MODE.md)
 - [GitHub Pages Continuous Documentation Deployment](GITHUB_PAGES_DEPLOYMENT.md)
 - [Continuous Pull Request & Branch Verification Pipeline](PULL_REQUEST_VERIFICATION_PIPELINE.md)
+- [Model Access Control & Model Quotas](MODEL_ACCESS_CONTROL_AND_LIMITS.md)

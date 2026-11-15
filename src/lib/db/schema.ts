@@ -17,6 +17,19 @@ export const users = sqliteTable('users', {
   allowedModels: text('allowed_models', { mode: 'json' })
     .$type<string[]>()
     .default(sql`'["*"]'`),
+  modelLimits: text('model_limits', { mode: 'json' })
+    .$type<
+      Record<
+        string,
+        {
+          tokenLimit5h?: number | null;
+          tokenLimitWeekly?: number | null;
+          tokenLimitPerDay?: number | null;
+          maxTokensPerRequest?: number | null;
+        }
+      >
+    >()
+    .default(sql`'{}'`),
   tokenLimit5h: integer('token_limit_5h'),
   tokenLimitWeekly: integer('token_limit_weekly'),
   tokenLimitPerDay: integer('token_limit_per_day'),
