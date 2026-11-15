@@ -94,6 +94,8 @@ nav:
           - Waypoint Cron Webhooks: architecture/WAYPOINT_CRON_WEBHOOKS.md
           - Scratchpad Canvas: architecture/SCRATCHPAD.md
           - AI Presentation Generator: architecture/PRESENTATIONS.md
+          - Bulk & Selective Deletion: architecture/BULK_DELETE_MODE.md
+          - Bulk Selection & Multi-Format Export: architecture/BULK_EXPORT_MODE.md
           - PDF Export Customization: architecture/PDF_EXPORT_CUSTOMIZATION.md
           - UI Themes: architecture/UI_THEMES.md
           - Localization System: architecture/LOCALIZATION.md
@@ -102,6 +104,7 @@ nav:
           - Security Architecture: architecture/SECURITY.md
           - Roles, Vault & Multi-User: architecture/ROLES_VAULT_AND_MULTIUSER.md
           - API Access & Playground: architecture/API_ACCESS_AND_PLAYGROUND.md
+          - Pull Request Verification Pipeline: architecture/PULL_REQUEST_VERIFICATION_PIPELINE.md
           - Docker Multi-Arch Build Pipeline: architecture/DOCKER_RELEASE_PIPELINE.md
           - GitHub Pages Deployment: architecture/GITHUB_PAGES_DEPLOYMENT.md
   - API Reference:

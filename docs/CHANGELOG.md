@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.0]
+
+### Security & Access Control
+- Administrator Self-Demotion & Account Protection: Prevented administrators from demoting their own administrator privileges or disabling their own accounts, eliminating lock-out vulnerabilities and reinforcing role-based access control (Issue: #3)
+- Token Limit Validation & Sanitization: Enforced strict sanitization and validation for all user token limits (5-hour, daily, weekly, monthly, and per-request limits), rejecting non-integer or negative inputs (Issue: #3)
+- Database Schema Migrations: Added automated schema migrations for token limit fields in the SQLite database layer
+
+### Added
+- Bulk & Selective Deletion Mode: Introduced unified multi-item selection and deletion across Library chats, Waypoints, Crons, Scratchpads, and Batch Search workspaces with confirmation dialogues, bulk selection toolbars, and server-side authorization checks
+- Bulk Selection & Multi-Format Document Export: Added multi-item selection and bundled archive export for batch research outputs into PDF, Markdown, HTML, and JSON/CSV files with summary indexes
+- Scoped Batch Query Studio & LLM Context Overflow Resilience: Implemented modular section slicing and smart context navigation for high-volume batch search items in Scratchpad, preventing LLM token context overflow
+- Scratchpad Conversation History Reset: Added on-demand chat history clearing for Scratchpad workspaces with confirmation prompts
+- Batch Search Floating Status Minimization: Added ability to hide, minimize, and restore the floating batch execution status widget across navigation views
+- Pull Request & Branch Verification Pipeline: Automated continuous integration workflow validating TypeScript types and production builds for branches and pull requests
+- Full 12-Language Localization: Complete translation coverage across 12 languages for bulk actions, export dialogs, token limits, and scratchpad tools
+
+### Fixed & Improved
+- Mermaid Diagram Syntax Auto-Repair: Enhanced parsing resilience in message rendering by auto-quoting labels containing special characters, parentheses, and slashes to prevent rendering failures
+
 ## [1.1.2]
 
 ### Fixed
