@@ -65,18 +65,15 @@ jobs:
             BUILD_TYPE="release"
             VERSION_RAW="${REF#refs/tags/}"
             PUBLISH_LATEST="true"
-            if [[ "$VERSION_RAW" == *"-"* ]]; then
-              PUBLISH_LATEST="false"
-            fi
           elif [ "$EVENT" = "push" ] && [[ "$REF" == refs/tags/* ]]; then
             BUILD_TYPE="release"
             VERSION_RAW="${REF#refs/tags/}"
             PUBLISH_LATEST="true"
-            if [[ "$VERSION_RAW" == *"-"* ]]; then
-              PUBLISH_LATEST="false"
-            fi
           elif [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/canary" ]; then
             BUILD_TYPE="canary"
+          elif [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/master" ]; then
+            BUILD_TYPE="master"
+            PUBLISH_LATEST="true"
           elif [ "$EVENT" = "workflow_dispatch" ]; then
             if [ -n "$INPUT_VERSION" ]; then
               BUILD_TYPE="release"
@@ -102,6 +99,11 @@ jobs:
               VERSION_CLEAN="${BASH_REMATCH[1]}"
             else
               VERSION_CLEAN="$VERSION_RAW"
+            fi
+
+            # Do not publish pre-releases (e.g. 1.2.0-beta, 1.2.0-rc1) as latest
+            if [ "$EVENT" != "workflow_dispatch" ] && [[ "$VERSION_CLEAN" == *"-"* ]]; then
+              PUBLISH_LATEST="false"
             fi
           fi
 
