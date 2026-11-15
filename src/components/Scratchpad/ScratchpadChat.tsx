@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, Fragment } from 'react';
 import {
   Send,
   Square,
@@ -20,7 +20,17 @@ import {
   Zap,
   Plus,
   HelpCircle,
+  Trash2,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  DialogTitle,
+  Description,
+  Transition,
+  TransitionChild,
+} from '@headlessui/react';
 import TextareaAutosize from 'react-textarea-autosize';
 import { useTranslation } from '@/lib/i18n';
 import ModelSelector from '../MessageInputActions/ChatModelSelector';
@@ -80,6 +90,13 @@ export interface SendMessageOptions {
   approvedPlan?: any;
 }
 
+export interface ActiveQueryScope {
+  index: number;
+  number: string;
+  title: string;
+  total: number;
+}
+
 interface ScratchpadChatProps {
   messages: ScratchpadChatMessage[];
   onSendMessage: (text: string, options?: SendMessageOptions) => Promise<void>;
@@ -92,6 +109,10 @@ interface ScratchpadChatProps {
   templateInfo?: { id?: string; name?: string; icon?: string; isBuiltin?: boolean } | null;
   isPresentation?: boolean;
   onAcceptPlan?: (plan: any) => Promise<void>;
+  activeQueryScope?: ActiveQueryScope | null;
+  onSelectQueryScope?: (index: number | null) => void;
+  onClearChat?: () => Promise<void> | void;
+  isClearingChat?: boolean;
 }
 
 const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
@@ -106,9 +127,14 @@ const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
   templateInfo = null,
   isPresentation = false,
   onAcceptPlan,
+  activeQueryScope = null,
+  onSelectQueryScope,
+  onClearChat,
+  isClearingChat = false,
 }) => {
   const { t } = useTranslation();
   const [input, setInput] = useState('');
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -244,6 +270,40 @@ const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-light-primary dark:bg-[#120f0d] border border-light-200 dark:border-[#221c16] rounded-2xl overflow-hidden shadow-sm">
+      {/* Copilot Header Bar */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-light-200/80 dark:border-[#221c16] bg-light-secondary/40 dark:bg-[#15110e]/60 shrink-0">
+        <div className="flex items-center space-x-2">
+          <div className="p-1 rounded-md bg-[#b8864d]/15 text-[#b8864d]">
+            <Bot className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">
+            {isPresentation
+              ? (t('presentation.aiCopilotTitle') || 'AI Presentation Assistant')
+              : (t('scratchpad.aiCopilotTitle') || 'AI Scratchpad Copilot')}
+          </span>
+          {messages.length > 0 && (
+            <span className="text-[10px] text-stone-400 dark:text-stone-500 font-mono">
+              ({messages.length})
+            </span>
+          )}
+        </div>
+
+        {onClearChat && (
+          <button
+            type="button"
+            onClick={() => setIsClearConfirmOpen(true)}
+            disabled={messages.length === 0 || loading || isClearingChat}
+            title={t('scratchpad.clearConversation') || 'Clear conversation'}
+            className="flex items-center space-x-1.5 px-2 py-1 rounded-lg text-[11px] font-medium text-stone-400 hover:text-red-500 hover:bg-red-500/10 dark:hover:text-red-400 dark:hover:bg-red-400/10 transition disabled:opacity-30 disabled:pointer-events-none"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">
+              {t('scratchpad.clearConversation') || 'Clear conversation'}
+            </span>
+          </button>
+        )}
+      </div>
+
       {/* Chat Messages List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
@@ -582,6 +642,31 @@ const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
 
       {/* Input Area */}
       <div className="p-3 border-t border-light-200 dark:border-[#221c16] bg-light-secondary/80 dark:bg-[#181411]/80 backdrop-blur-md">
+        {/* Active Query Scope Indicator */}
+        {activeQueryScope && (
+          <div className="flex items-center justify-between mb-2 px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs text-stone-800 dark:text-stone-200 animate-fadeIn">
+            <div className="flex items-center space-x-2 truncate min-w-0">
+              <Layers className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="font-semibold text-cyan-400 shrink-0">
+                #{activeQueryScope.number} ({activeQueryScope.index + 1}/{activeQueryScope.total})
+              </span>
+              <span className="truncate italic text-stone-600 dark:text-stone-300">
+                "{activeQueryScope.title}"
+              </span>
+            </div>
+            {onSelectQueryScope && (
+              <button
+                type="button"
+                onClick={() => onSelectQueryScope(null)}
+                title={t('scratchpad.fullDocument') || 'Switch to full document context'}
+                className="text-[10px] text-stone-400 hover:text-stone-200 px-1.5 py-0.5 rounded hover:bg-white/5 transition shrink-0 ml-2"
+              >
+                {t('common.clear') || 'Clear'}
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Selected Context Banner */}
         {selectedText && (
           <div className="flex items-center justify-between mb-2 px-3 py-1.5 rounded-xl bg-[#b8864d]/15 border border-[#b8864d]/30 text-xs text-stone-800 dark:text-stone-200 animate-fadeIn">
@@ -620,7 +705,9 @@ const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
               placeholder={
                 selectedText
                   ? t('scratchpad.refineSelectionPlaceholder') || 'Describe how to modify the selected fragment...'
-                  : t('scratchpad.promptPlaceholder') || 'Ask a question, request drafting, or edit a specific section...'
+                  : activeQueryScope
+                    ? `Ask a question, request drafting, or edit Query #${activeQueryScope.number}...`
+                    : t('scratchpad.promptPlaceholder') || 'Ask a question, request drafting, or edit a specific section...'
               }
               className="w-full bg-transparent text-xs text-stone-900 dark:text-stone-100 placeholder:text-stone-400 resize-none focus:outline-none"
             />
@@ -655,6 +742,86 @@ const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Clear Conversation Confirmation Dialog */}
+      <Transition appear show={isClearConfirmOpen} as={Fragment}>
+        <Dialog
+          as="div"
+          className="relative z-50"
+          onClose={() => {
+            if (!isClearingChat) setIsClearConfirmOpen(false);
+          }}
+        >
+          <TransitionChild
+            as={Fragment}
+            enter="ease-out duration-200"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-150"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <DialogBackdrop className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
+          </TransitionChild>
+
+          <div className="fixed inset-0 z-10 overflow-y-auto p-4 flex items-center justify-center">
+            <TransitionChild
+              as={Fragment}
+              enter="ease-out duration-200"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-150"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <DialogPanel className="w-full max-w-md transform rounded-2xl bg-light-primary dark:bg-[#14100d] border border-light-200 dark:border-[#2a241d] p-6 text-left shadow-2xl transition-all">
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="p-2.5 rounded-xl bg-red-500/10 text-red-500">
+                    <Trash2 className="w-5 h-5" />
+                  </div>
+                  <DialogTitle className="text-base font-semibold text-stone-900 dark:text-stone-100">
+                    {t('scratchpad.clearConversationConfirmTitle') || 'Clear conversation history?'}
+                  </DialogTitle>
+                </div>
+
+                <Description className="text-xs text-stone-500 dark:text-stone-400 leading-relaxed mb-6">
+                  {t('scratchpad.clearConversationConfirmDesc') ||
+                    'This will permanently remove all chat messages in this note. Note content and version history will not be affected.'}
+                </Description>
+
+                <div className="flex items-center justify-end space-x-2">
+                  <button
+                    type="button"
+                    disabled={isClearingChat}
+                    onClick={() => setIsClearConfirmOpen(false)}
+                    className="px-3.5 py-2 rounded-xl text-xs font-medium text-stone-600 dark:text-stone-400 hover:bg-black/5 dark:hover:bg-white/5 transition"
+                  >
+                    {t('common.cancel') || 'Cancel'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isClearingChat}
+                    onClick={async () => {
+                      if (onClearChat) {
+                        await onClearChat();
+                      }
+                      setIsClearConfirmOpen(false);
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-500 text-white hover:bg-red-600 transition flex items-center space-x-1.5 shadow-sm disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>
+                      {isClearingChat
+                        ? (t('common.loading') || 'Clearing...')
+                        : (t('scratchpad.clearConversation') || 'Clear')}
+                    </span>
+                  </button>
+                </div>
+              </DialogPanel>
+            </TransitionChild>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
   );
 };

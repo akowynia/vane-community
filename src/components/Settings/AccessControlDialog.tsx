@@ -377,8 +377,19 @@ export const AccessControlDialog = ({
           body: JSON.stringify(item),
         });
         if (!res.ok) {
-          const data = await res.json();
-          throw new Error(data.message || t('accessControl.saveError') || 'Failed to save');
+          let errorMsg = '';
+          try {
+            const rawText = await res.text();
+            try {
+              const parsed = JSON.parse(rawText);
+              errorMsg = parsed.message || parsed.error || rawText;
+            } catch {
+              errorMsg = rawText;
+            }
+          } catch {
+            errorMsg = `HTTP ${res.status}`;
+          }
+          throw new Error(errorMsg || t('accessControl.saveError') || 'Failed to save');
         }
       }
 
@@ -433,7 +444,7 @@ export const AccessControlDialog = ({
   const handleUpdateUserLimits = async (user: UserItem) => {
     try {
       const res = await fetch(`/api/users/${user.id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tokenLimit5h: user.tokenLimit5h,
@@ -449,13 +460,25 @@ export const AccessControlDialog = ({
       });
 
       if (!res.ok) {
-        throw new Error(t('accessControl.saveError') || 'Failed to save');
+        let errorMsg = '';
+        try {
+          const rawText = await res.text();
+          try {
+            const parsed = JSON.parse(rawText);
+            errorMsg = parsed.message || parsed.error || rawText;
+          } catch {
+            errorMsg = rawText;
+          }
+        } catch {
+          errorMsg = `HTTP ${res.status}`;
+        }
+        throw new Error(errorMsg || t('accessControl.saveError') || 'Failed to save changes');
       }
 
       toast.success(t('accessControl.saveSuccess') || 'User limits saved successfully.');
       loadData();
     } catch (err: any) {
-      toast.error(err.message || t('accessControl.saveError') || 'Failed to save');
+      toast.error(err.message || t('accessControl.saveError') || 'Failed to save changes');
     }
   };
 
@@ -1155,13 +1178,17 @@ export const AccessControlDialog = ({
                           </label>
                           <input
                             type="number"
-                            value={globalLimits.tokenLimit5h || ''}
-                            onChange={(e) =>
+                            min="0"
+                            step="1"
+                            value={globalLimits.tokenLimit5h ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value.trim();
+                              const val = parseInt(v, 10);
                               setGlobalLimits({
                                 ...globalLimits,
-                                tokenLimit5h: e.target.value ? parseInt(e.target.value, 10) : null,
-                              })
-                            }
+                                tokenLimit5h: v === '' || isNaN(val) ? null : Math.max(0, val),
+                              });
+                            }}
                             placeholder={t('accessControl.limit5hPlaceholder') || 'e.g. 50000 (empty = unlimited)'}
                             className="w-full px-3 py-2 rounded-lg border border-[#382d20] bg-black text-xs text-stone-200 focus:outline-none focus:border-[#b8864d]"
                           />
@@ -1178,15 +1205,17 @@ export const AccessControlDialog = ({
                           </label>
                           <input
                             type="number"
-                            value={globalLimits.tokenLimitWeekly || ''}
-                            onChange={(e) =>
+                            min="0"
+                            step="1"
+                            value={globalLimits.tokenLimitWeekly ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value.trim();
+                              const val = parseInt(v, 10);
                               setGlobalLimits({
                                 ...globalLimits,
-                                tokenLimitWeekly: e.target.value
-                                  ? parseInt(e.target.value, 10)
-                                  : null,
-                              })
-                            }
+                                tokenLimitWeekly: v === '' || isNaN(val) ? null : Math.max(0, val),
+                              });
+                            }}
                             placeholder={t('accessControl.limitWeeklyPlaceholder') || 'e.g. 250000 (empty = unlimited)'}
                             className="w-full px-3 py-2 rounded-lg border border-[#382d20] bg-black text-xs text-stone-200 focus:outline-none focus:border-[#b8864d]"
                           />
@@ -1203,15 +1232,17 @@ export const AccessControlDialog = ({
                           </label>
                           <input
                             type="number"
-                            value={globalLimits.tokenLimitPerDay || ''}
-                            onChange={(e) =>
+                            min="0"
+                            step="1"
+                            value={globalLimits.tokenLimitPerDay ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value.trim();
+                              const val = parseInt(v, 10);
                               setGlobalLimits({
                                 ...globalLimits,
-                                tokenLimitPerDay: e.target.value
-                                  ? parseInt(e.target.value, 10)
-                                  : null,
-                              })
-                            }
+                                tokenLimitPerDay: v === '' || isNaN(val) ? null : Math.max(0, val),
+                              });
+                            }}
                             placeholder={t('accessControl.limitDailyPlaceholder') || 'e.g. 100000 (empty = unlimited)'}
                             className="w-full px-3 py-2 rounded-lg border border-[#382d20] bg-black text-xs text-stone-200 focus:outline-none focus:border-[#b8864d]"
                           />
@@ -1224,15 +1255,17 @@ export const AccessControlDialog = ({
                           </label>
                           <input
                             type="number"
-                            value={globalLimits.maxTokensPerRequest || ''}
-                            onChange={(e) =>
+                            min="0"
+                            step="1"
+                            value={globalLimits.maxTokensPerRequest ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value.trim();
+                              const val = parseInt(v, 10);
                               setGlobalLimits({
                                 ...globalLimits,
-                                maxTokensPerRequest: e.target.value
-                                  ? parseInt(e.target.value, 10)
-                                  : null,
-                              })
-                            }
+                                maxTokensPerRequest: v === '' || isNaN(val) ? null : Math.max(0, val),
+                              });
+                            }}
                             placeholder={t('accessControl.maxPerRequestPlaceholder') || 'e.g. 4096 (empty = unlimited)'}
                             className="w-full px-3 py-2 rounded-lg border border-[#382d20] bg-black text-xs text-stone-200 focus:outline-none focus:border-[#b8864d]"
                           />
@@ -1245,15 +1278,17 @@ export const AccessControlDialog = ({
                           </label>
                           <input
                             type="number"
-                            value={globalLimits.qualityModeMaxTokens || ''}
-                            onChange={(e) =>
+                            min="0"
+                            step="1"
+                            value={globalLimits.qualityModeMaxTokens ?? ''}
+                            onChange={(e) => {
+                              const v = e.target.value.trim();
+                              const val = parseInt(v, 10);
                               setGlobalLimits({
                                 ...globalLimits,
-                                qualityModeMaxTokens: e.target.value
-                                  ? parseInt(e.target.value, 10)
-                                  : null,
-                              })
-                            }
+                                qualityModeMaxTokens: v === '' || isNaN(val) ? null : Math.max(0, val),
+                              });
+                            }}
                             placeholder={t('accessControl.qualityModeLimitPlaceholder') || 'e.g. 75000 (default 75,000)'}
                             className="w-full px-3 py-2 rounded-lg border border-[#382d20] bg-black text-xs text-stone-200 focus:outline-none focus:border-[#b8864d]"
                           />
@@ -1316,15 +1351,17 @@ export const AccessControlDialog = ({
                                 </label>
                                 <input
                                   type="number"
-                                  value={selectedUser.tokenLimit5h || ''}
-                                  onChange={(e) =>
+                                  min="0"
+                                  step="1"
+                                  value={selectedUser.tokenLimit5h ?? ''}
+                                  onChange={(e) => {
+                                    const v = e.target.value.trim();
+                                    const val = parseInt(v, 10);
                                     setSelectedUser({
                                       ...selectedUser,
-                                      tokenLimit5h: e.target.value
-                                        ? parseInt(e.target.value, 10)
-                                        : null,
-                                    })
-                                  }
+                                      tokenLimit5h: v === '' || isNaN(val) ? null : Math.max(0, val),
+                                    });
+                                  }}
                                   placeholder={t('accessControl.limitPlaceholderEmpty') || 'empty = unlimited'}
                                   className="w-full mt-1 px-3 py-2 rounded-lg border border-light-200 dark:border-[#382d20] bg-light-primary dark:bg-[#0c0a08] text-xs text-stone-200 focus:outline-none"
                                 />
@@ -1335,15 +1372,17 @@ export const AccessControlDialog = ({
                                 </label>
                                 <input
                                   type="number"
-                                  value={selectedUser.tokenLimitWeekly || ''}
-                                  onChange={(e) =>
+                                  min="0"
+                                  step="1"
+                                  value={selectedUser.tokenLimitWeekly ?? ''}
+                                  onChange={(e) => {
+                                    const v = e.target.value.trim();
+                                    const val = parseInt(v, 10);
                                     setSelectedUser({
                                       ...selectedUser,
-                                      tokenLimitWeekly: e.target.value
-                                        ? parseInt(e.target.value, 10)
-                                        : null,
-                                    })
-                                  }
+                                      tokenLimitWeekly: v === '' || isNaN(val) ? null : Math.max(0, val),
+                                    });
+                                  }}
                                   placeholder={t('accessControl.limitPlaceholderEmpty') || 'empty = unlimited'}
                                   className="w-full mt-1 px-3 py-2 rounded-lg border border-light-200 dark:border-[#382d20] bg-light-primary dark:bg-[#0c0a08] text-xs text-stone-200 focus:outline-none"
                                 />
@@ -1354,15 +1393,17 @@ export const AccessControlDialog = ({
                                 </label>
                                 <input
                                   type="number"
-                                  value={selectedUser.tokenLimitPerDay || ''}
-                                  onChange={(e) =>
+                                  min="0"
+                                  step="1"
+                                  value={selectedUser.tokenLimitPerDay ?? ''}
+                                  onChange={(e) => {
+                                    const v = e.target.value.trim();
+                                    const val = parseInt(v, 10);
                                     setSelectedUser({
                                       ...selectedUser,
-                                      tokenLimitPerDay: e.target.value
-                                        ? parseInt(e.target.value, 10)
-                                        : null,
-                                    })
-                                  }
+                                      tokenLimitPerDay: v === '' || isNaN(val) ? null : Math.max(0, val),
+                                    });
+                                  }}
                                   placeholder={t('accessControl.limitPlaceholderEmpty') || 'empty = unlimited'}
                                   className="w-full mt-1 px-3 py-2 rounded-lg border border-light-200 dark:border-[#382d20] bg-light-primary dark:bg-[#0c0a08] text-xs text-stone-200 focus:outline-none"
                                 />
@@ -1373,15 +1414,17 @@ export const AccessControlDialog = ({
                                 </label>
                                 <input
                                   type="number"
-                                  value={selectedUser.maxTokensPerRequest || ''}
-                                  onChange={(e) =>
+                                  min="0"
+                                  step="1"
+                                  value={selectedUser.maxTokensPerRequest ?? ''}
+                                  onChange={(e) => {
+                                    const v = e.target.value.trim();
+                                    const val = parseInt(v, 10);
                                     setSelectedUser({
                                       ...selectedUser,
-                                      maxTokensPerRequest: e.target.value
-                                        ? parseInt(e.target.value, 10)
-                                        : null,
-                                    })
-                                  }
+                                      maxTokensPerRequest: v === '' || isNaN(val) ? null : Math.max(0, val),
+                                    });
+                                  }}
                                   placeholder={t('accessControl.limitPlaceholderEmpty') || 'empty = unlimited'}
                                   className="w-full mt-1 px-3 py-2 rounded-lg border border-light-200 dark:border-[#382d20] bg-light-primary dark:bg-[#0c0a08] text-xs text-stone-200 focus:outline-none"
                                 />

@@ -24,6 +24,11 @@ import { generatePresentationPlan } from '@/lib/agents/scratchpad/presentationPl
 import { presentationGeneratorPrompt } from '@/lib/prompts/scratchpad/presentationGenerator';
 import { recordLlmMetric } from '@/lib/stats/tracker';
 import { getTokenCount } from '@/lib/utils/splitText';
+import {
+  parseBatchSections,
+  replaceBatchSection,
+  findSectionIndexBySnippet,
+} from '@/lib/scratchpad/batchSections';
 import { z } from 'zod';
 import crypto from 'crypto';
 
@@ -74,6 +79,11 @@ const scratchpadChatSchema = z.object({
   planApproved: z.boolean().optional().default(false),
   approvedPlan: z.any().optional(),
   presentationConfig: presentationConfigSchema.optional(),
+  activeQueryIndex: z.number().nullable().optional(),
+  activeQueryNumber: z.string().nullable().optional(),
+  activeQueryTitle: z.string().nullable().optional(),
+  isBatchScoped: z.boolean().optional().default(false),
+  fullDocumentContent: z.string().optional(),
 });
 
 export const POST = async (
@@ -791,8 +801,40 @@ GENERATION GUIDELINES:
         }
 
         // =========================================================================
-        // STANDARD NOTE WORKFLOW (Scratchpad Note)
+        // STANDARD NOTE WORKFLOW (Scratchpad Note & Scoped Batch Queries)
         // =========================================================================
+
+        let isBatchScoped = Boolean(data.isBatchScoped);
+        let activeQueryIndex = data.activeQueryIndex ?? null;
+        let activeQueryNumber = data.activeQueryNumber || null;
+        let activeQueryTitle = data.activeQueryTitle || null;
+        const baseFullDocument = data.fullDocumentContent || sketch.content || '';
+        let targetContent = data.currentContent || sketch.content || '';
+
+        // Auto-detect and guardrail against huge context payloads (>15,000 tokens)
+        const estimatedRawTokens = getTokenCount(targetContent);
+        if (estimatedRawTokens > 15000 && !isBatchScoped) {
+          const parsedSections = parseBatchSections(baseFullDocument || targetContent);
+          if (parsedSections.length >= 2) {
+            let matchedIdx = -1;
+            if (data.selectedText) {
+              matchedIdx = findSectionIndexBySnippet(parsedSections, data.selectedText);
+            }
+            if (matchedIdx !== -1) {
+              isBatchScoped = true;
+              activeQueryIndex = matchedIdx;
+              activeQueryNumber = parsedSections[matchedIdx].number;
+              activeQueryTitle = parsedSections[matchedIdx].title;
+              targetContent = parsedSections[matchedIdx].content;
+            } else {
+              isBatchScoped = true;
+              activeQueryIndex = 0;
+              activeQueryNumber = parsedSections[0].number;
+              activeQueryTitle = parsedSections[0].title;
+              targetContent = parsedSections[0].content;
+            }
+          }
+        }
 
         // Step 0: Clarification & Disambiguation Evaluation
         const shouldEvaluateClarification = !data.skipClarification && !data.clarificationResponse;
@@ -801,7 +843,7 @@ GENERATION GUIDELINES:
           const clarifEvaluation = await evaluateScratchpadClarification({
             query: data.message.content,
             currentTitle: data.currentTitle || sketch.title,
-            currentContent: data.currentContent || sketch.content,
+            currentContent: targetContent,
             selectedText: data.selectedText,
             llm,
             providerId: data.chatModel.providerId,
@@ -936,13 +978,74 @@ ${data.clarificationResponse.question ? `- Clarified question was: "${data.clari
 Tailor the research depth, technical angle, examples, and note structure specifically to this chosen focus!`;
         }
 
-        const systemPrompt = `You are Vane Scratchpad Copilot, an expert AI research and writing collaborator paired with a live interactive document editor.
+        let systemPrompt = '';
+
+        if (isBatchScoped && (activeQueryNumber || activeQueryTitle)) {
+          systemPrompt = `You are Vane Scratchpad Copilot, an expert AI research and writing collaborator paired with a live interactive document editor.
+The user is refining a SPECIFIC QUERY NOTE (Query #${activeQueryNumber || ''}: "${activeQueryTitle || ''}") inside a large Batch Research document.
+
+DOCUMENT TITLE: "${data.currentTitle || sketch.title}"
+TARGET QUERY: #${activeQueryNumber || ''} "${activeQueryTitle || ''}"
+
+CURRENT QUERY NOTE CONTENT:
+\`\`\`markdown
+${targetContent || '(Empty query note)'}
+\`\`\`
+
+${
+  data.selectedText
+    ? `IMPORTANT: The user has selected this specific snippet in this query note for focused refinement:
+<selected_text>
+${data.selectedText}
+</selected_text>
+Your task is to modify, rewrite, or expand upon this specific selection while seamlessly integrating with this query note.`
+    : ''
+}
+
+${clarificationSection}
+
+${
+  searchFindingsText
+    ? `<search_results note="Factual information found on the web. Cite these using [1], [2] notation where appropriate">
+${searchFindingsText}
+</search_results>`
+    : ''
+}
+
+${
+  waypointInstructions
+    ? `USER MASTERPROMPT / SPACE INSTRUCTIONS:
+${waypointInstructions}`
+    : ''
+}
+
+### CRITICAL INSTRUCTIONS FOR TARGET QUERY NOTE:
+1. Always respond in the same language as the user query. If the language is ambiguous, default to English.
+2. Chat Response:
+   - Provide a direct, natural, conversational explanation of your work, findings, or modifications for Query #${activeQueryNumber || ''}.
+   - NEVER output meta-headers, prefixes, or labels like "Part 1:", "Part 1 (Chat Commentary):", "Chat Commentary:", or "Komentarz:". Start speaking directly to the user.
+   - Cite search findings naturally using [1], [2] notation where relevant.
+3. Selection Context:
+   - If <selected_text> is provided, acknowledge the targeted snippet and clearly explain the revisions made to it.
+4. CITING SOURCES IN THE NOTE CONTENT (MANDATORY):
+   - In the document update block <note_update>, whenever search results are provided, you MUST ACTIVELY CITE them by placing citation numbers like [1], [2], or [3] at the end of the specific factual sentences.
+5. DOCUMENT UPDATE BLOCK (MANDATORY):
+   - ALWAYS include a <note_update>...</note_update> block containing the COMPLETE, UPDATED, BEAUTIFULLY FORMATTED MARKDOWN OF THIS TARGET QUERY NOTE.
+   - PRESERVE the top-level Markdown heading (# ...) of this query note.
+   - DO NOT output other queries from the batch report. Output ONLY the refined note for Query #${activeQueryNumber || ''}.
+6. NOTE EXPANSION SUGGESTIONS (MANDATORY):
+   - Immediately after the </note_update> block, output a <note_suggestions> block with 3 to 4 actionable, specific suggestions tailored to deepening this query note.
+   - Format each suggestion on a separate line starting with "- ".
+7. Ensure headings (#, ##, ###), bullet points, code blocks, diagrams (mermaid), and tables are clean, complete, and professional.
+8. Always use valid GFM table and code syntax.`;
+        } else {
+          systemPrompt = `You are Vane Scratchpad Copilot, an expert AI research and writing collaborator paired with a live interactive document editor.
 The user is drafting, refining, structuring, or expanding a document in the Scratchpad.
 
 DOCUMENT TITLE: "${data.currentTitle || sketch.title}"
 CURRENT DOCUMENT CONTENT:
 \`\`\`markdown
-${data.currentContent || sketch.content || '(Pusty dokument)'}
+${targetContent || '(Pusty dokument)'}
 \`\`\`
 
 ${
@@ -1006,6 +1109,7 @@ ${waypointInstructions}`
    - NEVER insert raw line breaks inside a table row or cell.
    - If a cell contains a pipe symbol \`|\` (e.g. in type signatures or shell commands), always escape it as \`\\|\` or wrap it in code format so it doesn't split table columns.
    - Keep comparison tables to 2 to 4 comparison items for optimal responsive layout in split editor view.`;
+        }
 
         const streamStartTime = performance.now();
         let activeResponseBlockId = crypto.randomUUID();
@@ -1090,7 +1194,12 @@ ${waypointInstructions}`
         }
 
         const finalTitle = data.currentTitle || sketch.title;
-        const finalContent = updatedNoteContent !== null ? updatedNoteContent : (data.currentContent || sketch.content);
+        let finalSectionContent = updatedNoteContent !== null ? updatedNoteContent : targetContent;
+        let finalContent = updatedNoteContent !== null ? updatedNoteContent : (targetContent || sketch.content);
+
+        if (isBatchScoped && activeQueryIndex !== null && activeQueryIndex !== undefined) {
+          finalContent = replaceBatchSection(baseFullDocument, activeQueryIndex, finalSectionContent);
+        }
 
         // Merge accumulated sources
         const existingSources = Array.isArray(sketch.sources)
@@ -1122,9 +1231,19 @@ ${waypointInstructions}`
         });
         const nextVersionNumber = (allVersions[0]?.versionNumber || 0) + 1;
 
+        const queryLabel =
+          activeQueryNumber ||
+          (activeQueryIndex !== null && activeQueryIndex !== undefined
+            ? String(activeQueryIndex + 1)
+            : '1');
+
         let versionSummary = data.selectedText
-          ? `AI edit to selection: "${data.selectedText.slice(0, 40)}..."`
-          : `AI update (${data.message.content.slice(0, 50)})`;
+          ? (isBatchScoped
+              ? `AI edit to selection in query #${queryLabel}: "${data.selectedText.slice(0, 40)}..."`
+              : `AI edit to selection: "${data.selectedText.slice(0, 40)}..."`)
+          : (isBatchScoped
+              ? `AI update to query #${queryLabel} [${activeQueryTitle || ''}]`
+              : `AI update (${data.message.content.slice(0, 50)})`);
 
         await db.insert(scratchpadVersions).values({
           id: crypto.randomUUID(),
@@ -1200,6 +1319,9 @@ ${waypointInstructions}`
             type: 'scratchpadUpdate',
             title: finalTitle,
             content: finalContent,
+            sectionContent: finalSectionContent,
+            activeQueryIndex,
+            isBatchScoped,
             versionNumber: nextVersionNumber,
             sources: collectedSources,
             chatText: chatDisplayText,
@@ -1235,6 +1357,53 @@ ${waypointInstructions}`
     console.error('Error in scratchpad chat API:', err);
     return Response.json(
       { message: err?.message || 'An unexpected server error occurred.' },
+      { status: 500 },
+    );
+  }
+};
+
+export const DELETE = async (
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) => {
+  try {
+    ensureScratchpadTables();
+    const { id } = await params;
+    const user = await resolveRequestUser(req as NextRequest);
+    const instanceMode = configManager.getConfig('instanceMode', 'single');
+
+    const sketch = await db.query.scratchpads.findFirst({
+      where: eq(scratchpads.id, id),
+    });
+
+    if (!sketch) {
+      return Response.json({ message: 'Scratchpad not found.' }, { status: 404 });
+    }
+
+    if (instanceMode === 'multi') {
+      if (!user) {
+        return Response.json({ message: 'Login required.' }, { status: 401 });
+      }
+      if (user.role !== 'admin' && sketch.userId && sketch.userId !== user.id) {
+        return Response.json(
+          { message: 'You do not have permission to modify this scratchpad.' },
+          { status: 403 },
+        );
+      }
+    }
+
+    db.transaction((tx) => {
+      tx.delete(scratchpadMessages).where(eq(scratchpadMessages.scratchpadId, id)).run();
+    });
+
+    return Response.json({
+      success: true,
+      message: 'Scratchpad chat history cleared successfully.',
+    });
+  } catch (err: any) {
+    console.error('Error clearing scratchpad chat:', err);
+    return Response.json(
+      { message: err?.message || 'Failed to clear chat history.' },
       { status: 500 },
     );
   }

@@ -36,6 +36,18 @@ export const GET = async (
     const user = await resolveRequestUser(req as NextRequest);
     const instanceMode = configManager.getConfig('instanceMode', 'single');
 
+    if (instanceMode === 'multi') {
+      if (!user) {
+        return Response.json({ message: 'Login required.' }, { status: 401 });
+      }
+      if (user.role === 'guest') {
+        return Response.json(
+          { message: 'Guest accounts cannot access or modify scheduled tasks.' },
+          { status: 403 },
+        );
+      }
+    }
+
     const cron = await db.query.waypointCrons.findFirst({
       where: eq(waypointCrons.id, id),
     });
@@ -121,6 +133,18 @@ export const PUT = async (
     const { id } = await params;
     const user = await resolveRequestUser(req as NextRequest);
     const instanceMode = configManager.getConfig('instanceMode', 'single');
+
+    if (instanceMode === 'multi') {
+      if (!user) {
+        return Response.json({ message: 'Login required.' }, { status: 401 });
+      }
+      if (user.role === 'guest') {
+        return Response.json(
+          { message: 'Guest accounts cannot access or modify scheduled tasks.' },
+          { status: 403 },
+        );
+      }
+    }
 
     const cron = await db.query.waypointCrons.findFirst({
       where: eq(waypointCrons.id, id),
@@ -258,6 +282,18 @@ export const DELETE = async (
     const { id } = await params;
     const user = await resolveRequestUser(req as NextRequest);
     const instanceMode = configManager.getConfig('instanceMode', 'single');
+
+    if (instanceMode === 'multi') {
+      if (!user) {
+        return Response.json({ message: 'Login required.' }, { status: 401 });
+      }
+      if (user.role === 'guest') {
+        return Response.json(
+          { message: 'Guest accounts cannot access or modify scheduled tasks.' },
+          { status: 403 },
+        );
+      }
+    }
 
     const cron = await db.query.waypointCrons.findFirst({
       where: eq(waypointCrons.id, id),

@@ -32,6 +32,12 @@ import Markdown, { MarkdownToJSX, RuleType } from 'markdown-to-jsx';
 import CodeBlock from '../MessageRenderer/CodeBlock';
 import ErrorBoundary from '../ErrorBoundary';
 import { useTranslation } from '@/lib/i18n';
+import BatchQueryNavigator from './BatchQueryNavigator';
+import {
+  parseBatchSections,
+  replaceBatchSection,
+  BatchSection,
+} from '@/lib/scratchpad/batchSections';
 
 interface ScratchpadEditorProps {
   content: string;
@@ -44,6 +50,11 @@ interface ScratchpadEditorProps {
   hoveredSourceIndex?: number | null;
   onHoverCitation?: (index: number | null) => void;
   templateInfo?: { id?: string; name?: string; icon?: string; isBuiltin?: boolean } | null;
+  isBatch?: boolean;
+  activeQueryIndex?: number;
+  onSelectQueryIndex?: (index: number) => void;
+  batchViewMode?: 'queries' | 'full';
+  onChangeBatchViewMode?: (mode: 'queries' | 'full') => void;
 }
 
 const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
@@ -57,6 +68,11 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
   hoveredSourceIndex = null,
   onHoverCitation,
   templateInfo = null,
+  isBatch = false,
+  activeQueryIndex,
+  onSelectQueryIndex,
+  batchViewMode,
+  onChangeBatchViewMode,
 }) => {
   const { t, locale } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -71,16 +87,54 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
   const [showAllSections, setShowAllSections] = useState(false);
   const [pageSize, setPageSize] = useState<number>(10);
 
+  // Batch query sections & view scoping
+  const parsedSections = useMemo(() => {
+    return parseBatchSections(content);
+  }, [content]);
+
+  const isBatchDocument = Boolean(
+    isBatch || parsedSections.length >= 2,
+  );
+
+  const [internalBatchViewMode, setInternalBatchViewMode] = useState<'queries' | 'full'>('queries');
+  const [internalActiveQueryIndex, setInternalActiveQueryIndex] = useState(0);
+
+  const currentBatchViewMode = batchViewMode ?? internalBatchViewMode;
+  const currentActiveQueryIndex = Math.max(
+    0,
+    Math.min(
+      parsedSections.length > 0 ? parsedSections.length - 1 : 0,
+      activeQueryIndex ?? internalActiveQueryIndex,
+    ),
+  );
+
+  const activeSection: BatchSection | undefined = parsedSections[currentActiveQueryIndex] || parsedSections[0];
+  const isQueriesMode = isBatchDocument && currentBatchViewMode === 'queries' && Boolean(activeSection);
+
+  // Displayed content in textarea: active single query note if in queries mode, otherwise full document
+  const displayedContent = isQueriesMode && activeSection ? activeSection.content : content;
+
   // Use deferred value for preview so typing in textarea remains fluid at 60fps
-  const deferredContent = useDeferredValue(content);
+  const deferredContent = useDeferredValue(displayedContent);
+
+  const handleContentUpdate = (newText: string) => {
+    if (isQueriesMode && activeSection) {
+      const updatedFull = replaceBatchSection(content, currentActiveQueryIndex, newText);
+      onChange(updatedFull);
+    } else {
+      onChange(newText);
+    }
+  };
+
   const isLargeDocument = Boolean(
-    deferredContent &&
+    !isQueriesMode &&
+      deferredContent &&
       (deferredContent.length > 10000 || (deferredContent.match(/(?:^|\n)#\s+/g) || []).length >= 4),
   );
 
-  // Detect separate query/note sections for bulk batch documents
+  // Detect separate query/note sections for bulk batch documents in full mode
   const detectedSections = useMemo(() => {
-    if (!deferredContent) return null;
+    if (isQueriesMode || !deferredContent) return null;
 
     // Strategy 1: Batch export format with divider followed by H1 header (# )
     if (/\n\s*---\s*\n(?=#\s)/.test(deferredContent)) {
@@ -101,7 +155,7 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
     // Strategy 3: General horizontal rule divider fallback (---)
     const parts = deferredContent.split(/\n\s*---\s*\n/).filter((p) => p.trim());
     return parts.length >= 4 ? parts : null;
-  }, [deferredContent]);
+  }, [isQueriesMode, deferredContent]);
 
   const totalPages = detectedSections ? Math.max(1, Math.ceil(detectedSections.length / pageSize)) : 1;
 
@@ -366,7 +420,7 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
     const end = textareaRef.current.selectionEnd;
 
     if (start !== end) {
-      const selected = content.slice(start, end);
+      const selected = displayedContent.slice(start, end);
       setSelectionRange({ start, end });
       onSelectText?.(selected);
     } else {
@@ -380,12 +434,12 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
     const textarea = textareaRef.current;
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const selected = content.slice(start, end) || defaultText;
+    const selected = displayedContent.slice(start, end) || defaultText;
 
     const newContent =
-      content.slice(0, start) + before + selected + after + content.slice(end);
+      displayedContent.slice(0, start) + before + selected + after + displayedContent.slice(end);
 
-    onChange(newContent);
+    handleContentUpdate(newContent);
 
     setTimeout(() => {
       textarea.focus();
@@ -402,11 +456,11 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
 
-    const lineStart = content.lastIndexOf('\n', start - 1) + 1;
+    const lineStart = displayedContent.lastIndexOf('\n', start - 1) + 1;
     const newContent =
-      content.slice(0, lineStart) + prefix + content.slice(lineStart);
+      displayedContent.slice(0, lineStart) + prefix + displayedContent.slice(lineStart);
 
-    onChange(newContent);
+    handleContentUpdate(newContent);
 
     setTimeout(() => {
       textarea.focus();
@@ -417,8 +471,8 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
     }, 0);
   };
 
-  const wordsCount = content ? content.trim().split(/\s+/).filter(Boolean).length : 0;
-  const charsCount = content ? content.length : 0;
+  const wordsCount = displayedContent ? displayedContent.trim().split(/\s+/).filter(Boolean).length : 0;
+  const charsCount = displayedContent ? displayedContent.length : 0;
 
   const btnClass = `p-1.5 rounded-lg transition ${
     isLocked
@@ -428,6 +482,24 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-light-primary dark:bg-[#120f0d] border border-light-200 dark:border-[#221c16] rounded-2xl overflow-hidden shadow-sm">
+      {/* Batch Research Query Navigator */}
+      {isBatchDocument && (
+        <BatchQueryNavigator
+          sections={parsedSections}
+          activeQueryIndex={currentActiveQueryIndex}
+          onSelectQueryIndex={(idx) => {
+            setInternalActiveQueryIndex(idx);
+            onSelectQueryIndex?.(idx);
+          }}
+          viewMode={currentBatchViewMode}
+          onChangeViewMode={(mode) => {
+            setInternalBatchViewMode(mode);
+            onChangeBatchViewMode?.(mode);
+          }}
+          isAiGenerating={isGenerating}
+        />
+      )}
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center justify-between px-3 py-2 border-b border-light-200 dark:border-[#221c16] bg-light-secondary/60 dark:bg-[#181411]/60 gap-2">
         {/* Formatting Actions */}
@@ -682,7 +754,7 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
           <div className={`h-full overflow-y-auto ${viewMode === 'split' ? 'w-1/2 border-r border-light-200 dark:border-[#221c16]' : 'w-full'}`}>
             <textarea
               ref={textareaRef}
-              value={content}
+              value={displayedContent}
               readOnly={isLocked}
               disabled={isLocked}
               onSelect={handleTextSelect}
@@ -690,7 +762,7 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
               onMouseUp={handleTextSelect}
               onChange={(e) => {
                 if (!isLocked) {
-                  onChange(e.target.value);
+                  handleContentUpdate(e.target.value);
                 }
               }}
               placeholder={
@@ -711,7 +783,7 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
             ref={previewContainerRef}
             className={`h-full overflow-y-auto p-6 ${viewMode === 'split' ? 'w-1/2' : 'w-full'} bg-light-primary dark:bg-[#120f0d] flex flex-col`}
           >
-            {content.trim() ? (
+            {displayedContent.trim() ? (
               <div className="flex-1 flex flex-col min-h-0">
                 {detectedSections ? (
                   <div className="flex flex-col space-y-4">
@@ -899,6 +971,14 @@ const ScratchpadEditor: React.FC<ScratchpadEditorProps> = ({
       {/* Footer Status Bar */}
       <div className="flex items-center justify-between px-4 py-2 border-t border-light-200 dark:border-[#221c16] bg-light-secondary/40 dark:bg-[#16120f]/40 text-[11px] text-stone-400 dark:text-stone-500">
         <div className="flex items-center space-x-3">
+          {isQueriesMode && activeSection && (
+            <>
+              <span className="font-semibold text-[#b8864d]">
+                #{activeSection.number} ({currentActiveQueryIndex + 1}/{parsedSections.length})
+              </span>
+              <span>•</span>
+            </>
+          )}
           <span>{wordsCount} {t('scratchpad.wordsCount') || 'words'}</span>
           <span>•</span>
           <span>{charsCount} {t('scratchpad.charsCount') || 'chars'}</span>

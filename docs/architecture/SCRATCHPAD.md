@@ -111,9 +111,10 @@ export const scratchpadTemplates = sqliteTable('scratchpad_templates', {
 6. `GET /api/scratchpad/[id]/versions` – fetch the list of all versions of the note.
 7. `POST /api/scratchpad/[id]/versions/[versionId]/revert` – restore the document to the indicated version.
 8. `POST /api/scratchpad/[id]/chat` – the streaming AI assistant that performs web research, drafts the note, and applies selective edits.
-9. `GET /api/scratchpad/templates` – fetch the list of built-in and user templates.
-10. `POST /api/scratchpad/templates` – save a new user template.
-11. `PUT / DELETE /api/scratchpad/templates/[id]` – modify or delete a user's own template.
+9. `DELETE /api/scratchpad/[id]/chat` – atomically clear all chat messages in the scratchpad conversation while preserving note content and versions.
+10. `GET /api/scratchpad/templates` – fetch the list of built-in and user templates.
+11. `POST /api/scratchpad/templates` – save a new user template.
+12. `PUT / DELETE /api/scratchpad/templates/[id]` – modify or delete a user's own template.
 
 ---
 
@@ -236,3 +237,44 @@ export const scratchpadTemplates = sqliteTable('scratchpad_templates', {
     - **Segmented Range Export & Standalone HTML Reports**:
       - Documents with >25 queries offer segmented export options (e.g., Part 1: 1-50, Part 2: 51-100) to prevent browser spooling bottlenecks.
       - Added direct "Download HTML Report (.html)" generation that packages complete styles, typography, and citation metadata into a single portable file.
+
+17. **Scoped Batch Query Studio & LLM Context Overflow Resilience (Variant B)**:
+    - **Problem Statement**:
+      - Bulk Batch Research documents commonly span over 100+ questions (100,000+ words, 300,000+ tokens).
+      - Passing the full compiled document into the Copilot chat prompt easily exceeded the model's maximum input context window (e.g., 131,072 tokens), throwing `input length exceeds model maximum context length`.
+      - Even on multi-million token models, completion output limits (4,096 - 8,192 tokens) prevented regenerating the full document, truncating and discarding ~95% of subsequent queries.
+    - **Architecture & Scoped Query Studio**:
+      - **Dual View Modes (Batch Query Studio vs Full Document)**:
+        - Added an interactive mode switch directly in the editor header:
+          - **Query Studio (Per-Query View)**: Displays and isolates exactly one active question/concept at a time. The editor, live preview, and AI Copilot operate solely on this targeted note, eliminating input token bloat (~1,000 tokens instead of 300,000+) and UI render lag.
+          - **Full Document View**: Displays the complete compiled report with table of contents and export controls.
+      - **Bi-directional Live State Synchronization**:
+        - Editing an individual query note automatically updates its section within the complete document using atomic section replacement (`replaceBatchSection`).
+        - Switching between Query Studio and Full Document maintains total document coherence.
+      - **Scoped Copilot Prompting**:
+        - When working in Query Studio or targeting a specific section, the Copilot chat sends only the targeted query note along with its title and number.
+        - The system instructions direct the LLM to output a `<note_update>` containing solely the refined query note, preserving its top-level header while generating actionable inline improvements.
+      - **Context Budget Guardrail & Auto-Scoping**:
+        - Backend protection checks the estimated token count of incoming documents.
+        - If the document exceeds safety limits (>15,000 tokens) and the user highlighted a selection snippet, the backend automatically resolves which query section contains the snippet and scopes generation to that single section.
+      - **Integrated Table of Contents Navigation**:
+        - Clicking a heading or "Ask AI about section" in the dynamic Table of Contents immediately switches the workspace to that query in Query Studio, setting it as active chat context.
+      - **Multi-language Support**:
+        - All Query Studio labels, switchers, search placeholders, and telemetry badges are fully internationalized across all 12 supported languages.
+
+18. **Conversation Clearing in Scratchpad Copilot**:
+    - **Purpose & User Control**:
+      - Provides users with the ability to clear their conversation history with the AI Copilot inside a scratchpad workspace without losing document text, version history, or active templates.
+    - **UI/UX & Dedicated Header**:
+      - Integrated an ergonomic header bar at the top of the AI Copilot pane featuring the assistant badge, current message count indicator, and a clear conversation action.
+      - The clear action is disabled when no messages exist, preventing redundant operations.
+    - **Accidental Deletion Prevention**:
+      - Triggering the action displays an accessible confirmation dialog explaining that chat messages will be cleared while the note content and version history remain intact.
+    - **Generation Concurrency Safety**:
+      - The clear action is blocked while the assistant is actively streaming tokens (`loading === true`), protecting against race conditions and concurrent stream writes.
+    - **Security & Authorization**:
+      - Protected by role-based access control (RBAC). In multi-user setups, non-admin users can only clear conversations belonging to their own notes.
+      - Message deletion executes inside an atomic database transaction.
+    - **Multi-language Support**:
+      - All button labels, confirmation titles, descriptions, and toast notifications are localized across all 12 supported languages.
+

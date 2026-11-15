@@ -164,6 +164,9 @@ try { db.exec("ALTER TABLE chats ADD COLUMN waypointId TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE model_stats ADD COLUMN userId TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN token_limit_5h INTEGER;"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN token_limit_weekly INTEGER;"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN token_limit_per_day INTEGER;"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN token_limit_per_month INTEGER;"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN max_tokens_per_request INTEGER;"); } catch(e) {}
 try { db.exec("ALTER TABLE scratchpads ADD COLUMN waypoint_id TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE scratchpads ADD COLUMN template_id TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE scratchpad_messages ADD COLUMN metrics TEXT;"); } catch(e) {}
@@ -447,6 +450,9 @@ try { db.exec("ALTER TABLE chats ADD COLUMN userId TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE model_stats ADD COLUMN userId TEXT;"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN token_limit_5h INTEGER;"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN token_limit_weekly INTEGER;"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN token_limit_per_day INTEGER;"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN token_limit_per_month INTEGER;"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN max_tokens_per_request INTEGER;"); } catch(e) {}
 try { db.exec("ALTER TABLE chats ADD COLUMN sources TEXT DEFAULT '[]';"); } catch(e) {}
 try { db.exec("ALTER TABLE chats ADD COLUMN files TEXT DEFAULT '[]';"); } catch(e) {}
 try { db.exec("ALTER TABLE chats ADD COLUMN waypointId TEXT;"); } catch(e) {}
