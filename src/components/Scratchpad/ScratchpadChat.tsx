@@ -354,11 +354,17 @@ const ScratchpadChat: React.FC<ScratchpadChatProps> = ({
 
             // Extract note clarification data if present (only for standard note mode)
             const clarificationBlock = !isPresentation
-              ? (msg.responseBlocks || []).find((b) => b && b.type === 'clarification')
+              ? (msg.responseBlocks || []).find((b) => b && (b.type === 'clarification' || (b.data && b.data.question)))
               : null;
+            let rawClarif = msg.clarification || (clarificationBlock ? clarificationBlock.data : null);
+            if (typeof rawClarif === 'string') {
+              try {
+                rawClarif = JSON.parse(rawClarif);
+              } catch {}
+            }
             const clarificationData: ScratchpadClarification | null =
-              !isPresentation
-                ? (msg.clarification || (clarificationBlock ? (clarificationBlock.data as ScratchpadClarification) : null))
+              !isPresentation && rawClarif && typeof rawClarif === 'object' && rawClarif.question
+                ? rawClarif
                 : null;
 
             // Extract presentation clarification data if present (only for presentation mode)

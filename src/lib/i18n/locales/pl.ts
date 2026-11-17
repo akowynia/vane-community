@@ -1485,6 +1485,17 @@ export const pl: Translations = {
     exportError: 'Nie udało się wyeksportować wybranych elementów.',
     noDataToExport: 'Brak danych do wyeksportowania.',
   },
+  diagram: {
+    diagram: 'Diagram',
+    preview: 'Podgląd',
+    code: 'Kod',
+    copy: 'Kopiuj',
+    copied: 'Skopiowano!',
+    renderError: 'Nie udało się wyrenderować diagramu Mermaid',
+    syntaxError: 'Składnia diagramu jest niepełna lub niepoprawna',
+    retry: 'Ponów próbę',
+    rendering: 'Renderowanie diagramu...',
+  },
 };
 
 

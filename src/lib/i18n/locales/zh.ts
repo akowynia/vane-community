@@ -1483,4 +1483,15 @@ export const zh: Translations = {
     exportError: '导出失败。',
     noDataToExport: '未找到可导出的数据。',
   },
+  diagram: {
+    diagram: '图表',
+    preview: '预览',
+    code: '代码',
+    copy: '复制',
+    copied: '已复制!',
+    renderError: '渲染 Mermaid 图表失败',
+    syntaxError: '图表语法不完整或无效',
+    retry: '重试',
+    rendering: '正在渲染图表...',
+  },
 };

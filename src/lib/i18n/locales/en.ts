@@ -1485,6 +1485,17 @@ export const en: Translations = {
     exportError: 'Failed to complete export.',
     noDataToExport: 'No data found to export.',
   },
+  diagram: {
+    diagram: 'Diagram',
+    preview: 'Preview',
+    code: 'Code',
+    copy: 'Copy',
+    copied: 'Copied!',
+    renderError: 'Failed to render Mermaid diagram',
+    syntaxError: 'Diagram syntax is incomplete or invalid',
+    retry: 'Retry',
+    rendering: 'Rendering diagram...',
+  },
 };
 
 

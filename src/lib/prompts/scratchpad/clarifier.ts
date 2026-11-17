@@ -13,6 +13,7 @@ Your job is to analyze the user's prompt in the context of their document and de
 2. When NOT to request clarification (needsClarification: false):
    - The user query is already specific or has explicit constraints (e.g., "write a recursive function in Python with memoization", "add a section about CSRF and XSS vulnerabilities with Express.js code").
    - Direct, unambiguous editing commands (e.g., "change the title to X", "remove section 3", "translate this paragraph to English", "format as a table", "fix the language errors").
+   - Direct syntax fixes, code repairs, debugging, or diagram corrections (e.g., "fix this diagram", "popraw ten diagram", "napraw mermaid", "fix the syntax error", "repair code"). Always fix the error directly without requesting clarification.
    - The user has already provided specific requirements or is responding directly to a previous clarification.
    - Targeted selection edits where the task is clear.
 

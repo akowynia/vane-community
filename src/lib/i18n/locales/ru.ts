@@ -1483,4 +1483,15 @@ export const ru: Translations = {
     exportError: 'Не удалось выполнить экспорт.',
     noDataToExport: 'Нет данных для экспорта.',
   },
+  diagram: {
+    diagram: 'Диаграмма',
+    preview: 'Предпросмотр',
+    code: 'Код',
+    copy: 'Копировать',
+    copied: 'Скопировано!',
+    renderError: 'Не удалось отобразить диаграмму Mermaid',
+    syntaxError: 'Синтаксис диаграммы неполон или неверен',
+    retry: 'Повторить',
+    rendering: 'Отображение диаграммы...',
+  },
 };

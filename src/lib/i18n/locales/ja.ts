@@ -1483,4 +1483,15 @@ export const ja: Translations = {
     exportError: 'エクスポートに失敗しました。',
     noDataToExport: 'エクスポート対象のデータが見つかりません。',
   },
+  diagram: {
+    diagram: 'ダイアグラム',
+    preview: 'プレビュー',
+    code: 'コード',
+    copy: 'コピー',
+    copied: 'コピー完了!',
+    renderError: 'Mermaid ダイアグラムの描画に失敗しました',
+    syntaxError: 'ダイアグラムの構文が不完全または無効です',
+    retry: '再試行',
+    rendering: 'ダイアグラムを描画中...',
+  },
 };

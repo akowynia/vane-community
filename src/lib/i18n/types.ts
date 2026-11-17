@@ -1490,4 +1490,15 @@ export interface Translations {
     exportError: string;
     noDataToExport: string;
   };
+  diagram?: {
+    diagram: string;
+    preview: string;
+    code: string;
+    copy: string;
+    copied: string;
+    renderError: string;
+    syntaxError: string;
+    retry: string;
+    rendering: string;
+  };
 }
