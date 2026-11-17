@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.2]
+
+### Fixed & Improved
+- Docker AMD64 & CI Dependency Installation: Resolved a critical CI and Docker build failure during `yarn install` where `onnxruntime-node` (transitive dependency of `@huggingface/transformers`) failed on Linux x64 environments attempting to download non-existent GPU/CUDA binary archives (`404 Not Found`). Configured CUDA installation skip flags via `.npmrc`, Dockerfiles (`Dockerfile`, `Dockerfile.slim`, `Dockerfile.mcp`), and GitHub Actions workflows, guaranteeing reliable builds across all architectures.
+
 ## [1.2.1]
 
 ### Fixed & Improved
