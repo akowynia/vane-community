@@ -2,6 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import {
+  Dialog,
+  DialogBackdrop,
+  DialogPanel,
+  DialogTitle,
+  Transition,
+  TransitionChild,
+} from '@headlessui/react';
+import {
   Plug,
   Plus,
   Trash2,
@@ -21,6 +29,8 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
+  Pencil,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTranslation } from '@/lib/i18n';
@@ -37,6 +47,7 @@ const MCPSection = () => {
   const [statuses, setStatuses] = useState<Record<string, MCPServerStatus>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editingServer, setEditingServer] = useState<MCPServerConfig | null>(null);
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
 
   // Form state
@@ -47,6 +58,7 @@ const MCPSection = () => {
   const [formArgs, setFormArgs] = useState('');
   const [formUrl, setFormUrl] = useState('');
   const [formApiKey, setFormApiKey] = useState('');
+  const [formCrawl4aiToken, setFormCrawl4aiToken] = useState('');
   const [formEnv, setFormEnv] = useState('');
   const [formAutoApprove, setFormAutoApprove] = useState(true);
 
@@ -175,24 +187,98 @@ const MCPSection = () => {
     }
   };
 
-  const openPreset = (preset: 'firecrawl' | 'crawl4ai_sse' | 'presenton') => {
+  const openAddModal = (
+    preset: 'custom' | 'firecrawl' | 'crawl4ai_sse' | 'crawl4ai_stdio' | 'presenton' = 'custom',
+  ) => {
+    setEditingServer(null);
     applyPreset(preset);
     setFormApiKey('');
+    setFormCrawl4aiToken('');
     setFormEnv('');
+    setFormAutoApprove(true);
     setIsAddOpen(true);
   };
 
-  const handleAddServer = async (e: React.FormEvent) => {
+  const openPreset = (preset: 'firecrawl' | 'crawl4ai_sse' | 'presenton') => {
+    openAddModal(preset);
+  };
+
+  const openEditModal = (server: MCPServerConfig) => {
+    setEditingServer(server);
+    setFormName(server.name || '');
+    setFormTransport(server.transport);
+    setFormCommand(server.command || '');
+    setFormArgs((server.args || []).join(' '));
+    setFormUrl(server.url || '');
+    setFormAutoApprove(server.autoApprove ?? true);
+
+    const lowerName = (server.name || '').toLowerCase();
+    const lowerCommand = (server.command || '').toLowerCase();
+    const lowerUrl = (server.url || '').toLowerCase();
+
+    if (lowerName.includes('firecrawl') || lowerCommand.includes('firecrawl')) {
+      setSelectedPreset('firecrawl');
+    } else if (
+      lowerName.includes('crawl4ai') ||
+      lowerCommand.includes('crawl4ai') ||
+      lowerUrl.includes(':11235')
+    ) {
+      setSelectedPreset(server.transport === 'sse' ? 'crawl4ai_sse' : 'crawl4ai_stdio');
+    } else if (lowerName.includes('presenton') || lowerUrl.includes('presenton')) {
+      setSelectedPreset('presenton');
+    } else {
+      setSelectedPreset('custom');
+    }
+
+    let apiKey = '';
+    let crawlToken = '';
+    const otherEnvLines: string[] = [];
+
+    if (server.env && typeof server.env === 'object') {
+      for (const [key, value] of Object.entries(server.env)) {
+        if (key === 'FIRECRAWL_API_KEY') {
+          apiKey = String(value);
+        } else if (key === 'CRAWL4AI_API_TOKEN' || key === 'API_TOKEN') {
+          crawlToken = String(value);
+        } else {
+          otherEnvLines.push(`${key}=${value}`);
+        }
+      }
+    }
+
+    setFormApiKey(apiKey);
+    setFormCrawl4aiToken(crawlToken);
+    setFormEnv(otherEnvLines.join('\n'));
+    setIsAddOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsAddOpen(false);
+    setEditingServer(null);
+    applyPreset('custom');
+    setFormApiKey('');
+    setFormCrawl4aiToken('');
+    setFormEnv('');
+  };
+
+  const handleSubmitServer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) {
       toast.error(t('mcp.nameRequired') || 'Server name is required');
       return;
     }
 
-    const parsedEnv: Record<string, string> = {};
-    if (formApiKey.trim()) {
-      parsedEnv['FIRECRAWL_API_KEY'] = formApiKey.trim();
+    if (formTransport === 'sse' && !formUrl.trim()) {
+      toast.error(t('mcp.urlRequired') || 'Server URL is required');
+      return;
     }
+
+    if (formTransport === 'stdio' && !formCommand.trim()) {
+      toast.error(t('mcp.commandRequired') || 'Executable command is required');
+      return;
+    }
+
+    const parsedEnv: Record<string, string> = {};
     if (formEnv.trim()) {
       const lines = formEnv.split('\n');
       for (const line of lines) {
@@ -207,41 +293,64 @@ const MCPSection = () => {
       }
     }
 
+    if (formApiKey.trim()) {
+      parsedEnv['FIRECRAWL_API_KEY'] = formApiKey.trim();
+    } else if (selectedPreset === 'firecrawl' || formName.toLowerCase().includes('firecrawl')) {
+      delete parsedEnv['FIRECRAWL_API_KEY'];
+    }
+
+    if (formCrawl4aiToken.trim()) {
+      parsedEnv['CRAWL4AI_API_TOKEN'] = formCrawl4aiToken.trim();
+    } else if (
+      selectedPreset === 'crawl4ai_sse' ||
+      selectedPreset === 'crawl4ai_stdio' ||
+      formName.toLowerCase().includes('crawl4ai')
+    ) {
+      delete parsedEnv['CRAWL4AI_API_TOKEN'];
+    }
+
+    const isEdit = Boolean(editingServer);
     const payload: Partial<MCPServerConfig> = {
       name: formName.trim(),
       transport: formTransport,
       command: formTransport === 'stdio' ? formCommand.trim() : undefined,
-      args: formTransport === 'stdio' && formArgs.trim() ? formArgs.split(' ').filter(Boolean) : undefined,
+      args: formTransport === 'stdio' ? formArgs.split(' ').filter(Boolean) : [],
       url: formTransport === 'sse' ? formUrl.trim() : undefined,
-      env: Object.keys(parsedEnv).length > 0 ? parsedEnv : undefined,
+      env: parsedEnv,
       autoApprove: formAutoApprove,
-      enabled: true,
+      enabled: editingServer ? editingServer.enabled : true,
     };
 
     try {
-      const res = await fetch('/api/mcp/servers', {
-        method: 'POST',
+      const endpoint = isEdit ? `/api/mcp/servers/${editingServer!.id}` : '/api/mcp/servers';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await fetch(endpoint, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
       if (res.ok) {
-        toast.success(t('mcp.serverAdded') || 'MCP server added successfully');
-        setIsAddOpen(false);
-        setFormName('');
-        setFormCommand('');
-        setFormArgs('');
-        setFormUrl('');
-        setFormApiKey('');
-        setFormEnv('');
-        setSelectedPreset('custom');
+        const data = await res.json().catch(() => null);
+        if (data?.server && isEdit) {
+          setServers((prev) =>
+            prev.map((s) => (s.id === data.server.id ? data.server : s)),
+          );
+        }
+        toast.success(
+          isEdit
+            ? t('mcp.serverUpdated') || 'MCP server updated successfully'
+            : t('mcp.serverAdded') || 'MCP server added successfully',
+        );
+        closeModal();
         loadServers();
       } else {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.message || 'Failed to add MCP server');
+        toast.error(err.message || (isEdit ? 'Failed to update MCP server' : 'Failed to add MCP server'));
       }
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to add MCP server');
+      toast.error(err?.message || (isEdit ? 'Failed to update MCP server' : 'Failed to add MCP server'));
     }
   };
 
@@ -434,19 +543,29 @@ const MCPSection = () => {
 
                     <div className="pt-2 border-t border-light-200 dark:border-[#2d251d] flex items-center justify-between gap-2">
                       {firecrawlConfigured ? (
-                        <button
-                          type="button"
-                          onClick={() => handleToggleServer(firecrawlConfigured)}
-                          className={`w-full py-1.5 px-3 rounded-lg text-xs font-medium transition ${
-                            firecrawlConfigured.enabled
-                              ? 'border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
-                              : 'border border-black/10 dark:border-white/10 text-black/60 dark:text-stone-400 bg-black/5 dark:bg-white/5 hover:bg-black/10'
-                          }`}
-                        >
-                          {firecrawlConfigured.enabled
-                            ? t('mcp.clickToDisable') || 'Active (Click to Disable)'
-                            : t('mcp.clickToEnable') || 'Click to Enable'}
-                        </button>
+                        <div className="flex items-center gap-1.5 w-full">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleServer(firecrawlConfigured)}
+                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition ${
+                              firecrawlConfigured.enabled
+                                ? 'border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
+                                : 'border border-black/10 dark:border-white/10 text-black/60 dark:text-stone-400 bg-black/5 dark:bg-white/5 hover:bg-black/10'
+                            }`}
+                          >
+                            {firecrawlConfigured.enabled
+                              ? t('mcp.clickToDisable') || 'Active (Click to Disable)'
+                              : t('mcp.clickToEnable') || 'Click to Enable'}
+                          </button>
+                          <button
+                            type="button"
+                            title={t('mcp.editServer') || 'Edit Server'}
+                            onClick={() => openEditModal(firecrawlConfigured)}
+                            className="p-1.5 rounded-lg border border-black/10 dark:border-white/10 text-black/50 dark:text-stone-400 hover:text-[#b8864d] hover:border-[#b8864d]/40 transition"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        </div>
                       ) : (
                         <button
                           type="button"
@@ -498,19 +617,29 @@ const MCPSection = () => {
 
                     <div className="pt-2 border-t border-light-200 dark:border-[#2d251d] flex items-center justify-between gap-2">
                       {crawl4aiConfigured ? (
-                        <button
-                          type="button"
-                          onClick={() => handleToggleServer(crawl4aiConfigured)}
-                          className={`w-full py-1.5 px-3 rounded-lg text-xs font-medium transition ${
-                            crawl4aiConfigured.enabled
-                              ? 'border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
-                              : 'border border-black/10 dark:border-white/10 text-black/60 dark:text-stone-400 bg-black/5 dark:bg-white/5 hover:bg-black/10'
-                          }`}
-                        >
-                          {crawl4aiConfigured.enabled
-                            ? t('mcp.clickToDisable') || 'Active (Click to Disable)'
-                            : t('mcp.clickToEnable') || 'Click to Enable'}
-                        </button>
+                        <div className="flex items-center gap-1.5 w-full">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleServer(crawl4aiConfigured)}
+                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition ${
+                              crawl4aiConfigured.enabled
+                                ? 'border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
+                                : 'border border-black/10 dark:border-white/10 text-black/60 dark:text-stone-400 bg-black/5 dark:bg-white/5 hover:bg-black/10'
+                            }`}
+                          >
+                            {crawl4aiConfigured.enabled
+                              ? t('mcp.clickToDisable') || 'Active (Click to Disable)'
+                              : t('mcp.clickToEnable') || 'Click to Enable'}
+                          </button>
+                          <button
+                            type="button"
+                            title={t('mcp.editServer') || 'Edit Server'}
+                            onClick={() => openEditModal(crawl4aiConfigured)}
+                            className="p-1.5 rounded-lg border border-black/10 dark:border-white/10 text-black/50 dark:text-stone-400 hover:text-[#b8864d] hover:border-[#b8864d]/40 transition"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        </div>
                       ) : (
                         <button
                           type="button"
@@ -567,19 +696,29 @@ const MCPSection = () => {
 
                     <div className="pt-2 border-t border-light-200 dark:border-[#2d251d] flex items-center justify-between gap-2">
                       {presentonConfigured ? (
-                        <button
-                          type="button"
-                          onClick={() => handleToggleServer(presentonConfigured)}
-                          className={`w-full py-1.5 px-3 rounded-lg text-xs font-medium transition ${
-                            presentonConfigured.enabled
-                              ? 'border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
-                              : 'border border-black/10 dark:border-white/10 text-black/60 dark:text-stone-400 bg-black/5 dark:bg-white/5 hover:bg-black/10'
-                          }`}
-                        >
-                          {presentonConfigured.enabled
-                            ? t('mcp.clickToDisable') || 'Active (Click to Disable)'
-                            : t('mcp.clickToEnable') || 'Click to Enable'}
-                        </button>
+                        <div className="flex items-center gap-1.5 w-full">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleServer(presentonConfigured)}
+                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-medium transition ${
+                              presentonConfigured.enabled
+                                ? 'border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20'
+                                : 'border border-black/10 dark:border-white/10 text-black/60 dark:text-stone-400 bg-black/5 dark:bg-white/5 hover:bg-black/10'
+                            }`}
+                          >
+                            {presentonConfigured.enabled
+                              ? t('mcp.clickToDisable') || 'Active (Click to Disable)'
+                              : t('mcp.clickToEnable') || 'Click to Enable'}
+                          </button>
+                          <button
+                            type="button"
+                            title={t('mcp.editServer') || 'Edit Server'}
+                            onClick={() => openEditModal(presentonConfigured)}
+                            className="p-1.5 rounded-lg border border-black/10 dark:border-white/10 text-black/50 dark:text-stone-400 hover:text-[#b8864d] hover:border-[#b8864d]/40 transition"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                        </div>
                       ) : (
                         <button
                           type="button"
@@ -609,12 +748,7 @@ const MCPSection = () => {
             </div>
             <button
               type="button"
-              onClick={() => {
-                applyPreset('custom');
-                setFormApiKey('');
-                setFormEnv('');
-                setIsAddOpen(true);
-              }}
+              onClick={() => openAddModal('custom')}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#b8864d] hover:bg-[#a6743b] rounded-xl transition shadow-sm"
             >
               <Plus size={14} />
@@ -696,7 +830,7 @@ const MCPSection = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => handleToggleServer(server)}
@@ -710,6 +844,15 @@ const MCPSection = () => {
                       </button>
                       <button
                         type="button"
+                        title={t('mcp.editServer') || 'Edit Server'}
+                        onClick={() => openEditModal(server)}
+                        className="p-1.5 text-black/40 dark:text-stone-500 hover:text-[#b8864d] rounded-lg transition"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        title={t('common.delete') || 'Delete'}
                         onClick={() => handleDeleteServer(server.id)}
                         className="p-1.5 text-black/40 dark:text-stone-500 hover:text-red-500 rounded-lg transition"
                       >
@@ -1002,234 +1145,308 @@ const MCPSection = () => {
         </div>
       )}
 
-      {/* Add Server Modal */}
-      {isAddOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-light-200 dark:border-[#2d251d] bg-light-primary dark:bg-[#181411] shadow-2xl p-6">
-            <h3 className="text-sm font-semibold text-black dark:text-stone-100 mb-4">
-              {t('mcp.addServerModalTitle') || 'Connect New MCP Server'}
-            </h3>
+      {/* Add / Edit Server Modal */}
+      <Transition show={isAddOpen} as={React.Fragment}>
+        <Dialog as="div" className="relative z-[9999]" onClose={closeModal}>
+          <TransitionChild
+            as={React.Fragment}
+            enter="ease-out duration-200"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-150"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <DialogBackdrop className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" />
+          </TransitionChild>
 
-            <form onSubmit={handleAddServer} className="space-y-4">
-              {/* Preset Selector */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
-                  {t('mcp.selectPreset') || 'Preset / Template'}
-                </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('custom')}
-                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left ${
-                      selectedPreset === 'custom'
-                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
-                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
-                    }`}
-                  >
-                    ⚙️ {t('mcp.presetCustom') || 'Custom Server'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('firecrawl')}
-                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
-                      selectedPreset === 'firecrawl'
-                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
-                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
-                    }`}
-                  >
-                    🔥 Firecrawl (stdio)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('crawl4ai_sse')}
-                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
-                      selectedPreset === 'crawl4ai_sse'
-                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
-                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
-                    }`}
-                  >
-                    ⚡ Crawl4AI (SSE)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('crawl4ai_stdio')}
-                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
-                      selectedPreset === 'crawl4ai_stdio'
-                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
-                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
-                    }`}
-                  >
-                    🐍 Crawl4AI (Python)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('presenton')}
-                    className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
-                      selectedPreset === 'presenton'
-                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
-                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
-                    }`}
-                  >
-                    📊 Presenton (SSE)
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
-                  {t('mcp.serverName') || 'Server Name'} *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Filesystem, GitHub, Postgres"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
-                  {t('mcp.transport') || 'Transport Type'}
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setFormTransport('stdio')}
-                    className={`px-3 py-2 rounded-xl border text-xs font-medium transition ${
-                      formTransport === 'stdio'
-                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
-                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
-                    }`}
-                  >
-                    stdio (Local Process)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormTransport('sse')}
-                    className={`px-3 py-2 rounded-xl border text-xs font-medium transition ${
-                      formTransport === 'sse'
-                        ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
-                        : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
-                    }`}
-                  >
-                    SSE (Remote HTTP)
-                  </button>
-                </div>
-              </div>
-
-              {formTransport === 'stdio' ? (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
-                      {t('mcp.command') || 'Executable Command'} *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. npx, uvx, python3, /usr/local/bin/my-tool"
-                      value={formCommand}
-                      onChange={(e) => setFormCommand(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
-                    />
+          <div className="fixed inset-0 z-10 overflow-y-auto p-4 flex items-center justify-center">
+            <TransitionChild
+              as={React.Fragment}
+              enter="ease-out duration-200"
+              enterFrom="opacity-0 scale-95"
+              enterTo="opacity-100 scale-100"
+              leave="ease-in duration-150"
+              leaveFrom="opacity-100 scale-100"
+              leaveTo="opacity-0 scale-95"
+            >
+              <DialogPanel className="relative transform overflow-hidden rounded-2xl bg-light-primary dark:bg-[#181411] border border-light-200 dark:border-[#2d251d] text-left shadow-2xl transition-all w-full max-w-lg max-h-[90vh] flex flex-col">
+                <form onSubmit={handleSubmitServer} className="flex flex-col h-full max-h-[90vh] overflow-hidden">
+                  {/* Header */}
+                  <div className="px-6 py-4 border-b border-light-200 dark:border-[#2d251d] flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-xl bg-[#b8864d]/15 text-[#b8864d]">
+                        {editingServer ? <Pencil className="w-4 h-4" /> : <Plug className="w-4 h-4" />}
+                      </div>
+                      <DialogTitle as="h3" className="text-sm font-semibold text-black dark:text-stone-100">
+                        {editingServer
+                          ? t('mcp.editServerModalTitle') || 'Edit MCP Server'
+                          : t('mcp.addServerModalTitle') || 'Connect New MCP Server'}
+                      </DialogTitle>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="p-1.5 rounded-lg text-black/40 dark:text-stone-500 hover:text-black dark:hover:text-stone-200 transition"
+                    >
+                      <X size={16} />
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
-                      {t('mcp.args') || 'Arguments (space-separated)'}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. -y @modelcontextprotocol/server-filesystem /path"
-                      value={formArgs}
-                      onChange={(e) => setFormArgs(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
-                    />
+
+                  {/* Scrollable Form Body */}
+                  <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                    {/* Preset Selector */}
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                        {t('mcp.selectPreset') || 'Preset / Template'}
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => applyPreset('custom')}
+                          className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left ${
+                            selectedPreset === 'custom'
+                              ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                              : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                          }`}
+                        >
+                          ⚙️ {t('mcp.presetCustom') || 'Custom Server'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyPreset('firecrawl')}
+                          className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
+                            selectedPreset === 'firecrawl'
+                              ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                              : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                          }`}
+                        >
+                          🔥 Firecrawl (stdio)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyPreset('crawl4ai_sse')}
+                          className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
+                            selectedPreset === 'crawl4ai_sse'
+                              ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                              : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                          }`}
+                        >
+                          ⚡ Crawl4AI (SSE)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyPreset('crawl4ai_stdio')}
+                          className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
+                            selectedPreset === 'crawl4ai_stdio'
+                              ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                              : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                          }`}
+                        >
+                          🐍 Crawl4AI (Python)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyPreset('presenton')}
+                          className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
+                            selectedPreset === 'presenton'
+                              ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                              : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                          }`}
+                        >
+                          📊 Presenton (SSE)
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                        {t('mcp.serverName') || 'Server Name'} *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Filesystem, GitHub, Postgres"
+                        value={formName}
+                        onChange={(e) => setFormName(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                        {t('mcp.transport') || 'Transport Type'}
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormTransport('stdio')}
+                          className={`px-3 py-2 rounded-xl border text-xs font-medium transition ${
+                            formTransport === 'stdio'
+                              ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                              : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                          }`}
+                        >
+                          stdio (Local Process)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormTransport('sse')}
+                          className={`px-3 py-2 rounded-xl border text-xs font-medium transition ${
+                            formTransport === 'sse'
+                              ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                              : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                          }`}
+                        >
+                          SSE (Remote HTTP)
+                        </button>
+                      </div>
+                    </div>
+
+                    {formTransport === 'stdio' ? (
+                      <>
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                            {t('mcp.command') || 'Executable Command'} *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. npx, uvx, python3, /usr/local/bin/my-tool"
+                            value={formCommand}
+                            onChange={(e) => setFormCommand(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                            {t('mcp.args') || 'Arguments (space-separated)'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. -y @modelcontextprotocol/server-filesystem /path"
+                            value={formArgs}
+                            onChange={(e) => setFormArgs(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                          {t('mcp.url') || 'SSE Server URL'} *
+                        </label>
+                        <input
+                          type="url"
+                          required
+                          placeholder="https://mcp-server.example.com/sse"
+                          value={formUrl}
+                          onChange={(e) => setFormUrl(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                        />
+                      </div>
+                    )}
+
+                    {/* Presenton Helper */}
+                    {(selectedPreset === 'presenton' || formName.toLowerCase().includes('presenton')) && (
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
+                        <p className="font-semibold mb-1">
+                          {t('mcp.presetPresenton') || 'Presenton Presentation Generator (SSE)'}
+                        </p>
+                        <p className="text-[11px] leading-relaxed">
+                          {t('mcp.presentonTip') ||
+                            'Connects to your local or self-hosted Presenton instance. Run with: docker compose --profile presenton up -d'}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Firecrawl API Key Helper */}
+                    {(selectedPreset === 'firecrawl' || formName.toLowerCase().includes('firecrawl')) && (
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                          {t('mcp.apiKeyLabel') || 'Firecrawl API Key (optional for cloud)'}
+                        </label>
+                        <input
+                          type="password"
+                          placeholder={t('mcp.apiKeyPlaceholder') || 'fc-xxxxxxxxxxxxxxxx'}
+                          value={formApiKey}
+                          onChange={(e) => setFormApiKey(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                        />
+                      </div>
+                    )}
+
+                    {/* Crawl4AI API Token Helper */}
+                    {(selectedPreset === 'crawl4ai_sse' ||
+                      selectedPreset === 'crawl4ai_stdio' ||
+                      formName.toLowerCase().includes('crawl4ai')) && (
+                      <div>
+                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                          {t('mcp.crawl4aiTokenLabel') || 'Crawl4AI API Token (optional)'}
+                        </label>
+                        <input
+                          type="password"
+                          placeholder={t('mcp.crawl4aiTokenPlaceholder') || 'e.g. test_api_code or token'}
+                          value={formCrawl4aiToken}
+                          onChange={(e) => setFormCrawl4aiToken(e.target.value)}
+                          className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                        />
+                        <p className="text-[10px] text-black/40 dark:text-stone-500 mt-1">
+                          {t('mcp.crawl4aiTokenTip') ||
+                            'Used for authenticated Crawl4AI instances. Defaults to test_api_code if unset.'}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* General Environment Variables */}
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                        {t('mcp.envVarsLabel') || 'Environment Variables (KEY=VALUE per line)'}
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder={
+                          selectedPreset === 'crawl4ai_sse' ||
+                          selectedPreset === 'crawl4ai_stdio' ||
+                          formName.toLowerCase().includes('crawl4ai')
+                            ? 'CRAWL4AI_API_TOKEN=your_token\nCRAWL4AI_BASE_URL=http://localhost:11235'
+                            : selectedPreset === 'firecrawl' || formName.toLowerCase().includes('firecrawl')
+                              ? 'FIRECRAWL_API_KEY=your_key\nCUSTOM_VAR=value'
+                              : selectedPreset === 'presenton' || formName.toLowerCase().includes('presenton')
+                                ? 'PRESENTON_API_KEY=your_key\nCUSTOM_VAR=value'
+                                : 'VARIABLE_NAME=value\nCUSTOM_VAR=value'
+                        }
+                        value={formEnv}
+                        onChange={(e) => setFormEnv(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                      />
+                    </div>
                   </div>
-                </>
-              ) : (
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
-                    {t('mcp.url') || 'SSE Server URL'} *
-                  </label>
-                  <input
-                    type="url"
-                    required
-                    placeholder="https://mcp-server.example.com/sse"
-                    value={formUrl}
-                    onChange={(e) => setFormUrl(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
-                  />
-                </div>
-              )}
 
-              {/* Presenton Helper */}
-              {(selectedPreset === 'presenton' || formName.toLowerCase().includes('presenton')) && (
-                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
-                  <p className="font-semibold mb-1">
-                    {t('mcp.presetPresenton') || 'Presenton Presentation Generator (SSE)'}
-                  </p>
-                  <p className="text-[11px] leading-relaxed">
-                    {t('mcp.presentonTip') ||
-                      'Connects to your local or self-hosted Presenton instance. Run with: docker compose --profile presenton up -d'}
-                  </p>
-                </div>
-              )}
-
-              {/* Firecrawl API Key Helper */}
-              {(selectedPreset === 'firecrawl' || formName.toLowerCase().includes('firecrawl')) && (
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
-                    {t('mcp.apiKeyLabel') || 'Firecrawl API Key (optional for cloud)'}
-                  </label>
-                  <input
-                    type="password"
-                    placeholder={t('mcp.apiKeyPlaceholder') || 'fc-xxxxxxxxxxxxxxxx'}
-                    value={formApiKey}
-                    onChange={(e) => setFormApiKey(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
-                  />
-                </div>
-              )}
-
-              {/* General Environment Variables */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
-                  {t('mcp.envVarsLabel') || 'Environment Variables (KEY=VALUE per line)'}
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder={t('mcp.envVarsPlaceholder') || 'FIRECRAWL_API_KEY=your_key\nCUSTOM_VAR=value'}
-                  value={formEnv}
-                  onChange={(e) => setFormEnv(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-light-200 dark:border-[#2d251d]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddOpen(false);
-                    applyPreset('custom');
-                    setFormApiKey('');
-                    setFormEnv('');
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl border border-light-200 dark:border-[#2d251d] text-xs font-medium text-black/70 dark:text-stone-300 hover:bg-black/5 dark:hover:bg-white/5 transition"
-                >
-                  {t('common.cancel') || 'Cancel'}
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 rounded-xl bg-[#b8864d] hover:bg-[#a6743b] text-xs font-medium text-white transition shadow-sm"
-                >
-                  {t('common.save') || 'Save Server'}
-                </button>
-              </div>
-            </form>
+                  {/* Fixed Footer */}
+                  <div className="px-6 py-3.5 border-t border-light-200 dark:border-[#2d251d] bg-light-secondary/20 dark:bg-[#14100d] flex items-center justify-end gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={closeModal}
+                      className="px-3.5 py-1.5 rounded-xl border border-light-200 dark:border-[#2d251d] text-xs font-medium text-black/70 dark:text-stone-300 hover:bg-black/5 dark:hover:bg-white/5 transition"
+                    >
+                      {t('common.cancel') || 'Cancel'}
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 rounded-xl bg-[#b8864d] hover:bg-[#a6743b] text-xs font-medium text-white transition shadow-sm"
+                    >
+                      {editingServer
+                        ? t('mcp.saveChanges') || 'Save Changes'
+                        : t('common.save') || 'Save Server'}
+                    </button>
+                  </div>
+                </form>
+              </DialogPanel>
+            </TransitionChild>
           </div>
-        </div>
-      )}
+        </Dialog>
+      </Transition>
     </div>
   );
 };

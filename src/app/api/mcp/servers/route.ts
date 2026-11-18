@@ -65,15 +65,42 @@ export const POST = async (req: Request) => {
       );
     }
 
+    const transport = body.transport === 'sse' ? 'sse' : 'stdio';
+
+    if (transport === 'sse') {
+      const url = body.url?.trim();
+      if (!url) {
+        return Response.json({ message: 'URL is required for SSE transport.' }, { status: 400 });
+      }
+      try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return Response.json(
+            { message: 'Invalid URL protocol: must be http or https.' },
+            { status: 400 },
+          );
+        }
+      } catch {
+        return Response.json({ message: 'Invalid URL format.' }, { status: 400 });
+      }
+    } else if (transport === 'stdio') {
+      if (!body.command?.trim()) {
+        return Response.json(
+          { message: 'Executable command is required for stdio transport.' },
+          { status: 400 },
+        );
+      }
+    }
+
     const servers = mcpClientManager.getServers();
     const newServer: MCPServerConfig = {
       id: crypto.randomUUID(),
       name: body.name.trim(),
-      transport: body.transport === 'sse' ? 'sse' : 'stdio',
-      command: body.command?.trim() || undefined,
-      args: Array.isArray(body.args) ? body.args : undefined,
-      url: body.url?.trim() || undefined,
-      env: typeof body.env === 'object' ? body.env : undefined,
+      transport,
+      command: transport === 'stdio' ? body.command?.trim() : undefined,
+      args: transport === 'stdio' && Array.isArray(body.args) && body.args.length > 0 ? body.args : undefined,
+      url: transport === 'sse' ? body.url?.trim() : undefined,
+      env: body.env && typeof body.env === 'object' && Object.keys(body.env).length > 0 ? body.env : undefined,
       enabled: body.enabled !== undefined ? Boolean(body.enabled) : true,
       autoApprove: Boolean(body.autoApprove),
       createdAt: new Date().toISOString(),

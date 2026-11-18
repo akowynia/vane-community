@@ -1446,6 +1446,16 @@ export interface Translations {
     selectPreset?: string;
     clickToDisable?: string;
     clickToEnable?: string;
+    editServer?: string;
+    editServerModalTitle?: string;
+    serverUpdated?: string;
+    crawl4aiTokenLabel?: string;
+    crawl4aiTokenPlaceholder?: string;
+    crawl4aiTokenTip?: string;
+    saveChanges?: string;
+    configure?: string;
+    urlRequired?: string;
+    commandRequired?: string;
   };
   bulkDelete?: {
     selectMode: string;
