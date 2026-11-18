@@ -10,6 +10,10 @@
   font-display: swap;
 }
 
+body {
+  font-family: 'Montserrat', Arial, sans-serif;
+}
+
 :root {
   --color-light-50: 255 255 255;
   --color-light-100: 246 248 250;
@@ -494,11 +498,21 @@ html[data-theme='matrix'] [class*="text-[#f3d5ab]"] {
   color: rgb(var(--color-accent-primary)) !important;
 }
 
-/* Fail-safe: prevent orphaned Mermaid error SVGs and temporary measurement nodes from leaking into body */
+/* Fail-safe: prevent orphaned Mermaid error SVGs from leaking into body */
+body > #error-svg {
+  display: none !important;
+}
+
+/* Off-screen measurement nodes: preserve layout geometry for SVG getBBox calculations while keeping them invisible */
 body > [id^="dmermaid"],
 body > [id^="mermaid"],
-body > #error-svg,
+body > [id^="dvane-mermaid"],
+body > [id^="vane-mermaid"],
 body > svg[id*="mermaid"] {
-  display: none !important;
+  position: absolute !important;
+  top: -99999px !important;
+  left: -99999px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 

@@ -40,6 +40,9 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Montserrat', 'Arial', 'sans-serif'],
+      },
       borderColor: () => {
         return {
           light: themeLight,

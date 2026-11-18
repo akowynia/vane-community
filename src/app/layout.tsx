@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic';
 
 import type { Metadata } from 'next';
-import { Montserrat } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import Sidebar from '@/components/Sidebar';
@@ -14,13 +13,6 @@ import { I18nProvider } from '@/lib/i18n';
 import { BatchSearchProvider } from '@/lib/batch-search/context';
 import { BatchFloatingStatus } from '@/components/BatchSearch/BatchFloatingStatus';
 import BatchSearchModal from '@/components/BatchSearch/BatchSearchModal';
-
-const montserrat = Montserrat({
-  weight: ['300', '400', '500', '700'],
-  subsets: ['latin'],
-  display: 'swap',
-  fallback: ['Arial', 'sans-serif'],
-});
 
 export const metadata: Metadata = {
   title: 'Vane-Community - Direct your curiosity',
@@ -38,6 +30,16 @@ export default function RootLayout({
   return (
     <html className="h-full" lang="en" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;700&display=swap"
+          rel="stylesheet"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -63,8 +65,7 @@ export default function RootLayout({
       </head>
       <body
         className={cn(
-          'h-full antialiased bg-light-primary dark:bg-dark-primary text-black dark:text-white transition-colors duration-200',
-          montserrat.className,
+          'h-full antialiased bg-light-primary dark:bg-dark-primary text-black dark:text-white transition-colors duration-200 font-sans',
         )}
       >
         <ThemeProvider>

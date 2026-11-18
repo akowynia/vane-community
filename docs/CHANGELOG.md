@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.2]
+
+### Fixed & Improved
+- Docker AMD64 & CI Dependency Installation: Resolved a critical CI and Docker build failure during `yarn install` where `onnxruntime-node` (transitive dependency of `@huggingface/transformers`) failed on Linux x64 environments attempting to download non-existent GPU/CUDA binary archives (`404 Not Found`). Configured CUDA installation skip flags via `.npmrc`, Dockerfiles (`Dockerfile`, `Dockerfile.slim`, `Dockerfile.mcp`), and GitHub Actions workflows, guaranteeing reliable builds across all architectures.
+
+## [1.2.1]
+
+### Fixed & Improved
+- Mermaid Diagram Browser Rendering: Resolved a regression where Mermaid diagrams failed to render in the chat interface due to layout measurement container styling; implemented non-destructive off-screen geometry preservation for SVG `.getBBox()` calculations (Issue: #8)
+- Critical DOM Removal Prevention: Fixed a catastrophic DOM deletion bug in Mermaid error cleanup where text-matching against "Syntax error in text" inadvertently removed the root application container in Scratchpad
+- Docker Build Reliability: Eliminated build-time crashes (`TypeError: Cannot read properties of null (reading '1')` in `@next/font/google`) during `RUN yarn build` in Docker by decoupling compilation from external Google Fonts endpoints and leveraging asynchronous runtime font loading with robust fallbacks
+- Scratchpad Clarifier Optimization: Refined clarification evaluation heuristics to prevent redundant clarifier prompts when users request direct syntax corrections, code repairs, or diagram fixes
+- Clarification Data Resilience: Guarded clarification option arrays and JSON data parsing against null/undefined runtime exceptions during note loading
+
+### Added
+- Interactive Diagram Controls: Added tabbed toolbar controls to Mermaid blocks allowing users to seamlessly toggle between rendered SVG diagrams and raw source code, complete with instant copy and a retry mechanism (Issue: #8)
+- 12-Language Diagram Localization: Provided localized strings for diagram controls, tabs, and error states across English, Polish, German, Spanish, French, Italian, Japanese, Korean, Portuguese, Russian, Ukrainian, and Chinese
+- Architectural Documentation: Documented Mermaid diagram rendering lifecycle, DOM isolation, security defenses, and prompting standards
+
 ## [1.2.0]
 
 ### Security & Access Control

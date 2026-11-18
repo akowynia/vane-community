@@ -33,6 +33,11 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile --network-timeout 600000
+        env:
+          ONNXRUNTIME_NODE_INSTALL_CUDA: skip
+          ONNXRUNTIME_NODE_INSTALL: skip
+          npm_config_onnxruntime_node_install_cuda: skip
+          npm_config_onnxruntime_node_install: skip
 
       - name: TypeScript type checking
         run: npx tsc --noEmit

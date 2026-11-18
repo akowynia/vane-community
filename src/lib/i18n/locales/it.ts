@@ -1497,4 +1497,15 @@ export const it: Translations = {
     exportError: 'Impossibile completare l’esportazione.',
     noDataToExport: 'Nessun dato trovato da esportare.',
   },
+  diagram: {
+    diagram: 'Diagramma',
+    preview: 'Anteprima',
+    code: 'Codice',
+    copy: 'Copia',
+    copied: 'Copiato!',
+    renderError: 'Impossibile eseguire il rendering del diagramma Mermaid',
+    syntaxError: 'La sintassi del diagramma è incompleta o non valida',
+    retry: 'Riprova',
+    rendering: 'Rendering del diagramma in corso...',
+  },
 };

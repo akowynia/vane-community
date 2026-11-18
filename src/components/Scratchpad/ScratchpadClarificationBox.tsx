@@ -27,10 +27,11 @@ export const ScratchpadClarificationBox: React.FC<ScratchpadClarificationBoxProp
   disabled = false,
 }) => {
   const { t } = useTranslation();
+  const options = Array.isArray(clarification?.options) ? clarification.options : [];
   const [selectedOption, setSelectedOption] = useState<string>(
-    clarification.selectedOption || (clarification.options.length > 0 ? clarification.options[0] : ''),
+    clarification?.selectedOption || (options.length > 0 ? options[0] : ''),
   );
-  const [customText, setCustomText] = useState<string>(clarification.customText || '');
+  const [customText, setCustomText] = useState<string>(clarification?.customText || '');
 
   const isResolved = clarification.status === 'answered' || clarification.status === 'skipped';
 
@@ -98,7 +99,7 @@ export const ScratchpadClarificationBox: React.FC<ScratchpadClarificationBoxProp
 
       {/* Options List */}
       <div className="space-y-1.5">
-        {clarification.options.map((option, idx) => {
+        {options.map((option, idx) => {
           const isSelected = selectedOption === option;
           return (
             <button

@@ -1497,4 +1497,15 @@ export const ko: Translations = {
     exportError: '내보내기를 완료하지 못했습니다.',
     noDataToExport: '내보낼 데이터를 찾을 수 없습니다.',
   },
+  diagram: {
+    diagram: '다이어그램',
+    preview: '미리보기',
+    code: '코드',
+    copy: '복사',
+    copied: '복사됨!',
+    renderError: 'Mermaid 다이어그램을 렌더링하지 못했습니다',
+    syntaxError: '다이어그램 구문이 불완전하거나 유효하지 않습니다',
+    retry: '다시 시도',
+    rendering: '다이어그램 렌더링 중...',
+  },
 };

@@ -1497,4 +1497,15 @@ export const uk: Translations = {
     exportError: 'Не вдалося виконати експорт.',
     noDataToExport: 'Немає даних для експорту.',
   },
+  diagram: {
+    diagram: 'Діаграма',
+    preview: 'Попередній перегляд',
+    code: 'Код',
+    copy: 'Копіювати',
+    copied: 'Скопійовано!',
+    renderError: 'Не вдалося відобразити діаграму Mermaid',
+    syntaxError: 'Синтаксис діаграми неповний або недійсний',
+    retry: 'Повторити',
+    rendering: 'Відображення діаграми...',
+  },
 };

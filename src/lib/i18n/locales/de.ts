@@ -1497,4 +1497,15 @@ export const de: Translations = {
     exportError: 'Exportieren fehlgeschlagen.',
     noDataToExport: 'Keine Daten zum Exportieren gefunden.',
   },
+  diagram: {
+    diagram: 'Diagramm',
+    preview: 'Vorschau',
+    code: 'Code',
+    copy: 'Kopieren',
+    copied: 'Kopiert!',
+    renderError: 'Fehler beim Rendern des Mermaid-Diagramms',
+    syntaxError: 'Die Diagrammsyntax ist unvollständig oder ungültig',
+    retry: 'Wiederholen',
+    rendering: 'Diagramm wird gerendert...',
+  },
 };
