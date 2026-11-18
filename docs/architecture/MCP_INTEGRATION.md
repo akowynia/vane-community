@@ -137,4 +137,33 @@ To provide transparency, security monitoring, and usage tracking across both inb
    - Top active callers and most frequently utilized tools.
    - Interactive filtering by direction, status, and full-text search.
 
+---
+
+## 7. Dynamic Server Configuration & Lifecycle Management
+
+To support operational agility without requiring manual deletion or redeployment, the MCP subsystem supports in-place server modification and hot session invalidation.
+
+### Key Lifecycle Capabilities:
+1. **In-Place Server Modification**:
+   - Existing server definitions can be edited directly from the management interface or individual preset cards.
+   - Editable attributes include server name, transport type, executable command and arguments for local processes, target URL for SSE connections, and scoped environment variables.
+
+2. **Session Invalidation & Reconnection**:
+   - Modifying or removing an existing server triggers immediate session invalidation.
+   - Active subprocesses are terminated gracefully with termination signals (`SIGTERM`), preventing zombie background processes.
+   - Cached remote sessions and tool registries are refreshed automatically on the subsequent invocation.
+
+3. **Preset-Aware Parameter & Token Management**:
+   - Configuration dialog adapts dynamically based on the selected integration template:
+     - **Crawl4AI**: Dedicated API token field (`CRAWL4AI_API_TOKEN`) and tailored environment variable templates for self-hosted instances.
+     - **Firecrawl**: Dedicated API key field (`FIRECRAWL_API_KEY`) for managed cloud scraping.
+     - **Presenton**: Tailored connection parameters for containerized AI presentation engines.
+     - **Custom**: Generic environment variable mapping with line-by-line key-value parsing.
+
+4. **Security & Input Validation**:
+   - Strict protocol validation for remote endpoints (requiring HTTP or HTTPS schemes).
+   - Protection against server-side request forgery (SSRF) and private cloud metadata exfiltration.
+   - Administrative permission enforcement in multi-tenant environments.
+
+
 

@@ -573,6 +573,20 @@ export interface Translations {
     confirmPassword?: string;
     passwordsDoNotMatch?: string;
     setupAdminAndSwitch?: string;
+    modelAccessScopeGlobal?: string;
+    modelAccessScopeUser?: string;
+    modelAccessSave?: string;
+    modelAccessSaveSuccess?: string;
+    modelActive?: string;
+    modelDisabled?: string;
+    modelLimitsTitle?: string;
+    modelLimit5hLabel?: string;
+    modelLimitDailyLabel?: string;
+    modelLimitPlaceholder?: string;
+    allowAllInProvider?: string;
+    blockAllInProvider?: string;
+    globalDisabledModelsDesc?: string;
+    userModelAccessDesc?: string;
   };
   modelUsage?: {
     usage5h: string;
@@ -1432,6 +1446,16 @@ export interface Translations {
     selectPreset?: string;
     clickToDisable?: string;
     clickToEnable?: string;
+    editServer?: string;
+    editServerModalTitle?: string;
+    serverUpdated?: string;
+    crawl4aiTokenLabel?: string;
+    crawl4aiTokenPlaceholder?: string;
+    crawl4aiTokenTip?: string;
+    saveChanges?: string;
+    configure?: string;
+    urlRequired?: string;
+    commandRequired?: string;
   };
   bulkDelete?: {
     selectMode: string;

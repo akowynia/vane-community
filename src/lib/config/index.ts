@@ -42,12 +42,17 @@ const ALLOWED_CONFIG_KEYS = new Set([
   'guestSettings.tokenLimitPerMonth',
   'guestSettings.maxTokensPerRequest',
   'guestSettings.qualityModeMaxTokens',
+  'guestSettings.allowedProviders',
+  'guestSettings.allowedModels',
+  'guestSettings.modelLimits',
   'globalLimits.tokenLimit5h',
   'globalLimits.tokenLimitWeekly',
   'globalLimits.tokenLimitPerDay',
   'globalLimits.tokenLimitPerMonth',
   'globalLimits.maxTokensPerRequest',
   'globalLimits.qualityModeMaxTokens',
+  'globalLimits.modelLimits',
+  'disabledModels',
   'beta.enablePresentations',
   'beta.enablePresentonBeta',
   'beta.presentations',
@@ -915,6 +920,44 @@ class ConfigManager {
       this.currentConfig.auth.adminPasswordHash = hashPassword(val);
       this.saveConfig();
       return;
+    } else if (key === 'disabledModels') {
+      if (!Array.isArray(val) || !val.every((item) => typeof item === 'string')) {
+        throw new Error('disabledModels must be an array of string model keys.');
+      }
+      val = Array.from(new Set(val.map((m: string) => m.trim()).filter(Boolean)));
+    } else if (
+      key === 'globalLimits.modelLimits' ||
+      key === 'guestSettings.modelLimits'
+    ) {
+      if (typeof val !== 'object' || val === null || Array.isArray(val)) {
+        throw new Error(`${key} must be an object.`);
+      }
+      const sanitizedModelLimits: Record<string, any> = {};
+      for (const [mKey, limitObj] of Object.entries(val)) {
+        if (!mKey || typeof limitObj !== 'object' || limitObj === null) continue;
+        const sLimit: Record<string, any> = {};
+        for (const limitField of ['tokenLimit5h', 'tokenLimitWeekly', 'tokenLimitPerDay', 'maxTokensPerRequest']) {
+          const rawNum = (limitObj as any)[limitField];
+          if (rawNum !== undefined && rawNum !== null && rawNum !== '') {
+            const parsed = Number(rawNum);
+            if (Number.isFinite(parsed) && parsed >= 0) {
+              sLimit[limitField] = Math.floor(parsed);
+            }
+          } else if (rawNum === null) {
+            sLimit[limitField] = null;
+          }
+        }
+        sanitizedModelLimits[mKey] = sLimit;
+      }
+      val = sanitizedModelLimits;
+    } else if (
+      key === 'guestSettings.allowedProviders' ||
+      key === 'guestSettings.allowedModels'
+    ) {
+      if (!Array.isArray(val) || !val.every((item) => typeof item === 'string')) {
+        throw new Error(`${key} must be an array of strings.`);
+      }
+      val = Array.from(new Set(val.map((item: string) => item.trim()).filter(Boolean)));
     } else if (
       key.startsWith('globalLimits.') ||
       key.startsWith('guestSettings.')

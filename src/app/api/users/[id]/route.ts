@@ -87,6 +87,27 @@ const updateUserHandler = async (
       updateValues.allowedModels = body.allowedModels;
     }
 
+    if (body.modelLimits !== undefined && typeof body.modelLimits === 'object' && body.modelLimits !== null && !Array.isArray(body.modelLimits)) {
+      const sanitizedModelLimits: Record<string, any> = {};
+      for (const [mKey, limitObj] of Object.entries(body.modelLimits)) {
+        if (!mKey || typeof limitObj !== 'object' || limitObj === null) continue;
+        const sLimit: Record<string, any> = {};
+        for (const limitField of ['tokenLimit5h', 'tokenLimitWeekly', 'tokenLimitPerDay', 'maxTokensPerRequest']) {
+          const rawNum = (limitObj as any)[limitField];
+          if (rawNum !== undefined && rawNum !== null && rawNum !== '') {
+            const parsed = Number(rawNum);
+            if (Number.isFinite(parsed) && parsed >= 0) {
+              sLimit[limitField] = Math.floor(parsed);
+            }
+          } else if (rawNum === null) {
+            sLimit[limitField] = null;
+          }
+        }
+        sanitizedModelLimits[mKey] = sLimit;
+      }
+      updateValues.modelLimits = sanitizedModelLimits;
+    }
+
     if (body.tokenLimit5h !== undefined) {
       const parsed = sanitizeTokenLimit(body.tokenLimit5h, 'tokenLimit5h');
       if (!parsed.valid) {

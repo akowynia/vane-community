@@ -64,6 +64,25 @@ class MCPClientManager {
   }
 
   /**
+   * Disconnect and invalidate any active process or cached session for a server
+   */
+  disconnectServer(serverId: string): void {
+    const stdioSession = this.stdioSessions.get(serverId);
+    if (stdioSession) {
+      try {
+        if (!stdioSession.process.killed) {
+          stdioSession.process.kill('SIGTERM');
+        }
+      } catch (err) {
+        console.warn(`[MCPClient] Error terminating subprocess for server ${serverId}:`, err);
+      }
+      this.stdioSessions.delete(serverId);
+    }
+
+    this.sseSessions.delete(serverId);
+  }
+
+  /**
    * Get or spawn a stdio subprocess connection for a server
    */
   private getOrCreateStdioSession(server: MCPServerConfig): StdioSession {
@@ -512,6 +531,11 @@ class MCPClientManager {
    */
   private async checkCrawl4AiStatus(server: MCPServerConfig): Promise<MCPServerStatus> {
     const candidateUrls = this.getCrawl4AiCandidateUrls(server);
+    const token =
+      server.env?.CRAWL4AI_API_TOKEN ||
+      server.env?.API_TOKEN ||
+      process.env.CRAWL4AI_API_TOKEN ||
+      'test_api_code';
     let lastError: any;
 
     for (const baseUrl of candidateUrls) {
@@ -525,6 +549,9 @@ class MCPClientManager {
       try {
         const res = await fetch(targetUrl, {
           method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           signal: controller.signal,
         });
         clearTimeout(timeout);

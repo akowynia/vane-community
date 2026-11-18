@@ -162,7 +162,7 @@ export const POST = async (
         if (wp?.systemInstructions) {
           waypointInstructions = wp.systemInstructions;
         }
-      } catch {}
+      } catch { }
     }
 
     const session = SessionManager.createSession();
@@ -185,7 +185,7 @@ export const POST = async (
       isClosed = true;
       try {
         await writer.close();
-      } catch {}
+      } catch { }
     };
 
     const disconnect = session.subscribe((event: string, eventData: any) => {
@@ -214,15 +214,15 @@ export const POST = async (
 
         const cleanConfig = data.presentationConfig
           ? Object.fromEntries(
-              Object.entries(data.presentationConfig).filter(
-                ([k, v]) =>
-                  v !== undefined &&
-                  k !== 'currentClarificationRound' &&
-                  k !== 'clarifications' &&
-                  k !== 'plan' &&
-                  k !== 'planStatus',
-              ),
-            )
+            Object.entries(data.presentationConfig).filter(
+              ([k, v]) =>
+                v !== undefined &&
+                k !== 'currentClarificationRound' &&
+                k !== 'clarifications' &&
+                k !== 'plan' &&
+                k !== 'planStatus',
+            ),
+          )
           : {};
 
         const metadata = {
@@ -242,7 +242,7 @@ export const POST = async (
         if (isPresentation) {
           const isPlanApproved = Boolean(
             data.planApproved ||
-              (metadata.planStatus === 'approved' && sketch.content && sketch.content.includes('---')),
+            (metadata.planStatus === 'approved' && sketch.content && sketch.content.includes('---')),
           );
 
           // PHASE 1 & 2: Clarification Loop and Plan Generation
@@ -522,36 +522,32 @@ PRESENTATION METADATA & CONFIG:
 - Include Speaker Notes: ${metadata.includeSpeakerNotes !== false ? 'YES (<!-- speaker: ... --> on every slide)' : 'NO'}
 - Include Citations: ${metadata.includeCitations !== false ? 'YES ([1], [2] notation)' : 'NO'}
 
-${
-  activePlan?.slides
-    ? `APPROVED PLAN OUTLINE (${activePlan.slides.length} SLIDES - YOU MUST GENERATE ALL ${activePlan.slides.length} SLIDES IN ORDER):
+${activePlan?.slides
+              ? `APPROVED PLAN OUTLINE (${activePlan.slides.length} SLIDES - YOU MUST GENERATE ALL ${activePlan.slides.length} SLIDES IN ORDER):
 ${JSON.stringify(activePlan.slides, null, 2)}`
-    : ''
-}
+              : ''
+            }
 
-${
-  !data.planApproved && data.currentContent && !data.currentContent.includes('w trakcie generowania') && !data.currentContent.includes('czeka na zatwierdzenie')
-    ? `EXISTING SLIDES CONTENT (for context/revision):
+${!data.planApproved && data.currentContent && !data.currentContent.includes('w trakcie generowania') && !data.currentContent.includes('czeka na zatwierdzenie')
+              ? `EXISTING SLIDES CONTENT (for context/revision):
 \`\`\`markdown
 ${data.currentContent}
 \`\`\``
-    : ''
-}
+              : ''
+            }
 
-${
-  searchFindingsText
-    ? `<search_results note="Factual information found on the web. STRICT RULE: Every number in charts MUST cite index and exact quote from here. Do not invent numbers.">
+${searchFindingsText
+              ? `<search_results note="Factual information found on the web. STRICT RULE: Every number in charts MUST cite index and exact quote from here. Do not invent numbers.">
 ${searchFindingsText}
 </search_results>`
-    : ''
-}
+              : ''
+            }
 
-${
-  waypointInstructions
-    ? `MASTER INSTRUCTIONS:
+${waypointInstructions
+              ? `MASTER INSTRUCTIONS:
 ${waypointInstructions}`
-    : ''
-}
+              : ''
+            }
 `;
 
           const streamStartTime = performance.now();
@@ -992,32 +988,29 @@ CURRENT QUERY NOTE CONTENT:
 ${targetContent || '(Empty query note)'}
 \`\`\`
 
-${
-  data.selectedText
-    ? `IMPORTANT: The user has selected this specific snippet in this query note for focused refinement:
+${data.selectedText
+              ? `IMPORTANT: The user has selected this specific snippet in this query note for focused refinement:
 <selected_text>
 ${data.selectedText}
 </selected_text>
 Your task is to modify, rewrite, or expand upon this specific selection while seamlessly integrating with this query note.`
-    : ''
-}
+              : ''
+            }
 
 ${clarificationSection}
 
-${
-  searchFindingsText
-    ? `<search_results note="Factual information found on the web. Cite these using [1], [2] notation where appropriate">
+${searchFindingsText
+              ? `<search_results note="Factual information found on the web. Cite these using [1], [2] notation where appropriate">
 ${searchFindingsText}
 </search_results>`
-    : ''
-}
+              : ''
+            }
 
-${
-  waypointInstructions
-    ? `USER MASTERPROMPT / SPACE INSTRUCTIONS:
+${waypointInstructions
+              ? `USER MASTERPROMPT / SPACE INSTRUCTIONS:
 ${waypointInstructions}`
-    : ''
-}
+              : ''
+            }
 
 ### CRITICAL INSTRUCTIONS FOR TARGET QUERY NOTE:
 1. Always respond in the same language as the user query. If the language is ambiguous, default to English.
@@ -1048,32 +1041,29 @@ CURRENT DOCUMENT CONTENT:
 ${targetContent || '(Pusty dokument)'}
 \`\`\`
 
-${
-  data.selectedText
-    ? `IMPORTANT: The user has selected this specific snippet in the editor for focused refinement:
+${data.selectedText
+              ? `IMPORTANT: The user has selected this specific snippet in the editor for focused refinement:
 <selected_text>
 ${data.selectedText}
 </selected_text>
 Your task is to modify, rewrite, or expand upon this specific selection while seamlessly integrating with the overall document.`
-    : ''
-}
+              : ''
+            }
 
 ${clarificationSection}
 
-${
-  searchFindingsText
-    ? `<search_results note="Factual information found on the web. Cite these using [1], [2] notation where appropriate">
+${searchFindingsText
+              ? `<search_results note="Factual information found on the web. Cite these using [1], [2] notation where appropriate">
 ${searchFindingsText}
 </search_results>`
-    : ''
-}
+              : ''
+            }
 
-${
-  waypointInstructions
-    ? `USER MASTERPROMPT / SPACE INSTRUCTIONS:
+${waypointInstructions
+              ? `USER MASTERPROMPT / SPACE INSTRUCTIONS:
 ${waypointInstructions}`
-    : ''
-}
+              : ''
+            }
 
 ### CRITICAL INSTRUCTIONS:
 1. Always respond in the same language as the user query. If the language is ambiguous, default to English.
@@ -1239,11 +1229,11 @@ ${waypointInstructions}`
 
         let versionSummary = data.selectedText
           ? (isBatchScoped
-              ? `AI edit to selection in query #${queryLabel}: "${data.selectedText.slice(0, 40)}..."`
-              : `AI edit to selection: "${data.selectedText.slice(0, 40)}..."`)
+            ? `AI edit to selection in query #${queryLabel}: "${data.selectedText.slice(0, 40)}..."`
+            : `AI edit to selection: "${data.selectedText.slice(0, 40)}..."`)
           : (isBatchScoped
-              ? `AI update to query #${queryLabel} [${activeQueryTitle || ''}]`
-              : `AI update (${data.message.content.slice(0, 50)})`);
+            ? `AI update to query #${queryLabel} [${activeQueryTitle || ''}]`
+            : `AI update (${data.message.content.slice(0, 50)})`);
 
         await db.insert(scratchpadVersions).values({
           id: crypto.randomUUID(),

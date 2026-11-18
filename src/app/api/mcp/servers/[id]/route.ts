@@ -33,19 +33,54 @@ export const PUT = async (
     }
 
     const current = servers[idx];
+    const newTransport = body.transport !== undefined ? body.transport : current.transport;
+
+    if (newTransport === 'sse') {
+      const targetUrl = body.url !== undefined ? body.url?.trim() : current.url;
+      if (!targetUrl) {
+        return Response.json({ message: 'URL is required for SSE transport.' }, { status: 400 });
+      }
+      try {
+        const parsed = new URL(targetUrl);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return Response.json(
+            { message: 'Invalid URL protocol: must be http or https.' },
+            { status: 400 },
+          );
+        }
+      } catch {
+        return Response.json({ message: 'Invalid URL format.' }, { status: 400 });
+      }
+    } else if (newTransport === 'stdio') {
+      const targetCommand = body.command !== undefined ? body.command?.trim() : current.command;
+      if (!targetCommand) {
+        return Response.json(
+          { message: 'Executable command is required for stdio transport.' },
+          { status: 400 },
+        );
+      }
+    }
+
     servers[idx] = {
       ...current,
       name: body.name !== undefined ? body.name.trim() : current.name,
-      transport: body.transport !== undefined ? body.transport : current.transport,
-      command: body.command !== undefined ? body.command?.trim() : current.command,
-      args: body.args !== undefined ? body.args : current.args,
-      url: body.url !== undefined ? body.url?.trim() : current.url,
-      env: body.env !== undefined ? body.env : current.env,
+      transport: newTransport,
+      command: newTransport === 'stdio' ? (body.command !== undefined ? body.command?.trim() : current.command) : undefined,
+      args: newTransport === 'stdio'
+        ? ('args' in body
+            ? (Array.isArray(body.args) && body.args.length > 0 ? body.args : undefined)
+            : current.args)
+        : undefined,
+      url: newTransport === 'sse' ? (body.url !== undefined ? body.url?.trim() : current.url) : undefined,
+      env: 'env' in body
+        ? (body.env && typeof body.env === 'object' && Object.keys(body.env).length > 0 ? body.env : undefined)
+        : current.env,
       enabled: body.enabled !== undefined ? Boolean(body.enabled) : current.enabled,
       autoApprove: body.autoApprove !== undefined ? Boolean(body.autoApprove) : current.autoApprove,
       updatedAt: new Date().toISOString(),
     };
 
+    mcpClientManager.disconnectServer(id);
     await mcpClientManager.saveServers(servers);
     return Response.json({ server: servers[idx] }, { status: 200 });
   } catch (err: any) {
@@ -80,6 +115,7 @@ export const DELETE = async (
       return Response.json({ message: 'MCP server not found' }, { status: 404 });
     }
 
+    mcpClientManager.disconnectServer(id);
     await mcpClientManager.saveServers(filtered);
     return Response.json({ success: true }, { status: 200 });
   } catch (err: any) {

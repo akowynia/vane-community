@@ -250,6 +250,7 @@ export async function validateApiKey(
         passwordHash: '',
         allowedProviders: ['*'],
         allowedModels: ['*'],
+        modelLimits: {},
         tokenLimit5h: null,
         tokenLimitWeekly: null,
         tokenLimitPerDay: null,

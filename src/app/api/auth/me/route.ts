@@ -45,6 +45,7 @@ export const GET = async (req: NextRequest) => {
           role: user.role,
           allowedProviders: user.allowedProviders,
           allowedModels: user.allowedModels,
+          modelLimits: user.modelLimits || {},
           tokenLimit5h: user.tokenLimit5h,
           tokenLimitWeekly: user.tokenLimitWeekly,
           tokenLimitPerDay: user.tokenLimitPerDay,
