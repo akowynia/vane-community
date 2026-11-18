@@ -63,6 +63,7 @@ graph TD
 | Source Event / Ref | Docker Hub Tags Published (Full) | Docker Hub Tags Published (Slim) | Updates `latest`? |
 | :--- | :--- | :--- | :--- |
 | `push` to `master` | `latest`, `main` | `slim-latest` | Yes |
+| `push` to `dev` | `beta`, `dev`, `full-beta` | `slim-beta`, `slim-dev` | No |
 | `push` to `canary` | `canary` | `slim-canary` | No |
 | Release / Tag `v1.2.0` | `1.2.0`, `v1.2.0`, `full-1.2.0`, `full-v1.2.0`, `latest`, `main` | `slim-1.2.0`, `slim-v1.2.0`, `slim-latest` | Yes (if stable) |
 | Prerelease `v1.2.0-rc1` | `1.2.0-rc1`, `v1.2.0-rc1`, `full-1.2.0-rc1` | `slim-1.2.0-rc1`, `slim-v1.2.0-rc1` | No |

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       git_ref:
-        description: 'Git branch, tag or commit SHA to build (e.g. v1.0.0, master)'
+        description: 'Git branch, tag or commit SHA to build (e.g. v1.0.0, master, dev)'
         required: false
         default: 'master'
       release_version:
@@ -19,6 +19,7 @@ on:
   push:
     branches:
       - master
+      - dev
       - canary
     tags:
       - 'v*'
@@ -71,6 +72,8 @@ jobs:
             PUBLISH_LATEST="true"
           elif [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/canary" ]; then
             BUILD_TYPE="canary"
+          elif [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/dev" ]; then
+            BUILD_TYPE="beta"
           elif [ "$EVENT" = "push" ] && [ "$REF" = "refs/heads/master" ]; then
             BUILD_TYPE="master"
             PUBLISH_LATEST="true"
@@ -85,6 +88,8 @@ jobs:
               PUBLISH_LATEST="$INPUT_LATEST"
             elif [ "$TARGET_REF" = "canary" ] || [ "$TARGET_REF" = "refs/heads/canary" ]; then
               BUILD_TYPE="canary"
+            elif [ "$TARGET_REF" = "dev" ] || [ "$TARGET_REF" = "refs/heads/dev" ]; then
+              BUILD_TYPE="beta"
             elif [ "$TARGET_REF" = "master" ] || [ "$TARGET_REF" = "refs/heads/master" ]; then
               BUILD_TYPE="master"
               PUBLISH_LATEST="true"
@@ -111,6 +116,8 @@ jobs:
             TAG_ID="${VERSION_CLEAN:-$VERSION_RAW}"
           elif [ "$BUILD_TYPE" = "canary" ]; then
             TAG_ID="canary"
+          elif [ "$BUILD_TYPE" = "beta" ]; then
+            TAG_ID="beta"
           else
             TAG_ID="latest"
           fi
@@ -260,6 +267,20 @@ jobs:
             fi
             if [ "$VARIANT" = "mcp" ]; then
               push_manifest "akowynia/vane-community:mcp-canary"
+            fi
+
+          elif [ "$BUILD_TYPE" = "beta" ]; then
+            push_manifest "akowynia/vane-community:${VARIANT}-beta"
+            if [ "$VARIANT" = "full" ]; then
+              push_manifest "akowynia/vane-community:beta"
+              push_manifest "akowynia/vane-community:dev"
+            fi
+            if [ "$VARIANT" = "slim" ]; then
+              push_manifest "akowynia/vane-community:slim-dev"
+            fi
+            if [ "$VARIANT" = "mcp" ]; then
+              push_manifest "akowynia/vane-community:mcp-beta"
+              push_manifest "akowynia/vane-community:mcp-dev"
             fi
 
           elif [ "$BUILD_TYPE" = "release" ]; then
