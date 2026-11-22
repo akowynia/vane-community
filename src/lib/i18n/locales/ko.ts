@@ -1449,6 +1449,11 @@ export const ko: Translations = {
     configure: '구성',
     urlRequired: '서버 URL이 필요합니다',
     commandRequired: '실행 명령이 필요합니다',
+    firecrawlApiUrlLabel: 'Firecrawl API URL (셀프 호스팅용 선택 사항)',
+    firecrawlApiUrlPlaceholder: '예: http://host.docker.internal:3002 또는 https://api.firecrawl.dev',
+    firecrawlApiUrlTip: '셀프 호스팅 Firecrawl의 API 엔드포인트를 지정합니다. Docker에서는 host.docker.internal:3002를 사용하세요.',
+    presetFirecrawlLocal: 'Firecrawl (로컬 REST / Docker)',
+    activeScraperSwitched: '{name}이(가) 활성 스크래퍼 엔진으로 설정되었습니다',
   },
   bulkDelete: {
     selectMode: '선택',

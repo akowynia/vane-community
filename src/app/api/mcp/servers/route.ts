@@ -93,6 +93,28 @@ export const POST = async (req: Request) => {
     }
 
     const servers = mcpClientManager.getServers();
+    const isScraper = (name?: string) => {
+      const lower = (name || '').toLowerCase();
+      return (
+        lower.includes('firecrawl') ||
+        lower.includes('crawl4ai') ||
+        lower.includes('scraper') ||
+        lower.includes('crawler')
+      );
+    };
+
+    const newServerEnabled = body.enabled !== undefined ? Boolean(body.enabled) : true;
+
+    // Ensure only one external scraper engine is active at any time
+    if (newServerEnabled && isScraper(body.name)) {
+      for (const s of servers) {
+        if (isScraper(s.name) && s.enabled) {
+          s.enabled = false;
+          mcpClientManager.disconnectServer(s.id);
+        }
+      }
+    }
+
     const newServer: MCPServerConfig = {
       id: crypto.randomUUID(),
       name: body.name.trim(),
@@ -101,7 +123,7 @@ export const POST = async (req: Request) => {
       args: transport === 'stdio' && Array.isArray(body.args) && body.args.length > 0 ? body.args : undefined,
       url: transport === 'sse' ? body.url?.trim() : undefined,
       env: body.env && typeof body.env === 'object' && Object.keys(body.env).length > 0 ? body.env : undefined,
-      enabled: body.enabled !== undefined ? Boolean(body.enabled) : true,
+      enabled: newServerEnabled,
       autoApprove: Boolean(body.autoApprove),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

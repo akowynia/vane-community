@@ -1449,6 +1449,11 @@ export const ru: Translations = {
     configure: 'Настроить',
     urlRequired: 'URL сервера обязателен',
     commandRequired: 'Исполняемая команда обязательна',
+    firecrawlApiUrlLabel: 'URL API Firecrawl (необязательно для self-hosted)',
+    firecrawlApiUrlPlaceholder: 'например: http://host.docker.internal:3002 или https://api.firecrawl.dev',
+    firecrawlApiUrlTip: 'Для локального Firecrawl укажите адрес API. В Docker используйте host.docker.internal:3002.',
+    presetFirecrawlLocal: 'Firecrawl (Локальный REST / Docker)',
+    activeScraperSwitched: '{name} установлен как активный движок скрапинга',
   },
   bulkDelete: {
     selectMode: 'Выбрать',

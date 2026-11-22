@@ -1449,6 +1449,11 @@ export const fr: Translations = {
     configure: 'Configurer',
     urlRequired: 'L\'URL du serveur est requise',
     commandRequired: 'La commande exécutable est requise',
+    firecrawlApiUrlLabel: 'URL de l\'API Firecrawl (facultatif pour auto-hébergé)',
+    firecrawlApiUrlPlaceholder: 'ex. http://host.docker.internal:3002 ou https://api.firecrawl.dev',
+    firecrawlApiUrlTip: 'Pour Firecrawl auto-hébergé, indiquez le point de terminaison. Dans Docker: host.docker.internal:3002.',
+    presetFirecrawlLocal: 'Firecrawl (REST local / Docker)',
+    activeScraperSwitched: '{name} défini comme moteur de scraping actif',
   },
   bulkDelete: {
     selectMode: 'Sélectionner',

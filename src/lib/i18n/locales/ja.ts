@@ -1449,6 +1449,11 @@ export const ja: Translations = {
     configure: '設定',
     urlRequired: 'サーバーURLは必須です',
     commandRequired: '実行コマンドは必須です',
+    firecrawlApiUrlLabel: 'Firecrawl API URL（セルフホスト用・省略可能）',
+    firecrawlApiUrlPlaceholder: '例: http://host.docker.internal:3002 または https://api.firecrawl.dev',
+    firecrawlApiUrlTip: 'セルフホスト版Firecrawlのエンドポイントを指定します。Docker環境では host.docker.internal:3002 を使用してください。',
+    presetFirecrawlLocal: 'Firecrawl（ローカルREST / Docker）',
+    activeScraperSwitched: '{name} がアクティブなスクレイパーエンジンに設定されました',
   },
   bulkDelete: {
     selectMode: '選択',

@@ -1449,6 +1449,11 @@ export const zh: Translations = {
     configure: '配置',
     urlRequired: '服务器 URL 为必填项',
     commandRequired: '可执行命令为必填项',
+    firecrawlApiUrlLabel: 'Firecrawl API URL (自托管可选)',
+    firecrawlApiUrlPlaceholder: '例如: http://host.docker.internal:3002 或 https://api.firecrawl.dev',
+    firecrawlApiUrlTip: '对于自托管Firecrawl，请指定API端点。在Docker中请使用 host.docker.internal:3002。',
+    presetFirecrawlLocal: 'Firecrawl (本地 REST / Docker)',
+    activeScraperSwitched: '已将 {name} 设置为当前活动的抓取引擎',
   },
   bulkDelete: {
     selectMode: '选择',

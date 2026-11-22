@@ -1,3 +1,4 @@
+import fs from 'fs';
 import { spawn, ChildProcess } from 'child_process';
 import configManager from '@/lib/config';
 import { validateUrlForSSRF } from '@/lib/security/ssrf';
@@ -284,6 +285,68 @@ class MCPClientManager {
   }
 
   /**
+   * Detect whether runtime environment is containerized (Docker)
+   */
+  private isDockerEnvironment(): boolean {
+    try {
+      return (
+        fs.existsSync('/.dockerenv') ||
+        fs.existsSync('/run/.containerenv') ||
+        Boolean(process.env.DOCKER_CONTAINER)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Helper to resolve local candidate URLs, seamlessly converting localhost / 127.0.0.1
+   * to host.docker.internal, docker bridge gateway (172.17.0.1), and known container names.
+   */
+  private resolveCandidateUrls(rawUrl: string, serviceHint?: string): string[] {
+    let normalized = (rawUrl || '').trim();
+    if (!normalized) return [];
+    if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+      normalized = `http://${normalized}`;
+    }
+
+    const inDocker = this.isDockerEnvironment();
+    const candidates: string[] = [];
+    const isLocal = normalized.includes('localhost') || normalized.includes('127.0.0.1');
+
+    if (inDocker && isLocal) {
+      // In Docker, host.docker.internal and container names must be prioritized over 127.0.0.1
+      candidates.push(
+        normalized.replace(/localhost|127\.0\.0\.1/, 'host.docker.internal'),
+        normalized.replace(/localhost|127\.0\.0\.1/, '172.17.0.1'),
+      );
+
+      const lowerHint = (serviceHint || '').toLowerCase();
+      if (lowerHint.includes('crawl4ai') || normalized.includes(':11235')) {
+        candidates.push(normalized.replace(/localhost(:\d+)?|127\.0\.0\.1(:\d+)?/, 'crawl4ai:11235'));
+      }
+      if (lowerHint.includes('firecrawl') || normalized.includes(':3002')) {
+        candidates.push(normalized.replace(/localhost(:\d+)?|127\.0\.0\.1(:\d+)?/, 'firecrawl:3002'));
+      }
+      if (lowerHint.includes('presenton') || normalized.includes(':5000') || normalized.includes(':5001')) {
+        candidates.push('http://presenton/mcp', 'http://presenton:80/mcp');
+      }
+
+      // Add original localhost as fallback
+      candidates.push(normalized);
+    } else {
+      candidates.push(normalized);
+      if (isLocal) {
+        candidates.push(
+          normalized.replace(/localhost|127\.0\.0\.1/, 'host.docker.internal'),
+        );
+      }
+    }
+
+    return Array.from(new Set(candidates));
+  }
+
+  /**
    * Build candidate endpoint URLs for remote SSE servers, handling Docker container networking
    */
   private getSSECandidateUrls(server: MCPServerConfig): string[] {
@@ -295,28 +358,8 @@ class MCPClientManager {
       urls.push(existing.targetUrl);
     }
 
-    urls.push(server.url);
-
-    if (server.url.includes('localhost:11235') || server.url.includes('127.0.0.1:11235')) {
-      urls.push(
-        server.url.replace(/localhost:11235|127\.0\.0\.1:11235/, 'crawl4ai:11235'),
-        server.url.replace(/localhost:11235|127\.0\.0\.1:11235/, 'host.docker.internal:11235'),
-      );
-    }
-
-    if (
-      server.url.includes(':5000') ||
-      server.url.includes(':5001') ||
-      server.url.toLowerCase().includes('presenton')
-    ) {
-      urls.push(
-        'http://presenton/mcp',
-        'http://presenton:80/mcp',
-        server.url.replace(/localhost:(5000|5001)|127\.0\.0\.1:(5000|5001)/, 'presenton'),
-        server.url.replace(/localhost:(5000|5001)|127\.0\.0\.1:(5000|5001)/, 'host.docker.internal:5001'),
-        'http://localhost:5001/mcp',
-      );
-    }
+    const resolved = this.resolveCandidateUrls(server.url, server.name);
+    urls.push(...resolved);
 
     return Array.from(new Set(urls));
   }
@@ -510,20 +553,8 @@ class MCPClientManager {
    */
   private getCrawl4AiCandidateUrls(server: MCPServerConfig): string[] {
     let raw = (server.url || 'http://localhost:11235').trim();
-    // Normalize: remove trailing slash and /mcp if present
     raw = raw.replace(/\/mcp\/?$/, '').replace(/\/+$/, '');
-    if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
-      raw = `http://${raw}`;
-    }
-
-    const candidates = [raw];
-    if (raw.includes('localhost:11235') || raw.includes('127.0.0.1:11235')) {
-      candidates.push(
-        raw.replace(/localhost:11235|127\.0\.0\.1:11235/, 'host.docker.internal:11235'),
-        raw.replace(/localhost:11235|127\.0\.0\.1:11235/, 'crawl4ai:11235'),
-      );
-    }
-    return Array.from(new Set(candidates));
+    return this.resolveCandidateUrls(raw, 'crawl4ai');
   }
 
   /**
@@ -557,11 +588,14 @@ class MCPClientManager {
         clearTimeout(timeout);
 
         if (res.ok) {
+          this.sseSessions.set(server.id, { targetUrl: baseUrl });
           return {
             serverId: server.id,
             status: 'connected',
             toolsCount: 1,
           };
+        } else {
+          lastError = new Error(`HTTP ${res.status}: ${res.statusText || 'Crawl4AI service error'}`);
         }
       } catch (err: any) {
         clearTimeout(timeout);
@@ -574,9 +608,19 @@ class MCPClientManager {
       lastError?.message?.includes('fetch failed') ||
       lastError?.message?.includes('ECONNREFUSED');
 
-    const errorMsg = isConnRefused
-      ? 'Crawl4AI offline (run: docker compose up -d crawl4ai)'
-      : (lastError?.message || 'Crawl4AI unreachable');
+    const isTimeout =
+      lastError?.name === 'AbortError' ||
+      lastError?.name === 'TimeoutError' ||
+      lastError?.message?.includes('aborted');
+
+    let errorMsg: string;
+    if (isConnRefused) {
+      errorMsg = 'Crawl4AI offline (verify container is running: docker compose up -d crawl4ai)';
+    } else if (isTimeout) {
+      errorMsg = 'Connection timed out. If running in Docker, ensure Crawl4AI listens on 0.0.0.0 and use host.docker.internal';
+    } else {
+      errorMsg = lastError?.message || 'Crawl4AI unreachable';
+    }
 
     return {
       serverId: server.id,
@@ -677,6 +721,195 @@ class MCPClientManager {
   }
 
   /**
+   * Check if the given server config represents a self-hosted Firecrawl REST service
+   */
+  private isFirecrawl(server: MCPServerConfig): boolean {
+    const name = (server.name || '').toLowerCase();
+    const url = (server.url || '').toLowerCase();
+    return server.transport !== 'stdio' && (name.includes('firecrawl') || url.includes(':3002'));
+  }
+
+  /**
+   * Generate candidate base URLs for self-hosted Firecrawl API
+   */
+  private getFirecrawlCandidateUrls(server: MCPServerConfig): string[] {
+    let raw = (server.url || 'http://localhost:3002').trim();
+    raw = raw.replace(/\/+$/, '');
+    return this.resolveCandidateUrls(raw, 'firecrawl');
+  }
+
+  /**
+   * Health check for self-hosted Firecrawl API container
+   */
+  private async checkFirecrawlStatus(server: MCPServerConfig): Promise<MCPServerStatus> {
+    const candidateUrls = this.getFirecrawlCandidateUrls(server);
+    const apiKey =
+      server.env?.FIRECRAWL_API_KEY ||
+      server.env?.API_KEY ||
+      process.env.FIRECRAWL_API_KEY ||
+      '';
+
+    let lastError: any;
+
+    for (const baseUrl of candidateUrls) {
+      // Test readiness, health, or root endpoints
+      const testEndpoints = [`${baseUrl}/v0/health/readiness`, `${baseUrl}/health`, `${baseUrl}/`];
+      for (const targetUrl of testEndpoints) {
+        const ssrfCheck = await validateUrlForSSRF(targetUrl, { allowLocal: true });
+        if (!ssrfCheck.valid) continue;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 4000);
+
+        try {
+          const headers: Record<string, string> = {
+            'Accept': 'application/json',
+          };
+          if (apiKey) {
+            headers['Authorization'] = `Bearer ${apiKey}`;
+          }
+
+          const res = await fetch(targetUrl, {
+            method: 'GET',
+            headers,
+            signal: controller.signal,
+          });
+          clearTimeout(timeout);
+
+          if (res.ok) {
+            this.sseSessions.set(server.id, { targetUrl: baseUrl });
+            return {
+              serverId: server.id,
+              status: 'connected',
+              toolsCount: 1,
+            };
+          } else {
+            lastError = new Error(`HTTP ${res.status}: ${res.statusText || 'Firecrawl service error'}`);
+          }
+        } catch (err: any) {
+          clearTimeout(timeout);
+          lastError = err;
+        }
+      }
+    }
+
+    const isConnRefused =
+      lastError?.code === 'ECONNREFUSED' ||
+      lastError?.message?.includes('fetch failed') ||
+      lastError?.message?.includes('ECONNREFUSED');
+
+    const isTimeout =
+      lastError?.name === 'AbortError' ||
+      lastError?.name === 'TimeoutError' ||
+      lastError?.message?.includes('aborted');
+
+    let errorMsg: string;
+    if (isConnRefused) {
+      errorMsg = 'Firecrawl offline (run: docker compose up -d firecrawl)';
+    } else if (isTimeout) {
+      errorMsg = 'Connection timed out. If running in Docker, ensure Firecrawl listens on 0.0.0.0 and use host.docker.internal:3002';
+    } else {
+      errorMsg = lastError?.message || 'Firecrawl unreachable';
+    }
+
+    return {
+      serverId: server.id,
+      status: 'error',
+      error: errorMsg,
+      toolsCount: 0,
+    };
+  }
+
+  /**
+   * Invoke /v1/scrape on self-hosted Firecrawl API
+   */
+  private async callFirecrawlTool(
+    server: MCPServerConfig,
+    toolName: string,
+    args: Record<string, any>,
+  ): Promise<MCPCallToolResult> {
+    const candidateUrls = this.getFirecrawlCandidateUrls(server);
+    const targetUrlInput = args.url || args.urls;
+    if (!targetUrlInput) {
+      return {
+        content: [{ type: 'text', text: 'Missing required argument: url' }],
+        isError: true,
+      };
+    }
+
+    const apiKey =
+      server.env?.FIRECRAWL_API_KEY ||
+      server.env?.API_KEY ||
+      process.env.FIRECRAWL_API_KEY ||
+      '';
+
+    let lastError: any;
+
+    for (const baseUrl of candidateUrls) {
+      const scrapeUrl = `${baseUrl}/v1/scrape`;
+      const ssrfCheck = await validateUrlForSSRF(scrapeUrl, { allowLocal: true });
+      if (!ssrfCheck.valid) continue;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 45000);
+
+      try {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+        if (apiKey) {
+          headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+
+        const res = await fetch(scrapeUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            url: targetUrlInput,
+            formats: ['markdown'],
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+
+        if (!res.ok) {
+          throw new Error(`Firecrawl returned HTTP ${res.status}: ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        const markdown =
+          data?.data?.markdown ||
+          data?.markdown ||
+          data?.data?.content ||
+          data?.content ||
+          '';
+
+        if (!markdown && !data?.success) {
+          throw new Error(data?.error || 'Firecrawl failed to extract page content');
+        }
+
+        return {
+          content: [{ type: 'text', text: markdown }],
+          isError: false,
+        };
+      } catch (err: any) {
+        clearTimeout(timeout);
+        lastError = err;
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `Firecrawl execution failed: ${lastError?.message || 'Connection failed'}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  /**
    * List all tools exposed by a specific MCP server
    */
   async listServerTools(server: MCPServerConfig): Promise<MCPTool[]> {
@@ -688,6 +921,25 @@ class MCPClientManager {
           name: 'crawl4ai_scrape',
           description:
             'Extract clean markdown and metadata from a URL using Crawl4AI (with BM25 noise pruning)',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              url: { type: 'string', description: 'The URL to scrape' },
+            },
+            required: ['url'],
+          },
+          serverId: server.id,
+          serverName: server.name,
+        },
+      ];
+    }
+
+    if (this.isFirecrawl(server)) {
+      return [
+        {
+          name: 'firecrawl_scrape',
+          description:
+            'Extract clean markdown from a URL using self-hosted Firecrawl API',
           inputSchema: {
             type: 'object',
             properties: {
@@ -786,6 +1038,32 @@ class MCPClientManager {
       return result;
     }
 
+    if (this.isFirecrawl(server)) {
+      const result = await this.callFirecrawlTool(server, toolName, args);
+      const durationMs = Math.round(performance.now() - startTime);
+      const isError = Boolean(result.isError);
+      const summaryText = result.content?.[0]?.text;
+
+      recordMcpLog({
+        direction: 'outbound',
+        serverName: server.name,
+        method: 'tools/call',
+        toolName,
+        callerUser: 'search-agent',
+        inputPayload: args,
+        outputSummary: summaryText
+          ? summaryText.length > 200
+            ? summaryText.substring(0, 200) + '...'
+            : summaryText
+          : 'Success',
+        status: isError ? 'error' : 'success',
+        errorMessage: isError ? summaryText || 'Tool returned error' : undefined,
+        durationMs,
+      }).catch(() => {});
+
+      return result;
+    }
+
     try {
       let result: any;
       if (server.transport === 'stdio') {
@@ -857,6 +1135,9 @@ class MCPClientManager {
     if (this.isCrawl4Ai(server)) {
       return this.checkCrawl4AiStatus(server);
     }
+    if (this.isFirecrawl(server)) {
+      return this.checkFirecrawlStatus(server);
+    }
 
     try {
       let result: any;
@@ -872,10 +1153,15 @@ class MCPClientManager {
         toolsCount,
       };
     } catch (err: any) {
+      let errorMsg = err?.message || 'Connection failed';
+      if (err?.name === 'AbortError' || errorMsg.includes('aborted')) {
+        errorMsg =
+          'Connection timed out. If running in Docker, ensure target service listens on 0.0.0.0 and use host.docker.internal';
+      }
       return {
         serverId: server.id,
         status: 'error',
-        error: err?.message || 'Connection failed',
+        error: errorMsg,
         toolsCount: 0,
       };
     }

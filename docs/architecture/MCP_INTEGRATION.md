@@ -155,8 +155,8 @@ To support operational agility without requiring manual deletion or redeployment
 
 3. **Preset-Aware Parameter & Token Management**:
    - Configuration dialog adapts dynamically based on the selected integration template:
-     - **Crawl4AI**: Dedicated API token field (`CRAWL4AI_API_TOKEN`) and tailored environment variable templates for self-hosted instances.
-     - **Firecrawl**: Dedicated API key field (`FIRECRAWL_API_KEY`) for managed cloud scraping.
+     - **Crawl4AI**: Dedicated API token field (`CRAWL4AI_API_TOKEN`) and tailored candidate URL resolution for self-hosted instances.
+     - **Firecrawl**: Dedicated API URL (`FIRECRAWL_API_URL`) and API key (`FIRECRAWL_API_KEY`) for both self-hosted Docker and managed cloud scraping.
      - **Presenton**: Tailored connection parameters for containerized AI presentation engines.
      - **Custom**: Generic environment variable mapping with line-by-line key-value parsing.
 
@@ -164,6 +164,35 @@ To support operational agility without requiring manual deletion or redeployment
    - Strict protocol validation for remote endpoints (requiring HTTP or HTTPS schemes).
    - Protection against server-side request forgery (SSRF) and private cloud metadata exfiltration.
    - Administrative permission enforcement in multi-tenant environments.
+
+---
+
+## 8. Container Networking & Self-Hosted Scraper Adapters
+
+To ensure seamless connectivity when the platform runs inside Docker containers:
+
+1. **Intelligent Docker Loopback Resolution**:
+   - When configured with loopback targets (`localhost` or `127.0.0.1`), endpoints are dynamically resolved to multi-candidate network routes:
+     - `host.docker.internal` (Docker Desktop and Linux host-gateway).
+     - Default Docker bridge gateway (`172.17.0.1`).
+     - Standard container service names (such as `crawl4ai:11235`, `firecrawl:3002`, `presenton:80`).
+     - Original loopback addresses as fallback.
+   - Container environments prioritize host and container routes first, avoiding black-hole timeouts.
+
+2. **Native Self-Hosted Scraper Support**:
+   - **Crawl4AI Adapter**: Health probe against `/health` and direct scraping against `/crawl_direct`.
+   - **Firecrawl Dual Mode**:
+     - *Local REST API*: Connects directly to self-hosted instances on port 3002, probing `/v0/health/readiness` and extracting clean markdown via `/v1/scrape`.
+     - *Standard MCP Process*: Spawns the official MCP server over `stdio` pointing to `FIRECRAWL_API_URL`.
+
+3. **Actionable Diagnostics**:
+   - Network timeouts, firewall drops, or missing port bindings are intercepted and surfaced with actionable troubleshooting guidance rather than generic abort exceptions.
+
+4. **Mutually Exclusive Scraper Routing**:
+   - Only a single external scraper engine (such as Crawl4AI or Firecrawl) can be active at any given time.
+   - Activating or toggling on any external scraper automatically disables and unloads previously active scrapers, preventing duplicate execution paths, ambiguous badge statuses, and conflicting scraping policies.
+
+
 
 
 

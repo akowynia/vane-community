@@ -1456,6 +1456,11 @@ export interface Translations {
     configure?: string;
     urlRequired?: string;
     commandRequired?: string;
+    firecrawlApiUrlLabel?: string;
+    firecrawlApiUrlPlaceholder?: string;
+    firecrawlApiUrlTip?: string;
+    presetFirecrawlLocal?: string;
+    activeScraperSwitched?: string;
   };
   bulkDelete?: {
     selectMode: string;

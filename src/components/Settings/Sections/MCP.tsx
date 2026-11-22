@@ -51,13 +51,14 @@ const MCPSection = () => {
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
 
   // Form state
-  const [selectedPreset, setSelectedPreset] = useState<'custom' | 'firecrawl' | 'crawl4ai_sse' | 'crawl4ai_stdio' | 'presenton'>('custom');
+  const [selectedPreset, setSelectedPreset] = useState<'custom' | 'firecrawl' | 'firecrawl_sse' | 'crawl4ai_sse' | 'crawl4ai_stdio' | 'presenton'>('custom');
   const [formName, setFormName] = useState('');
   const [formTransport, setFormTransport] = useState<'stdio' | 'sse'>('stdio');
   const [formCommand, setFormCommand] = useState('');
   const [formArgs, setFormArgs] = useState('');
   const [formUrl, setFormUrl] = useState('');
   const [formApiKey, setFormApiKey] = useState('');
+  const [formFirecrawlApiUrl, setFormFirecrawlApiUrl] = useState('');
   const [formCrawl4aiToken, setFormCrawl4aiToken] = useState('');
   const [formEnv, setFormEnv] = useState('');
   const [formAutoApprove, setFormAutoApprove] = useState(true);
@@ -152,7 +153,7 @@ const MCPSection = () => {
     );
   };
 
-  const applyPreset = (preset: 'custom' | 'firecrawl' | 'crawl4ai_sse' | 'crawl4ai_stdio' | 'presenton') => {
+  const applyPreset = (preset: 'custom' | 'firecrawl' | 'firecrawl_sse' | 'crawl4ai_sse' | 'crawl4ai_stdio' | 'presenton') => {
     setSelectedPreset(preset);
     if (preset === 'firecrawl') {
       setFormName('Firecrawl');
@@ -160,6 +161,12 @@ const MCPSection = () => {
       setFormCommand('npx');
       setFormArgs('-y firecrawl-mcp');
       setFormUrl('');
+    } else if (preset === 'firecrawl_sse') {
+      setFormName('Firecrawl');
+      setFormTransport('sse');
+      setFormCommand('');
+      setFormArgs('');
+      setFormUrl('http://localhost:3002');
     } else if (preset === 'crawl4ai_sse') {
       setFormName('Crawl4AI');
       setFormTransport('sse');
@@ -188,18 +195,19 @@ const MCPSection = () => {
   };
 
   const openAddModal = (
-    preset: 'custom' | 'firecrawl' | 'crawl4ai_sse' | 'crawl4ai_stdio' | 'presenton' = 'custom',
+    preset: 'custom' | 'firecrawl' | 'firecrawl_sse' | 'crawl4ai_sse' | 'crawl4ai_stdio' | 'presenton' = 'custom',
   ) => {
     setEditingServer(null);
     applyPreset(preset);
     setFormApiKey('');
+    setFormFirecrawlApiUrl('');
     setFormCrawl4aiToken('');
     setFormEnv('');
     setFormAutoApprove(true);
     setIsAddOpen(true);
   };
 
-  const openPreset = (preset: 'firecrawl' | 'crawl4ai_sse' | 'presenton') => {
+  const openPreset = (preset: 'firecrawl' | 'firecrawl_sse' | 'crawl4ai_sse' | 'presenton') => {
     openAddModal(preset);
   };
 
@@ -216,8 +224,12 @@ const MCPSection = () => {
     const lowerCommand = (server.command || '').toLowerCase();
     const lowerUrl = (server.url || '').toLowerCase();
 
-    if (lowerName.includes('firecrawl') || lowerCommand.includes('firecrawl')) {
-      setSelectedPreset('firecrawl');
+    if (
+      lowerName.includes('firecrawl') ||
+      lowerCommand.includes('firecrawl') ||
+      lowerUrl.includes(':3002')
+    ) {
+      setSelectedPreset(server.transport === 'sse' ? 'firecrawl_sse' : 'firecrawl');
     } else if (
       lowerName.includes('crawl4ai') ||
       lowerCommand.includes('crawl4ai') ||
@@ -231,6 +243,7 @@ const MCPSection = () => {
     }
 
     let apiKey = '';
+    let firecrawlUrl = '';
     let crawlToken = '';
     const otherEnvLines: string[] = [];
 
@@ -238,6 +251,8 @@ const MCPSection = () => {
       for (const [key, value] of Object.entries(server.env)) {
         if (key === 'FIRECRAWL_API_KEY') {
           apiKey = String(value);
+        } else if (key === 'FIRECRAWL_API_URL') {
+          firecrawlUrl = String(value);
         } else if (key === 'CRAWL4AI_API_TOKEN' || key === 'API_TOKEN') {
           crawlToken = String(value);
         } else {
@@ -247,6 +262,7 @@ const MCPSection = () => {
     }
 
     setFormApiKey(apiKey);
+    setFormFirecrawlApiUrl(firecrawlUrl);
     setFormCrawl4aiToken(crawlToken);
     setFormEnv(otherEnvLines.join('\n'));
     setIsAddOpen(true);
@@ -257,6 +273,7 @@ const MCPSection = () => {
     setEditingServer(null);
     applyPreset('custom');
     setFormApiKey('');
+    setFormFirecrawlApiUrl('');
     setFormCrawl4aiToken('');
     setFormEnv('');
   };
@@ -295,8 +312,22 @@ const MCPSection = () => {
 
     if (formApiKey.trim()) {
       parsedEnv['FIRECRAWL_API_KEY'] = formApiKey.trim();
-    } else if (selectedPreset === 'firecrawl' || formName.toLowerCase().includes('firecrawl')) {
+    } else if (
+      selectedPreset === 'firecrawl' ||
+      selectedPreset === 'firecrawl_sse' ||
+      formName.toLowerCase().includes('firecrawl')
+    ) {
       delete parsedEnv['FIRECRAWL_API_KEY'];
+    }
+
+    if (formFirecrawlApiUrl.trim()) {
+      parsedEnv['FIRECRAWL_API_URL'] = formFirecrawlApiUrl.trim();
+    } else if (
+      selectedPreset === 'firecrawl' ||
+      selectedPreset === 'firecrawl_sse' ||
+      formName.toLowerCase().includes('firecrawl')
+    ) {
+      delete parsedEnv['FIRECRAWL_API_URL'];
     }
 
     if (formCrawl4aiToken.trim()) {
@@ -372,15 +403,29 @@ const MCPSection = () => {
 
   const handleToggleServer = async (server: MCPServerConfig) => {
     try {
+      const willEnable = !server.enabled;
       const res = await fetch(`/api/mcp/servers/${server.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled: !server.enabled }),
+        body: JSON.stringify({ enabled: willEnable }),
       });
       if (res.ok) {
-        setServers(
-          servers.map((s) => (s.id === server.id ? { ...s, enabled: !s.enabled } : s)),
-        );
+        if (willEnable && isScraperServer(server.name)) {
+          setServers(
+            servers.map((s) => {
+              if (s.id === server.id) return { ...s, enabled: true };
+              if (isScraperServer(s.name)) return { ...s, enabled: false };
+              return s;
+            }),
+          );
+          toast.success(
+            (t('mcp.activeScraperSwitched') || '{name} set as the active scraper engine').replace('{name}', server.name),
+          );
+        } else {
+          setServers(
+            servers.map((s) => (s.id === server.id ? { ...s, enabled: willEnable } : s)),
+          );
+        }
       }
     } catch (err: any) {
       toast.error(err?.message || 'Failed to update server');
@@ -1225,6 +1270,17 @@ const MCPSection = () => {
                         </button>
                         <button
                           type="button"
+                          onClick={() => applyPreset('firecrawl_sse')}
+                          className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
+                            selectedPreset === 'firecrawl_sse'
+                              ? 'border-[#b8864d] bg-[#b8864d]/10 text-[#b8864d]'
+                              : 'border-light-200 dark:border-[#2d251d] text-black/60 dark:text-stone-400'
+                          }`}
+                        >
+                          🔥 {t('mcp.presetFirecrawlLocal') || 'Firecrawl (Local REST)'}
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => applyPreset('crawl4ai_sse')}
                           className={`px-2.5 py-1.5 rounded-xl border text-xs font-medium transition text-left truncate ${
                             selectedPreset === 'crawl4ai_sse'
@@ -1360,19 +1416,42 @@ const MCPSection = () => {
                       </div>
                     )}
 
-                    {/* Firecrawl API Key Helper */}
-                    {(selectedPreset === 'firecrawl' || formName.toLowerCase().includes('firecrawl')) && (
-                      <div>
-                        <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
-                          {t('mcp.apiKeyLabel') || 'Firecrawl API Key (optional for cloud)'}
-                        </label>
-                        <input
-                          type="password"
-                          placeholder={t('mcp.apiKeyPlaceholder') || 'fc-xxxxxxxxxxxxxxxx'}
-                          value={formApiKey}
-                          onChange={(e) => setFormApiKey(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
-                        />
+                    {/* Firecrawl API Key & Endpoint Helper */}
+                    {(selectedPreset === 'firecrawl' ||
+                      selectedPreset === 'firecrawl_sse' ||
+                      formName.toLowerCase().includes('firecrawl')) && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                            {t('mcp.firecrawlApiUrlLabel') || 'Firecrawl API URL (optional for self-hosted)'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder={
+                              t('mcp.firecrawlApiUrlPlaceholder') ||
+                              'e.g. http://host.docker.internal:3002 or https://api.firecrawl.dev'
+                            }
+                            value={formFirecrawlApiUrl}
+                            onChange={(e) => setFormFirecrawlApiUrl(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                          />
+                          <p className="text-[10px] text-black/40 dark:text-stone-500 mt-1">
+                            {t('mcp.firecrawlApiUrlTip') ||
+                              'For self-hosted Firecrawl, specify the API endpoint. In Docker, use host.docker.internal:3002.'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-[#b8864d] mb-1">
+                            {t('mcp.apiKeyLabel') || 'Firecrawl API Key (optional for self-hosted)'}
+                          </label>
+                          <input
+                            type="password"
+                            placeholder={t('mcp.apiKeyPlaceholder') || 'fc-xxxxxxxxxxxxxxxx'}
+                            value={formApiKey}
+                            onChange={(e) => setFormApiKey(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl border border-light-200 dark:border-[#2d251d] bg-light-secondary/60 dark:bg-[#1b1713] text-xs font-mono text-black dark:text-stone-100 focus:outline-none focus:border-[#b8864d]"
+                          />
+                        </div>
                       </div>
                     )}
 

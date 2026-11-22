@@ -80,6 +80,26 @@ export const PUT = async (
       updatedAt: new Date().toISOString(),
     };
 
+    const isScraper = (name?: string) => {
+      const lower = (name || '').toLowerCase();
+      return (
+        lower.includes('firecrawl') ||
+        lower.includes('crawl4ai') ||
+        lower.includes('scraper') ||
+        lower.includes('crawler')
+      );
+    };
+
+    // Ensure only one external scraper engine is active at any time
+    if (servers[idx].enabled && isScraper(servers[idx].name)) {
+      for (let i = 0; i < servers.length; i++) {
+        if (i !== idx && isScraper(servers[i].name) && servers[i].enabled) {
+          servers[i].enabled = false;
+          mcpClientManager.disconnectServer(servers[i].id);
+        }
+      }
+    }
+
     mcpClientManager.disconnectServer(id);
     await mcpClientManager.saveServers(servers);
     return Response.json({ server: servers[idx] }, { status: 200 });
