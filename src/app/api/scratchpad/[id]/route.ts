@@ -17,7 +17,7 @@ import { getLocalizedBuiltinTemplate } from '@/lib/scratchpad/builtinTemplates';
 const updateScratchpadSchema = z.object({
   title: z.string().max(200).optional(),
   content: z.string().optional(),
-  type: z.enum(['note', 'presentation']).optional(),
+  type: z.enum(['note', 'presentation', 'batch']).optional(),
   metadata: z.record(z.string(), z.any()).optional(),
   waypointId: z.string().optional().nullable(),
   templateId: z.string().optional().nullable(),
@@ -195,7 +195,19 @@ export const PUT = async (
       }
     }
 
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return Response.json(
+        {
+          message:
+            'Invalid or truncated JSON request body. The payload may exceed the server request size limit.',
+        },
+        { status: 400 },
+      );
+    }
+
     const parsed = updateScratchpadSchema.safeParse(body);
 
     if (!parsed.success) {

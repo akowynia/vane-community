@@ -20,8 +20,14 @@ import {
   compileDocument,
   exportToCsv,
 } from './parser';
-
-const STORAGE_KEY = 'vane_batch_search_persisted_session_v1';
+import {
+  buildBoundedBatchTitle,
+  clearPersistedBatchSession,
+  loadPersistedBatchSession,
+  MAX_SOURCE_SNIPPET_LENGTH,
+  normalizeBatchSources,
+  savePersistedBatchSession,
+} from './storage';
 
 interface AvailableModelInfo {
   providerId: string;
@@ -158,8 +164,10 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
   // Providers state
   const [providers, setProviders] = useState<MinimalProvider[]>([]);
 
-  // Track initial load from localStorage
+  // Track initial load from persisted browser storage
   const isHydratedRef = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasWarnedStorageErrorRef = useRef(false);
 
   useEffect(() => {
     isPausedRef.current = isPaused;
@@ -192,19 +200,17 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
     fetchProviders();
   }, [defaultModelKey]);
 
-  // Restore session from localStorage on client mount
+  // Restore session from IndexedDB (with legacy localStorage fallback) on client mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
-          // Reset any dangling 'searching' states to 'pending'
-          const sanitizedItems = parsed.items.map((it: BatchQueryItem) => ({
-            ...it,
-            status: it.status === 'searching' ? 'pending' : it.status,
-          }));
-          setItems(sanitizedItems);
+    let cancelled = false;
+
+    const restoreSession = async () => {
+      try {
+        const parsed = await loadPersistedBatchSession();
+        if (cancelled || !parsed) return;
+
+        if (Array.isArray(parsed.items) && parsed.items.length > 0) {
+          setItems(parsed.items);
           if (parsed.activeTab) setActiveTab(parsed.activeTab);
           if (parsed.rawCsvText) setRawCsvText(parsed.rawCsvText);
           if (parsed.defaultSources) setDefaultSources(parsed.defaultSources);
@@ -220,34 +226,65 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
           if (typeof parsed.isFloatingHidden === 'boolean')
             setIsFloatingHidden(parsed.isFloatingHidden);
         }
+      } catch {
+        // Ignore storage read errors
+      } finally {
+        if (!cancelled) {
+          isHydratedRef.current = true;
+        }
       }
-    } catch {
-      // Ignore storage read errors
-    } finally {
-      isHydratedRef.current = true;
-    }
+    };
+
+    restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Persist session to localStorage on changes
+  // Persist session to IndexedDB (and compact fallback) on changes
   useEffect(() => {
     if (!isHydratedRef.current) return;
-    try {
-      const payload = {
-        items,
-        activeTab,
-        rawCsvText,
-        defaultSources,
-        defaultOptimization,
-        defaultModelKey,
-        defaultProviderId,
-        headerFormat,
-        includeSources,
-        isFloatingHidden,
-      };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    } catch {
-      // Ignore storage write errors
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
     }
+
+    if (items.length === 0 && !rawCsvText) {
+      return;
+    }
+
+    const payload = {
+      items,
+      activeTab,
+      rawCsvText,
+      defaultSources,
+      defaultOptimization,
+      defaultModelKey,
+      defaultProviderId,
+      headerFormat,
+      includeSources,
+      isFloatingHidden,
+    };
+
+    saveTimerRef.current = setTimeout(() => {
+      void savePersistedBatchSession(payload).then((result) => {
+        if (!result.saved && !hasWarnedStorageErrorRef.current) {
+          hasWarnedStorageErrorRef.current = true;
+          toast.error(
+            'Unable to persist batch search session in browser storage. Export your results to avoid data loss.',
+          );
+        }
+      });
+    }, 150);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
   }, [
     items,
     activeTab,
@@ -562,13 +599,18 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    hasWarnedStorageErrorRef.current = false;
     setIsSearching(false);
     setIsPaused(false);
     setCurrentRunningIndex(null);
     setIsFloatingHidden(false);
     setItems([]);
     setRawCsvText('');
-    localStorage.removeItem(STORAGE_KEY);
+    void clearPersistedBatchSession();
     setActiveTab('upload');
     toast.info(t('batchSearch.clearAll') || 'Cleared batch search.');
   }, [t]);
@@ -620,7 +662,7 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
     return {
       response: cleanResponse,
       reasoning: extractedReasoning || undefined,
-      sourcesList: data.sources || [],
+      sourcesList: normalizeBatchSources(data.sources, true),
     };
   };
 
@@ -916,38 +958,41 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
         items.forEach((item, itemIdx) => {
           const itemSources = Array.isArray(item.sourcesList) ? item.sourcesList : [];
           itemSources.forEach((src: any) => {
-            const url = src?.metadata?.url || src?.url || '';
-            const title = src?.metadata?.title || src?.title || `Query ${item.number}`;
+            const url = (src?.metadata?.url || src?.url || '').trim();
+            const title = (src?.metadata?.title || src?.title || `Query ${item.number}`).trim();
             const dedupKey = url
-              ? url.toLowerCase().trim()
-              : `${title.toLowerCase().trim()}-${itemIdx}`;
+              ? url.toLowerCase()
+              : `${title.toLowerCase()}-${itemIdx}`;
             if (!seenUrls.has(dedupKey)) {
               seenUrls.add(dedupKey);
+              const rawSnippet =
+                src?.content ||
+                src?.snippet ||
+                src?.metadata?.snippet ||
+                src?.pageContent ||
+                '';
+              const boundedSnippet =
+                typeof rawSnippet === 'string'
+                  ? rawSnippet.trim().slice(0, MAX_SOURCE_SNIPPET_LENGTH)
+                  : '';
+              const publishedDate = src?.metadata?.publishedDate;
+
               aggregatedSources.push({
-                pageContent:
-                  src?.pageContent ||
-                  src?.snippet ||
-                  src?.metadata?.snippet ||
-                  src?.content ||
-                  '',
+                content: boundedSnippet,
+                pageContent: boundedSnippet,
                 metadata: {
                   title,
                   url,
                   queryNumber: item.number,
                   queryText: item.query,
-                  ...(src?.metadata || {}),
+                  ...(publishedDate ? { publishedDate } : {}),
                 },
               });
             }
           });
         });
 
-        const firstCompleted = items.find((i) => i.status === 'completed') || items[0];
-        const defaultTitle = firstCompleted?.query
-          ? `Batch Research: ${firstCompleted.query}${items.length > 1 ? ` (+${items.length - 1})` : ''}`
-          : `Batch Research (${items.length} items)`;
-
-        const titleToSave = (customTitle && customTitle.trim()) || defaultTitle;
+        const titleToSave = buildBoundedBatchTitle(customTitle, items);
 
         const res = await fetch('/api/scratchpad', {
           method: 'POST',
@@ -968,12 +1013,13 @@ export const BatchSearchProvider: React.FC<{ children: ReactNode }> = ({
                 number: it.number,
                 query: it.query,
                 status: it.status,
+                selected: Boolean(it.selected),
                 response: it.response,
                 sources: it.sources,
                 optimizationMode: it.optimizationMode,
                 modelKey: it.modelKey,
                 providerId: it.providerId,
-                sourcesList: it.sourcesList,
+                sourcesList: normalizeBatchSources(it.sourcesList, false),
               })),
             },
           }),

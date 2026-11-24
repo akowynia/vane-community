@@ -107,6 +107,20 @@ export const GET = async (req: Request) => {
         sourcesCount = 0;
       }
 
+      let parsedMetadata: Record<string, any> = {};
+      try {
+        const rawMeta =
+          typeof item.metadata === 'string'
+            ? JSON.parse(item.metadata || '{}')
+            : item.metadata || {};
+        if (rawMeta && typeof rawMeta === 'object' && !Array.isArray(rawMeta)) {
+          const { items: _omittedBatchItems, ...summaryMeta } = rawMeta as Record<string, any>;
+          parsedMetadata = summaryMeta;
+        }
+      } catch {
+        parsedMetadata = {};
+      }
+
       // Stripped excerpt for preview
       const cleanExcerpt = (item.content || '')
         .replace(/[#*`_~>\-[\]]/g, ' ')
@@ -119,7 +133,7 @@ export const GET = async (req: Request) => {
         title: item.title || 'Untitled',
         excerpt: cleanExcerpt,
         type: item.type || 'note',
-        metadata: typeof item.metadata === 'string' ? JSON.parse(item.metadata || '{}') : (item.metadata || {}),
+        metadata: parsedMetadata,
         userId: item.userId,
         waypointId: item.waypointId,
         templateId: item.templateId,
@@ -154,7 +168,19 @@ export const POST = async (req: Request) => {
       );
     }
 
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return Response.json(
+        {
+          message:
+            'Invalid or truncated JSON request body. The payload may exceed the server request size limit.',
+        },
+        { status: 400 },
+      );
+    }
+
     const parsed = createScratchpadSchema.safeParse(body);
 
     if (!parsed.success) {
