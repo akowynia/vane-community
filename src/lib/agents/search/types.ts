@@ -82,6 +82,7 @@ export type ResearcherInput = {
   followUp: string;
   classification: ClassifierOutput;
   config: SearchAgentConfig;
+  signal?: AbortSignal;
 };
 
 export type ResearcherOutput = {

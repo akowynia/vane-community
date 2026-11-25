@@ -125,6 +125,9 @@ class Researcher {
     ];
 
     for (let i = 0; i < maxIteration; i++) {
+      if (input.signal?.aborted) {
+        break;
+      }
       if (tokenTracker.isLimitExceeded()) {
         isTokenLimitReached = true;
         console.warn(
@@ -166,6 +169,7 @@ class Researcher {
             ...prunedMessages,
           ],
           tools: availableTools,
+          signal: input.signal,
         });
 
         const block = session.getBlock(researchBlockId);
@@ -176,6 +180,9 @@ class Researcher {
         let finalToolCalls: ToolCall[] = [];
 
         for await (const partialRes of actionStream) {
+          if (input.signal?.aborted) {
+            break;
+          }
           if (partialRes.toolCallChunk.length > 0) {
             partialRes.toolCallChunk.forEach((tc) => {
               if (

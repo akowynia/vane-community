@@ -10,8 +10,13 @@ import { isCloudMetadataIP } from '@/lib/security/ssrf';
 
 interface OllamaConfig {
   baseURL: string;
+  numCtx?: number;
   queueEnabled?: boolean;
 }
+
+const DEFAULT_OLLAMA_NUM_CTX = 16384;
+const MIN_OLLAMA_NUM_CTX = 512;
+const MAX_OLLAMA_NUM_CTX = 1048576;
 
 const providerConfigFields: UIConfigField[] = [
   {
@@ -23,6 +28,18 @@ const providerConfigFields: UIConfigField[] = [
     default: 'http://host.docker.internal:11434',
     placeholder: 'http://host.docker.internal:11434',
     env: 'OLLAMA_BASE_URL',
+    scope: 'server',
+  },
+  {
+    type: 'string',
+    name: 'Context Window (num_ctx)',
+    key: 'numCtx',
+    description:
+      'Context window in tokens (e.g. 8192, 16384, 32000). Use 0 for Ollama model default. Lowering this prevents CPU offload on >30B models.',
+    required: false,
+    default: String(DEFAULT_OLLAMA_NUM_CTX),
+    placeholder: String(DEFAULT_OLLAMA_NUM_CTX),
+    env: 'OLLAMA_NUM_CTX',
     scope: 'server',
   },
   {
@@ -159,6 +176,7 @@ class OllamaProvider extends BaseModelProvider<OllamaConfig> {
     return new OllamaLLM({
       baseURL: this.config.baseURL,
       model: key,
+      numCtx: this.config.numCtx,
     });
   }
 
@@ -217,8 +235,32 @@ class OllamaProvider extends BaseModelProvider<OllamaConfig> {
         ? raw.queueEnabled === true || raw.queueEnabled === 'true'
         : true;
 
+    let numCtx = DEFAULT_OLLAMA_NUM_CTX;
+    if (
+      raw.numCtx !== undefined &&
+      raw.numCtx !== null &&
+      String(raw.numCtx).trim() !== ''
+    ) {
+      const parsedNumCtx =
+        typeof raw.numCtx === 'number'
+          ? raw.numCtx
+          : Number(String(raw.numCtx).trim());
+      if (
+        !Number.isInteger(parsedNumCtx) ||
+        (parsedNumCtx !== 0 &&
+          (parsedNumCtx < MIN_OLLAMA_NUM_CTX ||
+            parsedNumCtx > MAX_OLLAMA_NUM_CTX))
+      ) {
+        throw new Error(
+          `Invalid Context Window (num_ctx): must be 0 (model default) or an integer between ${MIN_OLLAMA_NUM_CTX} and ${MAX_OLLAMA_NUM_CTX}.`,
+        );
+      }
+      numCtx = parsedNumCtx;
+    }
+
     return {
       baseURL: trimmed.replace(/\/+$/, ''),
+      numCtx,
       queueEnabled,
     };
   }

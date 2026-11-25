@@ -17,6 +17,9 @@ abstract class BaseLLM<CONFIG> {
   abstract streamObject<T>(
     input: GenerateObjectInput,
   ): AsyncGenerator<Partial<z.infer<T>>>;
+  getContextWindow(): number | undefined {
+    return undefined;
+  }
 }
 
 export default BaseLLM;

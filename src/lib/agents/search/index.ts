@@ -202,6 +202,7 @@ class SearchAgent {
           followUp: input.followUp,
           classification: classification,
           config: input.config,
+          signal: input.signal,
         });
       }
 
@@ -214,6 +215,39 @@ class SearchAgent {
         type: 'researchComplete',
       });
 
+      const contextWindow = input.config.llm.getContextWindow?.();
+      const maxSearchContextTokens = contextWindow
+        ? Math.min(12000, Math.max(1500, Math.floor(contextWindow * 0.55)))
+        : 12000;
+      const maxHistoryTokens = contextWindow
+        ? Math.min(4000, Math.max(800, Math.floor(contextWindow * 0.2)))
+        : 4000;
+
+      const boundedChatHistory = (() => {
+        const recent = input.chatHistory.slice(-6);
+        const kept: typeof recent = [];
+        let historyTokens = 0;
+
+        for (let i = recent.length - 1; i >= 0; i--) {
+          const msg = recent[i];
+          const msgTokens = getTokenCount(msg.content || '');
+          if (historyTokens + msgTokens <= maxHistoryTokens) {
+            kept.unshift(msg);
+            historyTokens += msgTokens;
+          } else if (kept.length === 0) {
+            const approxChars = Math.max(200, maxHistoryTokens * 3);
+            kept.unshift({
+              ...msg,
+              content: (msg.content || '').slice(-approxChars),
+            });
+            break;
+          } else {
+            break;
+          }
+        }
+        return kept;
+      })();
+
       let finalContext =
         '<Query to be answered without searching; Search not made>';
 
@@ -225,7 +259,10 @@ class SearchAgent {
         let accumulatedTokens = 0;
         const validFindings: string[] = [];
         const domainTokenCounts = new Map<string, number>();
-        const MAX_PER_DOMAIN_TOKENS = 2000;
+        const MAX_PER_DOMAIN_TOKENS = Math.min(
+          2000,
+          Math.max(600, Math.floor(maxSearchContextTokens * 0.25)),
+        );
 
         for (let i = 0; i < searchResults.searchFindings.length; i++) {
           const f = searchResults.searchFindings[i];
@@ -245,7 +282,10 @@ class SearchAgent {
             : '';
           const entry = `<result index=${i + 1} title="${f.metadata.title}"${dateAttr}>${f.content}</result>`;
           const entryTokens = getTokenCount(entry);
-          if (accumulatedTokens + entryTokens > 12000 && validFindings.length > 0) {
+          if (
+            accumulatedTokens + entryTokens > maxSearchContextTokens &&
+            validFindings.length > 0
+          ) {
             break;
           }
           validFindings.push(entry);
@@ -296,19 +336,23 @@ class SearchAgent {
 
       if (input.signal?.aborted) return;
 
-      const runWriterStream = async (promptToUse: string) => {
+      const runWriterStream = async (
+        promptToUse: string,
+        historyToUse = boundedChatHistory,
+      ) => {
         const answerStream = input.config.llm.streamText({
           messages: [
             {
               role: 'system',
               content: promptToUse,
             },
-            ...input.chatHistory.slice(-6),
+            ...historyToUse,
             {
               role: 'user',
               content: input.followUp,
             },
           ],
+          signal: input.signal,
         });
 
         for await (const chunk of answerStream) {
@@ -417,18 +461,40 @@ class SearchAgent {
 
         session.emitBlock(metricsBlock);
       } catch (streamError: any) {
+        if (input.signal?.aborted || streamError?.name === 'AbortError') {
+          throw streamError;
+        }
+
         const errorMsg = streamError?.message || '';
+        const causeCode = streamError?.cause?.code || streamError?.code;
         const isContextOverflow =
           errorMsg.includes('exceeds the available context size') ||
           errorMsg.includes('exceed_context_size_error') ||
           errorMsg.includes('context_length_exceeded') ||
           errorMsg.includes('maximum context length') ||
           errorMsg.includes('token count exceeds') ||
-          streamError?.code === 400;
+          errorMsg.includes('prompt is too long') ||
+          errorMsg.includes('too many tokens') ||
+          streamError?.code === 400 ||
+          streamError?.status === 400 ||
+          streamError?.statusCode === 400 ||
+          streamError?.status_code === 400;
 
-        if (isContextOverflow && searchResults?.searchFindings?.length) {
+        const isTimeoutError =
+          streamError?.name === 'HeadersTimeoutError' ||
+          streamError?.name === 'BodyTimeoutError' ||
+          streamError?.name === 'TimeoutError' ||
+          errorMsg.includes('Headers Timeout') ||
+          errorMsg.includes('Body Timeout') ||
+          causeCode === 'UND_ERR_HEADERS_TIMEOUT' ||
+          causeCode === 'UND_ERR_BODY_TIMEOUT';
+
+        if (
+          (isContextOverflow || (isTimeoutError && !activeResponseBlockId)) &&
+          searchResults?.searchFindings?.length
+        ) {
           console.warn(
-            'Context length exceeded in writer stream, retrying with truncated context...',
+            `${isTimeoutError ? 'Writer stream timed out' : 'Context length exceeded'} in writer stream, retrying with truncated context...`,
           );
           try {
             // Emergency truncation: take only the top 5 sources, max 800 chars each
@@ -456,7 +522,7 @@ class SearchAgent {
                 ]);
               }
             }
-            await runWriterStream(fallbackPrompt);
+            await runWriterStream(fallbackPrompt, []);
 
             const fallbackSourcesCount = Math.min(5, searchResults.searchFindings.length);
             const sanitizedFallback = sanitizeCitations(fullResponseText, fallbackSourcesCount);

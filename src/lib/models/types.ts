@@ -54,6 +54,7 @@ type GenerateTextInput = {
   messages: Message[];
   tools?: Tool[];
   options?: GenerateOptions;
+  signal?: AbortSignal;
 };
 
 type GenerateTextOutput = {
@@ -73,6 +74,7 @@ type GenerateObjectInput = {
   schema: z.ZodTypeAny;
   messages: Message[];
   options?: GenerateOptions;
+  signal?: AbortSignal;
 };
 
 type GenerateObjectOutput<T> = {

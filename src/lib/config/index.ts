@@ -670,9 +670,15 @@ class ConfigManager {
         hash: '',
       };
 
+      const envOverriddenKeys = new Set<string>();
+
       provider.fields.forEach((field) => {
+        const envVal = getEnvWithAliases(field.env);
+        if (envVal) {
+          envOverriddenKeys.add(field.key);
+        }
         let val =
-          getEnvWithAliases(field.env) ||
+          envVal ||
           field.default ||
           ''; /* Env var must exist for providers */
         if (
@@ -711,10 +717,15 @@ class ConfigManager {
             (p) => p.type === provider.key,
           );
           if (sameTypeProvider) {
-            sameTypeProvider.config = {
+            const mergedConfig: Record<string, any> = {
               ...sameTypeProvider.config,
-              ...newProvider.config,
             };
+            for (const [k, v] of Object.entries(newProvider.config)) {
+              if (envOverriddenKeys.has(k) || mergedConfig[k] === undefined) {
+                mergedConfig[k] = v;
+              }
+            }
+            sameTypeProvider.config = mergedConfig;
             sameTypeProvider.hash = hashObj(sameTypeProvider.config);
           } else {
             newProviders.push(newProvider);

@@ -41,6 +41,7 @@ class APISearchAgent {
           followUp: input.followUp,
           classification: classification,
           config: input.config,
+          signal: input.signal,
         }).finally(() => {
           if (researchSession) {
             researchSession.destroy();
@@ -104,6 +105,7 @@ class APISearchAgent {
             content: input.followUp,
           },
         ],
+        signal: input.signal,
       });
 
       for await (const chunk of answerStream) {

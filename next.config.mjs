@@ -27,6 +27,7 @@ const nextConfig = {
     'playwright',
     'officeparser',
     'file-type',
+    'undici',
   ],
   outputFileTracingIncludes: {
     '/api/**': [
