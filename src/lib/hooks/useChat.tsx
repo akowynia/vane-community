@@ -607,11 +607,87 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     });
   }, [messages]);
 
-  const isReconnectingRef = useRef(false);
+  const reconnectAbortControllerRef = useRef<AbortController | null>(null);
   const handledMessageEndRef = useRef<Set<string>>(new Set());
 
+  const abortReconnect = useCallback(() => {
+    const controller = reconnectAbortControllerRef.current;
+    reconnectAbortControllerRef.current = null;
+    if (controller) {
+      controller.abort();
+    }
+  }, []);
+
+  /**
+   * Read an NDJSON chat event stream with an inactivity watchdog and per-line JSON parsing.
+   */
+  const consumeChatEventStream = async (
+    body: ReadableStream<Uint8Array>,
+    messageHandler: (data: any) => Promise<void>,
+    abortController: AbortController,
+  ) => {
+    const reader = body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let watchdogTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const resetWatchdog = () => {
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+      watchdogTimer = setTimeout(() => {
+        console.warn('Chat stream watchdog timeout (90s of silence)');
+        abortController.abort();
+      }, 90000);
+    };
+
+    resetWatchdog();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        resetWatchdog();
+
+        if (done) {
+          if (buffer.trim()) {
+            try {
+              const json = JSON.parse(buffer.trim());
+              if (json.type !== 'ping') {
+                messageHandler(json);
+              }
+            } catch (e) {
+              console.warn('Failed to parse trailing chunk:', buffer, e);
+            }
+          }
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const json = JSON.parse(trimmed);
+            if (json.type === 'ping') {
+              continue;
+            }
+            messageHandler(json);
+          } catch (err) {
+            console.warn('Failed to parse SSE JSON line:', trimmed, err);
+          }
+        }
+      }
+    } finally {
+      if (watchdogTimer) clearTimeout(watchdogTimer);
+      try {
+        reader.releaseLock();
+      } catch {}
+    }
+  };
+
   const checkReconnect = async () => {
-    if (isReconnectingRef.current) return;
+    abortReconnect();
 
     setIsReady(true);
     console.debug(new Date(), 'app:ready');
@@ -624,12 +700,17 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         setResearchEnded(false);
         setMessageAppeared(false);
 
-        isReconnectingRef.current = true;
+        const controller = new AbortController();
+        reconnectAbortControllerRef.current = controller;
+        const isSuperseded = () => reconnectAbortControllerRef.current !== controller;
 
         try {
           const res = await fetch(`/api/reconnect/${lastMsg.backendId}`, {
             method: 'POST',
+            signal: controller.signal,
           });
+
+          if (isSuperseded()) return;
 
           if (!res.ok) {
             console.warn(`Reconnect returned status ${res.status}`);
@@ -655,38 +736,17 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                 ),
               );
             }
-            setLoading(false);
             return;
           }
 
           if (!res.body) throw new Error('No response body');
 
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder('utf-8');
-
-          let partialChunk = '';
           const messageHandler = getMessageHandler(lastMsg);
-
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            partialChunk += decoder.decode(value, { stream: true });
-
-            try {
-              const lines = partialChunk.split('\n');
-              partialChunk = lines.pop() || '';
-              for (const msg of lines) {
-                if (!msg.trim()) continue;
-                const json = JSON.parse(msg.trim());
-                if (json.type === 'ping') continue;
-                messageHandler(json);
-              }
-            } catch {
-              console.warn('Incomplete JSON, waiting for next chunk...');
-            }
+          await consumeChatEventStream(res.body, messageHandler, controller);
+        } catch (error: any) {
+          if (isSuperseded()) {
+            return;
           }
-        } catch (error) {
           console.warn('Error during reconnect:', error);
           if (chatId) {
             await loadMessages(
@@ -711,8 +771,10 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
             );
           }
         } finally {
-          setLoading(false);
-          isReconnectingRef.current = false;
+          if (reconnectAbortControllerRef.current === controller) {
+            reconnectAbortControllerRef.current = null;
+            setLoading(false);
+          }
         }
       }
     }
@@ -737,6 +799,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    abortReconnect();
     setLoading(false);
     const newId = crypto.randomBytes(20).toString('hex');
     setChatId(newId);
@@ -758,7 +821,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     } else {
       handleSetWaypointId(null);
     }
-  }, [handleSetWaypointId]);
+  }, [abortReconnect, handleSetWaypointId]);
 
   const previousParamsChatIdRef = useRef<string | undefined>(params.chatId);
 
@@ -769,6 +832,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
+      abortReconnect();
+      setLoading(false);
       setChatId(params.chatId);
       setMessages([]);
       chatHistory.current = [];
@@ -781,7 +846,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       previousParamsChatIdRef.current = undefined;
       resetChat();
     }
-  }, [params.chatId, resetChat]);
+  }, [params.chatId, resetChat, abortReconnect]);
 
   useEffect(() => {
     if (
@@ -1076,6 +1141,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
+    abortReconnect();
     setLoading(false);
     setMessages((prev) =>
       prev.map((msg, idx) => {
@@ -1137,6 +1203,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     waypointIdOverride,
   ) => {
     if (loading || !message) return;
+    abortReconnect();
     setLoading(true);
     setResearchEnded(false);
     setMessageAppeared(false);
@@ -1271,46 +1338,12 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (!res.body) throw new Error('No response body');
 
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder('utf-8');
-
-      let buffer = '';
-      const messageHandler = getMessageHandler(newMessage);
-
-      while (true) {
-        const { value, done } = await reader.read();
-        resetWatchdog();
-
-        if (done) {
-          if (buffer.trim()) {
-            try {
-              const json = JSON.parse(buffer.trim());
-              messageHandler(json);
-            } catch (e) {
-              console.warn('Failed to parse trailing chunk:', buffer, e);
-            }
-          }
-          break;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const json = JSON.parse(trimmed);
-            if (json.type === 'ping') {
-              continue;
-            }
-            messageHandler(json);
-          } catch (err) {
-            console.warn('Failed to parse SSE JSON line:', trimmed, err);
-          }
-        }
+      if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
       }
+      const messageHandler = getMessageHandler(newMessage);
+      await consumeChatEventStream(res.body, messageHandler, abortController);
     } catch (err: any) {
       if (err?.name === 'AbortError') {
         console.info('Message generation stream was disconnected or stopped.');
